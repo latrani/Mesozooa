@@ -187,6 +187,12 @@
 
   // Exposed for the trail scrubber (Plan 2).
   export function panTo(id: string) {
+    if (zoom !== ZOOM_DEFAULT) {
+      zoom = ZOOM_DEFAULT;
+      // wait for the SVG to resize back to 1:1 before centering on the target
+      requestAnimationFrame(() => scrollToNode(id));
+      return;
+    }
     scrollToNode(id);
   }
 
@@ -229,8 +235,12 @@
   $effect(() => {
     const d = tipId ? (posOf.get(tipId)?.depth ?? -1) : -1;
     void scrollWidth; // re-run when the scrollable width changes too
-    if (scroller && tipId && d >= 0 && (tipId !== lastTipId || rightInset !== lastInset)) {
-      scrollToNode(tipId);
+    if (scroller && tipId && d >= 0) {
+      if (tipId !== lastTipId) {
+        resetZoom(); // navigation -> back to the default view, which re-centers on the new tip
+      } else if (rightInset !== lastInset) {
+        scrollToNode(tipId);
+      }
     }
     lastTipId = tipId;
     lastInset = rightInset;
