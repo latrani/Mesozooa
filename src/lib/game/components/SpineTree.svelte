@@ -5,6 +5,9 @@
   import { scrollFade } from "../../actions/scrollFade";
   import { createCountWarmth } from "../warmth";
   import { warmthRampColor } from "../warmth-ramp";
+  import {
+    ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, clampZoom, zoomStep, scrollForZoom,
+  } from "../zoom";
   // The node glyphs stay authored in src/assets/*.svg (edit them in a vector tool, re-export,
   // and this picks the change up on rebuild/HMR). ?raw gives the file text; we lift out its
   // viewBox + inner markup to build a recolorable <symbol> below.
@@ -133,6 +136,7 @@
   let vbH = $derived((layout.maxY - layout.minY) * Y_GAP + PAD * 2 + LABEL_PAD);
 
   let scroller = $state<HTMLDivElement | null>(null);
+  let zoom = $state(ZOOM_DEFAULT);
   const px = (x: number) => STEM + PAD + x * X_GAP;
   const py = (y: number) => PAD + LABEL_PAD + (y - layout.minY) * Y_GAP;
 
@@ -186,6 +190,37 @@
     scrollToNode(id);
   }
 
+  // Sole mutator of zoom. Clamps, then keeps `origin` fixed under the pointer. The scroll is set
+  // on the next frame so the SVG has resized to the new zoom before we clamp scrollLeft/Top.
+  function applyZoom(nextZoom: number, origin: { x: number; y: number }) {
+    if (!scroller) return;
+    const oldZoom = zoom;
+    const z = clampZoom(nextZoom);
+    if (z === oldZoom) return;
+    const target = scrollForZoom({
+      origin,
+      oldZoom,
+      newZoom: z,
+      scroll: { left: scroller.scrollLeft, top: scroller.scrollTop },
+      viewport: { w: scroller.clientWidth, h: scroller.clientHeight },
+      content: { w: scrollWidth, h: vbH },
+    });
+    zoom = z;
+    requestAnimationFrame(() => scroller?.scrollTo({ left: target.left, top: target.top }));
+  }
+
+  // Return to the default view: 1:1, re-centered on the current tip.
+  function resetZoom() {
+    zoom = ZOOM_DEFAULT;
+    requestAnimationFrame(() => { if (tipId) scrollToNode(tipId); });
+  }
+
+  // Button helpers zoom around the viewport center.
+  function zoomButton(dir: 1 | -1) {
+    if (!scroller) return;
+    applyZoom(zoomStep(zoom, dir), { x: scroller.clientWidth / 2, y: scroller.clientHeight / 2 });
+  }
+
   // Center the tip whenever it changes, or when rightInset settles (it's 0 until the floating
   // overlay is measured post-mount). The game's tip only ever deepens, so "on change" doesn't
   // regress its forward-follow feel; Explore's tip jumps freely, giving click-to-center.
@@ -207,8 +242,9 @@
   <div class="tree-scroll" bind:this={scroller} use:scrollFade={{ dep: scrollWidth, alwaysLeft: true }}>
     <svg
       class="tree"
-      width={scrollWidth}
-      height={vbH}
+      class:zoomed={zoom !== ZOOM_DEFAULT}
+      width={scrollWidth * zoom}
+      height={vbH * zoom}
       viewBox={`0 0 ${scrollWidth} ${vbH}`}
       role="img"
       aria-label="Cladogram"
@@ -314,6 +350,13 @@
 {:else}
   <p class="tree-empty">{emptyLabel}</p>
 {/if}
+{#if layout.nodes.length}
+  <div class="zoom-controls" role="group" aria-label="Zoom">
+    <button type="button" aria-label="Zoom out" onclick={() => zoomButton(-1)} disabled={zoom <= ZOOM_MIN}>&minus;</button>
+    <button type="button" aria-label="Reset zoom" onclick={resetZoom} disabled={zoom === ZOOM_DEFAULT}>⌂</button>
+    <button type="button" aria-label="Zoom in" onclick={() => zoomButton(1)} disabled={zoom >= ZOOM_MAX}>+</button>
+  </div>
+{/if}
 </div>
 
 <style>
@@ -323,6 +366,9 @@
   .tree-viewport .tree-scroll { flex: 1 1 auto; min-width: 0; }
   .tree-scroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
   .tree { color: var(--ink); display: block; min-width: max-content; }
+  /* min-width:max-content keeps the tree full-size at rest; release it while zoomed so zoom-out
+     can shrink the SVG below its intrinsic content width. */
+  .tree.zoomed { min-width: 0; }
   .edge { stroke: var(--leader); stroke-width: 2; fill: none; }
   .edge.spine {
     stroke: var(--spine); stroke-width: 5;  /* fallback; per-segment stroke set inline (warmth) */
@@ -359,6 +405,15 @@
      colored by warmth). No dot ring — the label outline alone marks the selection. */
   .label-ring { stroke-width: 2; }
   .node.highlight .lbl { font-weight: var(--fw-black); }
+  .zoom-controls {
+    position: absolute; z-index: 5; right: var(--space-4); bottom: var(--space-4);
+    display: flex; gap: 1px;
+  }
+  .zoom-controls button {
+    display: flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; font-size: 1rem; cursor: pointer;
+  }
+  .zoom-controls button:disabled { cursor: default; opacity: 0.5; }
   .tree-empty {
     color: var(--ink-soft); font-size: var(--type-body); padding: var(--space-6);
     flex: 1 1 auto; width: 100%; min-height: 200px;
