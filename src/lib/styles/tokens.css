@@ -1,0 +1,122 @@
+:root {
+  /* GROUND — adobe near-white */
+  --bg-page: #f8f4ea;
+  --bg-surface: #f2ebdb;
+  --bg-sunk: #eaddc7;
+  --hairline: #d8ccb6;
+
+  /* INK — warm dark brown (never pure black) */
+  --ink: #33261a;        /* body/heading — 13.3:1 on bg-page */
+  --ink-soft: #5f5040;   /* secondary — 7.1:1 */
+  --ink-mute: #8a7963;   /* meta/large only — NOT body */
+
+  /* TERRACOTTA placards (dark chrome, cream text) */
+  --placard: #9a4a33;
+  --placard-dp: #7c3b28;
+  --placard-edge: #5f2c1e;
+  --cream: #f7efe0;      /* text on placards — 4.9:1 on --placard */
+  --cream-dim: #f0d8b8;  /* meta on placards — large only */
+
+  /* TURQUOISE — hero identity (spine, brand, gem end of ramp) */
+  --turq: #0d9aa8;
+  --turq-dp: #0a7a86;
+
+  /* MAHOGANY — primary action (NOT blue) */
+  --mahogany: #7a3a26;   /* cream text 7.5:1 */
+  --mahogany-hi: #8f4630;
+
+  /* SAND accents */
+  --sand-200: #e6be93;
+  --sand-400: #c8a578;
+
+  /* WARMTH RAMP — ore (cold/far) -> turquoise gem (hot/near) */
+  --warm-0: #7a6a4c;
+  --warm-1: #8f7f4a;
+  --warm-2: #7f9257;
+  --warm-3: #4f9f8a;
+  --warm-4: #1aa39f;
+  --warm-5: #0d9aa8;
+
+  /* ============================================================
+     SEMANTIC LAYER — roles map to primitives above; components
+     read THESE, not the raw colors. Recolor a region by editing
+     its one *-surface line here (at :root). The -dp/-edge tokens
+     DERIVE via color-mix, so the whole placard re-tones from one
+     edit. (Derivation reproduces the sampled terracotta within
+     rounding: mix 20% -> #7b3b29 ≈ sampled #7c3b28; 40% -> #5c2c1f
+     ≈ #5f2c1e. Verified in a render probe.)
+     RULE: derived tokens MUST live here at :root beside their
+     surface token — color-mix does NOT re-cascade if a *-surface
+     is overridden in a nested scope, only at :root. Recolor here.
+     ============================================================ */
+
+  /* Trail placard */
+  --trail-surface: var(--placard);
+  --trail-dp:   color-mix(in srgb, var(--trail-surface), #000 20%);
+  --trail-edge: color-mix(in srgb, var(--trail-surface), #000 40%);
+  --trail-text: var(--cream);
+  --trail-text-dim: var(--cream-dim);
+
+  /* Specimen placard (+ Explore's NodeDetail, same role) */
+  --specimen-surface: var(--placard);
+  --specimen-dp:   color-mix(in srgb, var(--specimen-surface), #000 20%);
+  --specimen-edge: color-mix(in srgb, var(--specimen-surface), #000 40%);
+  --specimen-text: var(--cream);
+  --specimen-text-dim: var(--cream-dim);
+
+  /* Primary action — turquoise hero (user-directed; overrides the earlier
+     mahogany-CTA spec note). Gradient runs light turq -> deep turq. */
+  --action-primary: var(--turq-dp);
+  --action-primary-hi: var(--turq);
+  --action-primary-text: var(--cream);
+  --action-primary-edge: color-mix(in srgb, var(--turq-dp), #000 30%);
+
+  /* Secondary action — surface-adaptive ghost. Same form on every surface;
+     only the ink/outline color follows the surface. Defaults to mahogany for
+     the light ground; dark placards re-point this to cream. */
+  --btn-secondary-ink: var(--mahogany);
+
+  /* Spine (hero) + tree marks */
+  --spine: var(--turq);
+  --node-frontier: var(--turq-dp);
+  --node-context: var(--ink-mute);
+  /* Genus outside the playable pool (Explore only) — faded enough to skip when scanning for
+     something to guess, not so faded it reads as disabled. Lands on the off-spine clade color
+     by design; genus-vs-clade is carried by the dot, not the label fill. */
+  --node-nonplayable: var(--ink-mute);
+  --leader: var(--hairline);
+  --gem-glow: 0 0 8px rgba(13,154,168,.55);
+
+  /* Active-tab / focus accent */
+  --accent: var(--turq);
+
+  /* TYPE — base 24px, +50% scale (spec §2.2) */
+  --type-display: 2rem;
+  --type-h: 1.25rem;
+  --type-body: 1.05rem;
+  --type-label: 0.92rem;
+  --type-meta: 0.78rem;
+  --type-eyebrow: 0.72rem;
+  --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700; --fw-black: 800;
+
+  /* FONTS — Hanken Grotesk (variable, full weight range) for body/UI; Arsenal 700 for
+     headings/wordmark (display character; only its bold weight is loaded). */
+  --font-body: "Hanken Grotesk Variable", system-ui, sans-serif;
+  --font-head: "Arsenal", var(--font-body);
+  /* handwritten hand — curator's-note slips on the specimen mount */
+  --font-hand: "Architects Daughter", ui-rounded, cursive;
+
+  /* SPACE / EDGES / MATERIAL */
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+  --space-4: 1rem; --space-5: 1.5rem; --space-6: 2.5rem; --space-7: 4rem;
+  --radius-card: 8px; --radius-pill: 999px;
+  --placard-border: 1px solid var(--placard-edge);
+  --shadow-lift: 0 2px 4px rgba(51,38,26,.12), 0 8px 22px rgba(51,38,26,.10);
+  --shadow-placard: 0 2px 3px rgba(51,38,26,.18), 0 10px 26px rgba(95,44,30,.20);
+  --inset-well: inset 0 2px 4px rgba(51,38,26,.10);
+  --inset-hi: inset 0 1px 0 rgba(255,255,255,.12);
+
+  /* MOTION */
+  --ease: cubic-bezier(.2,.6,.2,1);
+  --dur-fast: 120ms; --dur: 220ms; --dur-slow: 420ms;
+}

@@ -1,0 +1,10 @@
+node_modules
+dist
+data/raw-taxa.json
+data/raw-pbdb.json
+screenshots/
+moodboard/
+.DS_Store
+.claude/settings.local.json
+public/images/
+images-src/

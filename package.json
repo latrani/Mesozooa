@@ -1,0 +1,39 @@
+{
+  "name": "mesozooa",
+  "private": true,
+  "description": "A dinosaurs-only, Metazooa-style cladistics guessing game plus a walkable dinosaur cladogram. Static Svelte 5 + TypeScript SPA.",
+  "author": "Morgan Nichols",
+  "license": "MIT",
+  "homepage": "https://mesozooa.latrani.net/",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "fetch": "npm run fetch:wikidata && npm run fetch:pbdb && npm run fetch:images && npm run process:images && npm run build:data",
+    "fetch:wikidata": "tsx scripts/fetch-wikidata.ts",
+    "fetch:pbdb": "tsx scripts/fetch-pbdb.ts",
+    "fetch:images": "tsx scripts/fetch-images.ts",
+    "process:images": "tsx scripts/process-images.ts",
+    "build:data": "tsx scripts/build-tree.ts"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@tsconfig/svelte": "^5.0.4",
+    "@types/node": "^26.1.1",
+    "playwright": "^1.61.1",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "@fontsource-variable/hanken-grotesk": "^5.2.8",
+    "@fontsource/architects-daughter": "^5.2.7",
+    "@fontsource/arsenal": "^5.2.7"
+  }
+}

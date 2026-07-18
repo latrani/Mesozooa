@@ -1,0 +1,61 @@
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { height: 100%; }
+/* Desktop: lock the app to the viewport and scroll WITHIN regions (tree, guess list),
+   so the page itself never scrolls and interactive elements stay put. Narrow keeps normal
+   document flow (the game's own narrow layout pegs its own input). */
+@media (min-width: 641px) {
+  #app { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  #app > .app-header { flex: 0 0 auto; }
+  #app > main { flex: 1 1 auto; min-height: 0; }
+  #app > .app-footer { flex: 0 0 auto; }
+}
+body {
+  margin: 0;
+  background:
+    radial-gradient(140% 100% at 12% 8%, #fbf8f0 0%, var(--bg-page) 55%) fixed;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 24px;            /* +50% base — spec §2.2 (locked) */
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font: inherit; }
+h1, h2, p, ul { margin: 0; }
+ul { list-style: none; padding: 0; }
+a { color: var(--mahogany); }
+
+/* ── Shared action buttons ───────────────────────────────────────────
+   One source of truth for the two button roles. Primary = turquoise hero
+   fill. Secondary = surface-adaptive ghost: identical form everywhere, ink
+   follows --btn-secondary-ink (mahogany on light ground; dark placards
+   re-point it to cream). Both are pills with matched geometry. */
+.btn-primary, .btn-secondary {
+  font-size: var(--type-body); border-radius: var(--radius-pill);
+  padding: .75rem 1.25rem; cursor: pointer; text-align: center;
+  transition: filter var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+.btn-primary {
+  font-weight: var(--fw-black); color: var(--action-primary-text);
+  background: linear-gradient(var(--action-primary-hi), var(--action-primary));
+  border: 1px solid var(--action-primary-edge);
+  box-shadow: var(--shadow-lift), var(--inset-hi);
+}
+.btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
+.btn-secondary {
+  font-weight: var(--fw-bold); color: var(--btn-secondary-ink);
+  background: transparent; border: 2px solid var(--btn-secondary-ink);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--btn-secondary-ink) 12%, transparent);
+}
+.btn-primary:disabled, .btn-secondary:disabled { opacity: .5; cursor: default; }
+.eyebrow {
+  font-size: var(--type-eyebrow); font-weight: var(--fw-bold);
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-mute);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .001ms !important; animation-duration: .001ms !important; }
+}
