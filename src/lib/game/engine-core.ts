@@ -151,6 +151,12 @@ export function revealedNodeIds(state: GameState, store: TreeStore): Set<string>
     if (g.kind === "leafHint") continue; // leaf hint reveals no tree node
     for (const id of store.pathToRoot(g.guessId)) ids.add(id);
   }
+  // Once the round is over, the answer belongs on the tree: on a win it's already in via the
+  // winning guess; on a loss the target was never guessed, so add its lineage explicitly.
+  // Guarded on the ended state so a mid-play hint/clue never spoils the target.
+  if (state.status !== "playing") {
+    for (const id of store.pathToRoot(state.target)) ids.add(id);
+  }
   return ids;
 }
 

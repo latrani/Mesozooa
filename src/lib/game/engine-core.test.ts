@@ -254,6 +254,16 @@ describe("clue press does not spoil the target", () => {
   });
 });
 
+describe("revealedNodeIds reveals the answer once the round ends", () => {
+  it("adds the target's lineage on a loss, but not while still playing", () => {
+    const playing = applyGuess(practice("TC"), "TR", store, warmth); // wrong guess, still playing
+    expect(revealedNodeIds(playing, store).has("TC")).toBe(false); // not spoiled mid-play
+    const lost = applyForfeit(playing);
+    expect(lost.status).toBe("lost");
+    expect(revealedNodeIds(lost, store).has("TC")).toBe(true); // answer revealed on the tree
+  });
+});
+
 describe("newRoundState", () => {
   it("creates a playing practice state", () => {
     const s = newRoundState(store, () => 0);

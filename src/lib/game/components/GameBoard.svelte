@@ -55,7 +55,14 @@
   // Before the first guess there's no warmest node, so show the bare root (Dinosauria) sitting
   // ore-colored on the axis rather than a placeholder message. Once a guess lands, warmestId +
   // revealed drive the spine as usual (revealed always includes the root via pathToRoot).
-  let treeTipId = $derived(store.warmestId ?? treeStore.data.rootId);
+  // On a loss the target was never guessed, so make the now-revealed answer lineage the spine
+  // (revealedNodeIds adds it on end state) and center on it; otherwise follow the warmest guess,
+  // or the bare root before any guess.
+  let treeTipId = $derived(
+    store.state.status === "lost"
+      ? store.state.target
+      : (store.warmestId ?? treeStore.data.rootId),
+  );
   let treeRevealed = $derived(
     store.warmestId ? store.revealed : new Set([treeStore.data.rootId]),
   );
