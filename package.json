@@ -5,6 +5,11 @@
   "author": "Morgan Nichols",
   "license": "MIT",
   "homepage": "https://mesozooa.latrani.net/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/latrani/Mesozooa.git"
+  },
+  "bugs": "https://github.com/latrani/Mesozooa/issues",
   "type": "module",
   "scripts": {
     "dev": "vite",
