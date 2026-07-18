@@ -7,7 +7,7 @@ import { AVES, DINOSAURIA, NEORNITHES } from "../src/lib/tree/types";
 import type { GenusAttribute, GenusAttributes } from "../src/lib/attributes";
 import type { ImageCredits } from "../src/lib/image-credits";
 import { enrichAge, isMesozoic, MESOZOIC_END_MA } from "../src/lib/geologic-time";
-import { findConflicts, type NameConflict } from "../src/lib/tree/names";
+import { findConflicts, findDecisionCollisions, type NameConflict } from "../src/lib/tree/names";
 import { NAME_DECISIONS } from "../src/lib/tree/name-decisions";
 
 function renderReport(conflicts: NameConflict[]): string {
@@ -90,6 +90,16 @@ async function main() {
   if (conflicts.length > 0) {
     console.error(`\n✗ ${conflicts.length} undecided name disagreement(s). See data/name-disagreements.md`);
     console.error("  Add each Q-id to NAME_DECISIONS (src/lib/tree/name-decisions.ts) and rebuild.");
+    process.exit(1);
+  }
+
+  // Decision-collision gate: a NAME_DECISIONS entry whose name exactly matches a different node
+  // would silently MERGE the two in dedupe, collapsing a real clade rung. Fail closed.
+  const collisions = findDecisionCollisions(raws, NAME_DECISIONS);
+  if (collisions.length > 0) {
+    console.error(`\n✗ ${collisions.length} NAME_DECISIONS collision(s) — each would merge a distinct clade:`);
+    for (const c of collisions) console.error(`  decision ${c.id} -> "${c.name}" would merge into ${c.mergesInto.join(", ")}`);
+    console.error("  Pick a non-colliding name, or use the forced-merge-target mechanism if a merge IS intended.");
     process.exit(1);
   }
 

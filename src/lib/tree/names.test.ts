@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nameCandidates, resolveName, findConflicts } from "./names";
+import { nameCandidates, resolveName, findConflicts, findDecisionCollisions } from "./names";
 import type { RawTaxon } from "./types";
 
 const raw = (over: Partial<RawTaxon> & { id: string }): RawTaxon => ({
@@ -56,5 +56,55 @@ describe("findConflicts", () => {
   it("does not flag a conflict that has a decision", () => {
     const raws = [raw({ id: "Q18510948", name: "Carnottaurus", taxonName: "Carnotaurus" })];
     expect(findConflicts(raws, { Q18510948: { name: "Carnotaurus" } })).toEqual([]);
+  });
+});
+
+describe("findDecisionCollisions", () => {
+  it("flags a decision that picks an enwiki-only name colliding with a distinct node", () => {
+    // The caught draft: Q132824's en+P225 both say "Hesperornithiformes"; renaming it to its
+    // enwiki candidate "Hesperornithes" collides with the real, DISTINCT Hesperornithes node and
+    // collapses a clade rung via dedupe. The enwiki candidate must NOT clear the guard.
+    const raws = [
+      raw({ id: "Q132824", name: "Hesperornithiformes", taxonName: "Hesperornithiformes", enwikiTitle: "Hesperornithes" }),
+      raw({ id: "Q21446301", name: "Hesperornithes", taxonName: "Hesperornithes" }),
+    ];
+    expect(findDecisionCollisions(raws, { Q132824: { name: "Hesperornithes" } })).toEqual([
+      { id: "Q132824", name: "Hesperornithes", mergesInto: ["Q21446301"] },
+    ]);
+  });
+
+  it("does NOT flag a lowercase Wikidata twin capped to merge into the real node (intended)", () => {
+    // The real pattern (13 of the current decisions): a lowercase P225 ghost (Q124775780
+    // "psittacosaurus") is decided UP to "Psittacosaurus" so dedupe merges it into the real,
+    // already-capitalized node (Q132672). The decision only re-cases the node's OWN name, so it
+    // must not be flagged even though the resolved names then match exactly.
+    const raws = [
+      raw({ id: "Q132672", name: "Psittacosaurus", taxonName: "Psittacosaurus" }),
+      raw({ id: "Q124775780", name: "psittacosaurus", taxonName: "psittacosaurus" }),
+    ];
+    expect(findDecisionCollisions(raws, { Q124775780: { name: "Psittacosaurus" } })).toEqual([]);
+  });
+
+  it("returns [] when a decision's name is unique among nodes", () => {
+    const raws = [
+      raw({ id: "Q18510948", name: "Carnottaurus", taxonName: "Carnotaurus" }),
+      raw({ id: "Q1", name: "Allosaurus", taxonName: "Allosaurus" }),
+    ];
+    expect(findDecisionCollisions(raws, { Q18510948: { name: "Carnotaurus" } })).toEqual([]);
+  });
+
+  it("flags two decisions that resolve to the same name (mutual merge)", () => {
+    const raws = [
+      raw({ id: "Q10", name: "Aname", taxonName: "Aname" }),
+      raw({ id: "Q20", name: "Bname", taxonName: "Bname" }),
+    ];
+    const collisions = findDecisionCollisions(raws, {
+      Q10: { name: "Samename" },
+      Q20: { name: "Samename" },
+    });
+    expect(collisions).toEqual([
+      { id: "Q10", name: "Samename", mergesInto: ["Q20"] },
+      { id: "Q20", name: "Samename", mergesInto: ["Q10"] },
+    ]);
   });
 });
