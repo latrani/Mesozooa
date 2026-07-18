@@ -62,18 +62,20 @@ durable code map, not a changelog.
 
 ## Open threads
 
-- **Taxonomy source — biggest open design question; brainstorm before coding.** Research in
-  `docs/superpowers/specs/2026-07-17-taxonomy-source-research.md`. Core: **Wikidata's `parent taxon`
-  is not a cladogram**, and we're already asserting its phylogeny silently. The question is whether
-  PBDB becomes a *structural* second opinion or an *advisory/report-only* one (via the fail-closed
-  `NAME_DECISIONS` pattern already in the repo). This one decision drives three symptoms:
-  Archaeopteryx being a dead-equidistant guess, genus synonym merges, and PBDB homonym mis-dating.
-  Cheap first step (no tree change): one PBDB taxonomy fetch + one diff to size the disagreement.
-- **Deferred polish** in `docs/superpowers/deferred-findings.md` — tree scroll-centering,
-  deep-lineage trail height, a11y keyboard nav for the SVG tree nodes, and the dev-only `npm audit`
-  cleanup.
-- **Not happening — a dark theme.** It fights the warm adobe/terracotta material; sun-baked clay has
-  no night mode. The two-layer token split is a semantics preference, NOT theming groundwork.
+Work items live in GitHub issues now (see **Working agreements → Tracking deferred work**). The
+durable *context* stays here:
+
+- **Taxonomy source — biggest open design question; brainstorm before coding** (epic
+  [#13](https://github.com/latrani/Mesozooa/issues/13); research in
+  `docs/superpowers/specs/2026-07-17-taxonomy-source-research.md`). The load-bearing fact:
+  **Wikidata's `parent taxon` is not a cladogram**, and we're already asserting its phylogeny
+  silently. The decision is whether PBDB becomes a *structural* second opinion or an
+  *advisory/report-only* one (via the fail-closed `NAME_DECISIONS` pattern). One decision drives
+  three symptoms — Archaeopteryx as a dead-equidistant guess, genus synonym merges, PBDB homonym
+  mis-dating. Cheap first step (no tree change): one PBDB taxonomy fetch + one diff to size it.
+- **Not happening — a dark theme** (closed [#26](https://github.com/latrani/Mesozooa/issues/26)).
+  It fights the warm adobe/terracotta material; sun-baked clay has no night mode. The two-layer
+  token split is a semantics preference, NOT theming groundwork.
 
 ## Working agreements
 
@@ -85,8 +87,14 @@ durable code map, not a changelog.
 - **`verbatimModuleSyntax` is ON.** Type-only imports MUST use `import type`. Vitest does
   NOT catch violations — run `npx tsc --noEmit` (and `npx svelte-check` for `.svelte`) before
   committing. Pure logic is TDD-tested; Svelte components validated by build + running.
-- **Deferred review findings** are tracked in `docs/superpowers/deferred-findings.md` — add
-  newly-deferred items there (the SDD `progress.md` ledger is scratch).
+- **Tracking deferred work — file GitHub issues, NOT doc entries.** When a review defers a finding,
+  a design problem is parked, or a tradeoff is accepted, open an issue on `latrani/Mesozooa`. Label
+  meanings: `epic` (multi-symptom design question, umbrella), `tech-debt` (a deferred fix / check /
+  test gap), `by-design` (accepted-as-correct — file it **closed** so the rationale is searchable and
+  not re-flagged), `wontfix` (a declined problem). Delivery follows the usual rule: commit fixes with
+  `Closes #N` but leave unpushed (Indi pushes). The retired `docs/superpowers/deferred-findings.md` is
+  now history only (Resolved log + a short accepted-micro-tradeoffs appendix); the SDD `progress.md`
+  ledger is still scratch.
 - **`build:data` regenerates ALL committed data from the gitignored, machine-local raws — so a
   stale/incomplete raw pull silently DEGRADES the committed output.** This bit us once (2026-07-17:
   a Jul-14 `raw-pbdb.json` predating the state/formation harvest wiped clue location detail when
