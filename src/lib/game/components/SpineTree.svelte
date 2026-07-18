@@ -8,6 +8,7 @@
   import {
     ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, clampZoom, zoomStep, scrollForZoom,
   } from "../zoom";
+  import { PinchGesture } from "@use-gesture/vanilla";
   // The node glyphs stay authored in src/assets/*.svg (edit them in a vector tool, re-export,
   // and this picks the change up on rebuild/HMR). ?raw gives the file text; we lift out its
   // viewBox + inner markup to build a recolorable <symbol> below.
@@ -245,6 +246,31 @@
     lastTipId = tipId;
     lastInset = rightInset;
   });
+
+  // Touch two-finger pinch + trackpad ctrl+wheel, unified. Feeds the single applyZoom entry
+  // point. `from` starts each gesture at the current zoom; scaleBounds keeps the accumulated
+  // scale in range; passive:false lets it preventDefault the ctrl+wheel so the PAGE never zooms.
+  // Native one-finger scrolling (touch-action: pan-x pan-y on .tree-scroll) is untouched.
+  $effect(() => {
+    if (!scroller) return;
+    const el = scroller;
+    const gesture = new PinchGesture(
+      el,
+      (state) => {
+        const rect = el.getBoundingClientRect();
+        applyZoom(state.offset[0], { x: state.origin[0] - rect.left, y: state.origin[1] - rect.top });
+      },
+      {
+        scaleBounds: { min: ZOOM_MIN, max: ZOOM_MAX },
+        from: () => [zoom, 0] as [number, number],
+        rubberband: false,
+        eventOptions: { passive: false },
+      },
+    );
+    const stopGesture = (e: Event) => e.preventDefault();
+    el.addEventListener("gesturestart", stopGesture);
+    return () => { gesture.destroy(); el.removeEventListener("gesturestart", stopGesture); };
+  });
 </script>
 
 <div class="tree-viewport">
@@ -374,7 +400,8 @@
      it. In the base flex layout it takes the role .tree-scroll had. */
   .tree-viewport { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
   .tree-viewport .tree-scroll { flex: 1 1 auto; min-width: 0; }
-  .tree-scroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+  /* one-finger drag stays native scroll; two-finger goes to the pinch handler */
+  .tree-scroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; touch-action: pan-x pan-y; }
   .tree { color: var(--ink); display: block; min-width: max-content; }
   /* min-width:max-content keeps the tree full-size at rest; release it while zoomed so zoom-out
      can shrink the SVG below its intrinsic content width. */
