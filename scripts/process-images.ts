@@ -14,7 +14,11 @@ function encodeWebp(srcPath: string, destPath: string, opts: { maxWidth: number;
   // sibling `webpinfo` isn't guaranteed; use ImageMagick-free `sips` (macOS, already used in-repo).
   const widthOut = execFileSync("sips", ["-g", "pixelWidth", srcPath], { encoding: "utf8" });
   const m = widthOut.match(/pixelWidth:\s*(\d+)/);
-  const srcWidth = m ? Number(m[1]) : 0;
+  // A failed width read must NOT fall through to srcWidth=0 (which skips the -resize guard and
+  // ships the image un-capped). Throw instead — main() counts it as failed and warns, and we
+  // never emit a full-resolution WebP by accident.
+  if (!m) throw new Error(`sips returned no pixelWidth for ${srcPath} — refusing to encode un-capped`);
+  const srcWidth = Number(m[1]);
 
   // Build cwebp args for a given input, applying the never-upscale guard (cwebp -resize upscales
   // unconditionally, so we only pass it when the source is actually wider than maxWidth).
@@ -42,7 +46,11 @@ function encodeWebp(srcPath: string, destPath: string, opts: { maxWidth: number;
 
 function dirBytes(dir: string): number {
   if (!existsSync(dir)) return 0;
-  return readdirSync(dir).reduce((sum, f) => sum + statSync(`${dir}/${f}`).size, 0);
+  // Filter dotfiles (e.g. .DS_Store) to match the processing loop's source filter, so the
+  // reported originals size / ratio isn't inflated by files we never encode.
+  return readdirSync(dir)
+    .filter((f) => !f.startsWith("."))
+    .reduce((sum, f) => sum + statSync(`${dir}/${f}`).size, 0);
 }
 
 function fmtMB(n: number): string {

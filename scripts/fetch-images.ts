@@ -190,7 +190,18 @@ async function main() {
     }
   }
 
-  await writeFile(CREDITS_PATH, JSON.stringify(credits, null, 0));
+  // Wrap the final flush: a disk-write throw here would otherwise crash the run (and skip the
+  // report) after losing up to 24 credit entries gathered since the last periodic flush. Log it
+  // instead — a re-run's presence-skip recovers those entries anyway.
+  try {
+    await writeFile(CREDITS_PATH, JSON.stringify(credits, null, 0));
+  } catch (e) {
+    console.error(
+      `final credits flush to ${CREDITS_PATH} failed (up to 24 entries since the last periodic ` +
+        `flush not persisted; a re-run recovers them via presence-skip):`,
+      (e as Error).message,
+    );
+  }
   await mkdir("docs/superpowers", { recursive: true });
   await writeFile(REPORT_PATH, renderReport(credits, nameById));
 
