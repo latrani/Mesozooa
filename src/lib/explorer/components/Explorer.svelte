@@ -97,15 +97,17 @@
   }
   .recent .link:hover { text-decoration-color: var(--turq); color: var(--turq-dp); }
   .middle { display: flex; gap: var(--space-6); align-items: flex-start; min-height: 0; }
-  .middle :global(.tree-scroll) { flex: 1 1 auto; min-width: 0; }
+  .middle :global(.tree-viewport) { flex: 1 1 auto; min-width: 0; }
 
   @media (min-width: 641px) {
     /* fill the viewport slot; tree is an edge-to-edge canvas, detail floats over it, search
        is a pegged placard mirroring the game's guess area. */
     .explorer { flex: 1 1 auto; min-height: 0; gap: 0; padding: 0; }
     .middle { position: relative; display: block; flex: 1 1 auto; min-height: 0; }
+    .middle :global(.tree-viewport) { position: absolute; inset: 0; }
     .middle :global(.tree-scroll) {
-      position: absolute; inset: 0; display: flex; align-items: safe center; overflow: auto;
+      position: absolute; inset: 0; display: flex;
+      align-items: safe center; justify-content: safe center; overflow: auto;
     }
     .middle :global(.tree) { flex: none; }
     .detail-float {
@@ -123,6 +125,7 @@
   @media (max-width: 640px) {
     .explorer { padding-top: var(--space-4); }
     .middle { flex-direction: column; }
+    .middle :global(.tree-viewport) { width: 100%; }
     .middle :global(.tree-scroll) { width: 100%; }
     .bottom { position: sticky; bottom: 0; background: var(--bg-page); padding-bottom: var(--space-3); z-index: 2; }
   }

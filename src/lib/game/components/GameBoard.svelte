@@ -175,7 +175,7 @@
   /* Structural only — three stacked regions; the middle splits tree | specimen. */
   .game { display: flex; flex-direction: column; gap: var(--space-5); padding: 0 var(--space-6) var(--space-6); }
   .middle { display: flex; gap: var(--space-6); align-items: stretch; min-height: 0; }
-  .middle :global(.tree-scroll) { flex: 1 1 auto; min-width: 0; }
+  .middle :global(.tree-viewport) { flex: 1 1 auto; min-width: 0; }
   .bottom { display: flex; flex-direction: column; gap: var(--space-4); }
   .input-row { display: flex; gap: var(--space-3); align-items: center; }
 
@@ -202,8 +202,10 @@
     /* tree scroller fills the canvas. Horizontal stays start-aligned + scrollable (deep trees
        overflow right; the pan sets scrollLeft). Vertical uses `safe center`: centered when the
        tree fits, falls back to top-aligned scroll when it's taller — no clipping either way. */
+    .middle :global(.tree-viewport) { position: absolute; inset: 0; }
     .middle :global(.tree-scroll) {
-      position: absolute; inset: 0; display: flex; align-items: safe center; overflow: auto;
+      position: absolute; inset: 0; display: flex;
+      align-items: safe center; justify-content: safe center; overflow: auto;
     }
     .middle :global(.tree) { flex: none; }
     .specimen-float {
@@ -241,6 +243,7 @@
        .middle becomes a column so the specimen naturally stacks under the tree; the SVG's own
        min-width:max-content (Task 1) keeps the tree full-size and horizontally scrollable. */
     .middle { flex-direction: column; }
+    .middle :global(.tree-viewport) { width: 100%; }
     .middle :global(.tree-scroll) { width: 100%; }
     .input-row { position: sticky; bottom: 0; background: var(--bg-page); padding-bottom: var(--space-3); z-index: 2; }
   }

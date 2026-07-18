@@ -202,6 +202,7 @@
   });
 </script>
 
+<div class="tree-viewport">
 {#if layout.nodes.length}
   <div class="tree-scroll" bind:this={scroller} use:scrollFade={{ dep: scrollWidth, alwaysLeft: true }}>
     <svg
@@ -313,8 +314,13 @@
 {:else}
   <p class="tree-empty">{emptyLabel}</p>
 {/if}
+</div>
 
 <style>
+  /* Positioned viewport so the zoom controls can float over the canvas without scrolling with
+     it. In the base flex layout it takes the role .tree-scroll had. */
+  .tree-viewport { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
+  .tree-viewport .tree-scroll { flex: 1 1 auto; min-width: 0; }
   .tree-scroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
   .tree { color: var(--ink); display: block; min-width: max-content; }
   .edge { stroke: var(--leader); stroke-width: 2; fill: none; }
