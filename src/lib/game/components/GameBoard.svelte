@@ -52,6 +52,14 @@
     return map;
   });
 
+  // Before the first guess there's no warmest node, so show the bare root (Dinosauria) sitting
+  // ore-colored on the axis rather than a placeholder message. Once a guess lands, warmestId +
+  // revealed drive the spine as usual (revealed always includes the root via pathToRoot).
+  let treeTipId = $derived(store.warmestId ?? treeStore.data.rootId);
+  let treeRevealed = $derived(
+    store.warmestId ? store.revealed : new Set([treeStore.data.rootId]),
+  );
+
   // Always show a move counter; max is null in Practice (unbounded) -> rendered as a bare count.
   let budget = $derived({
     used: store.movesUsed ?? store.state.guesses.length,
@@ -96,15 +104,14 @@
   <div class="middle">
     <SpineTree
       bind:this={spine}
-      revealed={store.revealed}
-      tipId={store.warmestId}
+      revealed={treeRevealed}
+      tipId={treeTipId}
       {guessWarmth}
       {highlightId}
       {rightInset}
       showCounts={false}
       onnodeselect={ended && onexplore ? (id) => onexplore(id) : undefined}
       linkLabels={ended}
-      emptyLabel="Make a guess to start revealing the tree."
     />
     <div class="specimen-float" bind:clientWidth={specimenW}>
       <SpecimenPlacard view={specimenView(store.state, treeStore)}>
