@@ -3,7 +3,6 @@
   import { explorer } from "../explorerStore.svelte";
   import { searchSource, pathPositions } from "../explorer-core";
   import SpineTree from "../../game/components/SpineTree.svelte";
-  import { warmthRampColor } from "../../game/warmth-ramp";
   import { displayName } from "../../game/displayName";
   import SearchBox from "../../game/components/SearchBox.svelte";
   import SpecimenPlacard from "../../game/components/SpecimenPlacard.svelte";
@@ -24,9 +23,10 @@
     else explorer.focus(id);
   }
 
-  // Color the root->selection lineage 0..1; everything off it takes the structural default.
+  // Explore highlights the selected path only (issue #6): on-path (spine) nodes turquoise,
+  // everything else ore. Intentionally diverges from game mode's warmth coloring.
   let pathPos = $derived(pathPositions(treeStore, explorer.highlightId));
-  const nodeColor = (id: string) => (pathPos.has(id) ? warmthRampColor(pathPos.get(id)!) : null);
+  const nodeColor = (id: string) => (pathPos.has(id) ? "var(--turq)" : "var(--placard-edge)");
 
   // Match the game board: measure the floating detail card so the tree centers into the area
   // left of it, with no inset on narrow (card stacks in flow).
