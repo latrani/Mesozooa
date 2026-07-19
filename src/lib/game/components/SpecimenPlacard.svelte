@@ -30,7 +30,7 @@
       {#each view.fields as f (f.label)}
         <div class="field">
           <dt>{f.label}</dt>
-          <dd>{f.value ?? "? ? ?"}{#if f.detail}<span class="detail">{f.detail}</span>{/if}</dd>
+          <dd class:placeholder={f.value == null}>{f.value ?? "? ? ?"}{#if f.detail}<span class="detail">{f.detail}</span>{/if}</dd>
         </div>
       {/each}
     </dl>
@@ -70,6 +70,9 @@
   .field dt { display: inline; font-weight: var(--fw-bold); }
   .field dt::after { content: ": "; }
   .field dd { display: inline; margin: 0; }
+  /* placeholder clue rows during play — quieter + smaller so the un-identified plaque reads calm
+     (the museum "coming soon" conceit), without shrinking the identified/solved rows. */
+  .field dd.placeholder { opacity: .5; font-size: var(--type-label); font-weight: var(--fw-medium); }
   .field .detail { display: block; opacity: .72; font-size: var(--type-label); }
   .note { color: var(--specimen-text-dim); font-size: var(--type-body); }
   .wiki { font-weight: var(--fw-semibold); font-size: var(--type-label); align-self: flex-start; color: var(--sand-200); }
