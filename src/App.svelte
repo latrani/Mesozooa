@@ -70,8 +70,8 @@
   <span class="tagline">Find today's dinosaur!</span>
   <HowToPlay />
   <nav class="modes">
-    <button type="button" class:active={nav.tab === "daily"} onclick={() => nav.set("daily")}>Daily{#if hasProgress(daily.state)} — in progress{/if}</button>
-    <button type="button" class:active={nav.tab === "practice"} onclick={() => nav.set("practice")}>Practice{#if hasProgress(game.state)} — in progress{/if}</button>
+    <button type="button" class:active={nav.tab === "daily"} onclick={() => nav.set("daily")}>Daily{#if hasProgress(daily.state)}{" — in progress"}{/if}</button>
+    <button type="button" class:active={nav.tab === "practice"} onclick={() => nav.set("practice")}>Practice{#if hasProgress(game.state)}{" — in progress"}{/if}</button>
     <button type="button" class:active={nav.tab === "explore"} onclick={() => nav.set("explore")}>Explore</button>
   </nav>
 </header>
