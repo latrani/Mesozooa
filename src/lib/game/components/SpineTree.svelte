@@ -323,7 +323,6 @@
   <div class="tree-scroll" bind:this={scroller} use:scrollFade={{ dep: scrollWidth, alwaysLeft: true }}>
     <svg
       class="tree"
-      class:zoomed={zoom !== ZOOM_DEFAULT}
       width={contentWidth * zoom}
       height={vbH * zoom}
       viewBox={`0 0 ${contentWidth} ${vbH}`}
@@ -450,12 +449,14 @@
   .tree-viewport .tree-scroll { flex: 1 1 auto; min-width: 0; }
   /* one-finger drag stays native scroll; two-finger goes to the pinch handler */
   .tree-scroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; touch-action: pan-x pan-y; }
-  .tree { color: var(--ink); display: block; min-width: max-content; }
+  /* flex:none so the SVG's width attribute is always its used width — it neither grows nor
+     shrinks to the flex container. Without this the SVG (a flex item) shrinks to fit: at rest
+     that's masked, but a zoomed-IN tree wider than the viewport would collapse to container
+     width, killing horizontal scroll and snapping scrollLeft to 0 (the Explore zoom "jump").
+     flex:none holds the scaled width at every zoom level, in AND out. */
+  .tree { color: var(--ink); display: block; flex: none; }
   /* fixed-px specimen-clearance spacer; flex:none holds its width regardless of zoom (issue #32) */
   .runway { flex: none; align-self: stretch; }
-  /* min-width:max-content keeps the tree full-size at rest; release it while zoomed so zoom-out
-     can shrink the SVG below its intrinsic content width. */
-  .tree.zoomed { min-width: 0; }
   .edge { stroke: var(--leader); stroke-width: 2; fill: none; }
   .edge.spine {
     stroke: var(--spine); stroke-width: 5;  /* fallback; per-segment stroke set inline (warmth) */
