@@ -209,6 +209,33 @@ async function main() {
     }
   }
 
+  // GUARD 3 (monotypy layout/hint equivalence, issue #15): the Explore layout straightens on
+  // STRUCTURAL single-child, but skip-through hints walk on GENUS-COUNT narrowing. They agree only
+  // while no MULTI-child clade has a zero-genus child — such a node stays splayed in the layout yet
+  // a hint skips it, so the tree picture and the hint reveal disagree. Can't arise from today's
+  // data, but a future harvest could introduce it; fail the build here rather than re-checking by
+  // hand. Fix if it fires: unify both surfaces on the count test (straighten when the count equals
+  // the sole genus-bearing child's), then this guard can relax to that stronger invariant.
+  {
+    const offenders: string[] = [];
+    for (const n of Object.values(tree.nodes)) {
+      if (n.childrenIds.length < 2) continue;
+      for (const cid of n.childrenIds) {
+        const child = tree.nodes[cid];
+        if (child && (child.descendantGenusCount ?? 0) === 0) {
+          offenders.push(`${n.name} (${n.id}) → ${child.name} (${child.id})`);
+        }
+      }
+    }
+    if (offenders.length) {
+      console.error(`\n✗ monotypy layout/hint divergence: ${offenders.length} multi-child clade(s) with a zero-genus child:`);
+      for (const o of offenders) console.error(`    ${o}`);
+      console.error("  These stay splayed in Explore but get skipped by hints. Unify layout + hints on");
+      console.error("  the genus-count test (see spine-layout.ts / engine-core.ts) before shipping. (#15)");
+      process.exit(1);
+    }
+  }
+
   await mkdir("src/data", { recursive: true });
   await writeFile("src/data/tree.json", JSON.stringify(tree));
   await writeFile("src/data/genera-index.json", JSON.stringify(index));

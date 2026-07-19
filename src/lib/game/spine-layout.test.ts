@@ -216,6 +216,48 @@ describe("layoutSpine — off-spine nesting is planar", () => {
       }
     }
   });
+
+  // Regression for #17: the fixture above splays its two blocks to OPPOSITE sides (the A-Z split
+  // sends the deep chain below and the leaves above), so each side ends up with a single attach
+  // depth and the non-increasing-attach assertion holds trivially — deepestFirst is never actually
+  // exercised. This fixture forces TWO different parents (attach depths 0 and 2) to fan blocks onto
+  // the SAME side, which is the only configuration where deepestFirst's ordering matters: the
+  // shallow-attached deep chain must nest OUTSIDE the deep-attached leaf, or the leaf's riser slices
+  // through the chain's long horizontal run.
+  it("nests two same-side blocks with DIFFERENT attach depths deepest-innermost (crossing case)", () => {
+    // Spine Root→Sspine→Tspine→Wsp. Names chosen so both off-spine blocks sort ABOVE their anchor:
+    //   - parent Root (attach 0): a deep chain "Achain→Bchain→Cgenus"; "Achain" < anchor "Sspine".
+    //   - parent Tspine (attach 2): a leaf "Dleaf"; "Dleaf" < anchor "Wsp".
+    // Both land above → same side, attach depths 0 and 2 → deepestFirst decides the nesting.
+    const CL = "Q713623";
+    const raws = [
+      { id: "R", name: "Root", rankId: CL, parentId: null },
+      { id: "S", name: "Sspine", rankId: CL, parentId: "R" },
+      { id: "T", name: "Tspine", rankId: CL, parentId: "S" },
+      { id: "W", name: "Wsp", rankId: RANK_GENUS, parentId: "T", wikipediaUrl: "w" },
+      { id: "AC", name: "Achain", rankId: CL, parentId: "R" }, // attach depth 0, deep
+      { id: "BC", name: "Bchain", rankId: CL, parentId: "AC" },
+      { id: "CG", name: "Cgenus", rankId: RANK_GENUS, parentId: "BC", wikipediaUrl: "w" },
+      { id: "DL", name: "Dleaf", rankId: RANK_GENUS, parentId: "T", wikipediaUrl: "w" }, // attach depth 2
+    ];
+    const st = createTreeStore(assembleTree(raws, "R", "test"));
+    const l = layoutSpine(st, new Set(["R", "S", "T", "W", "AC", "BC", "CG", "DL"]), "W");
+    const m = byId(l);
+    const spineIds = new Set(l.nodes.filter((n) => n.onSpine).map((n) => n.id));
+    const blockRoots = l.edges
+      .filter((e) => !e.onSpine && spineIds.has(e.parentId))
+      .map((e) => ({ id: e.childId, y: m.get(e.childId)!.y, attach: m.get(e.parentId)!.depth }));
+
+    // The chain root (AC, attach 0) and the leaf (DL, attach 2) must share a side...
+    const ac = blockRoots.find((b) => b.id === "AC")!;
+    const dl = blockRoots.find((b) => b.id === "DL")!;
+    expect(Math.sign(ac.y)).toBe(Math.sign(dl.y));
+    // ...with TWO distinct attach depths on it — the guard against silent re-trivialization.
+    const side = blockRoots.filter((b) => Math.sign(b.y) === Math.sign(dl.y));
+    expect(new Set(side.map((b) => b.attach)).size).toBeGreaterThanOrEqual(2);
+    // deepest-innermost: the deep-attached leaf sits NEARER the axis than the shallow chain root.
+    expect(Math.abs(dl.y)).toBeLessThan(Math.abs(ac.y));
+  });
 });
 
 describe("centerOffsetFor", () => {
