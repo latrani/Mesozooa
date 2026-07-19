@@ -43,10 +43,10 @@
   .searchbox input::placeholder { color: var(--ink-mute); }
   .searchbox input:focus { outline: none; border-color: var(--accent); }
   /* chrome lives on the wrapper so the inner scroll-fade mask never eats bg/border/shadow.
-     Opens UPWARD — the search box lives in a bottom-pegged placard in both the game and
-     Explore, so a downward menu would open into the hidden region below the viewport. */
+     Opens DOWNWARD — after the layout rework the search box sits in the TOP cluster in both the
+     game and Explore, so the menu drops below the input. */
   .searchbox .menu {
-    position: absolute; z-index: 5; left: 0; right: 0; bottom: 100%; margin-bottom: var(--space-1);
+    position: absolute; z-index: 5; left: 0; right: 0; top: 100%; margin-top: var(--space-1);
     background: var(--bg-page); border: 1px solid var(--hairline);
     border-radius: var(--radius-card); box-shadow: var(--shadow-lift); overflow: hidden;
   }
