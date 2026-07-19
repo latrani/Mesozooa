@@ -5,6 +5,7 @@
   import GuessList from "./GuessList.svelte";
   import SpineTree from "./SpineTree.svelte";
   import SpecimenPlacard from "./SpecimenPlacard.svelte";
+  import BoardLayout from "./BoardLayout.svelte";
   import { specimenView } from "../specimen-view";
 
   let {
@@ -83,70 +84,53 @@
 
   // Component ref to the spine tree so trail crumbs can pan it (spec §3B).
   let spine = $state<ReturnType<typeof SpineTree>>();
-
-  // The specimen floats over the tree canvas (desktop). Measure its box so the tree centers
-  // into the area LEFT of it; on narrow it stacks in flow, so no inset.
-  let specimenW = $state(0);
-  let isDesktop = $state(
-    typeof matchMedia !== "undefined" ? matchMedia("(min-width: 641px)").matches : true,
-  );
-  $effect(() => {
-    if (typeof matchMedia === "undefined") return;
-    const mq = matchMedia("(min-width: 641px)");
-    const on = () => (isDesktop = mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  });
-  // inset = specimen width + its right offset (--space-5 = 24px) + a breathing gap before the tree
-  let rightInset = $derived(isDesktop && specimenW ? specimenW + 24 + 24 : 0);
 </script>
 
-<div class="game">
-  <div class="cluster">
-    <div class="cluster-main">
-      {#if ended}
-        <div class="result" class:won class:lost={!won} aria-live="polite">
-          <span class="result-line">{#if won}Congratulations! {answerName} guessed in {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
-        </div>
-      {:else}
-        <div class="input-row">
-          <SearchBox entries={availableEntries} onpick={(id) => store.guess(id)} placeholder="Guess a dinosaur…" />
-          {#if store.hint && store.canHint}
-            <button type="button" class="btn-secondary" onclick={() => store.hint?.()} disabled={!store.canHint}>
-              Hint {#if store.nextHintCost != null} ({store.nextHintCost} move{store.nextHintCost === 1 ? "" : "s"}){/if}
-            </button>
-          {/if}
-          {#if store.forfeit && turnCount > 0}
-            <button type="button" class="btn-secondary btn-forfeit" onclick={() => store.forfeit?.()}>Forfeit</button>
-          {/if}
-          {#if budget.max == null}
-            <span class="budget">Moves used: {budget.used}</span>
-          {:else}
-            <span class="budget">Moves remaining: {budget.max - budget.used}</span>
-          {/if}
-        </div>
-      {/if}
-      <GuessList
-        guesses={store.state.guesses}
-        targetId={won ? store.state.target : null}
-        revealId={ended && !won ? store.state.target : null}
-        onselect={(id) => { highlightId = id; spine?.panTo(id); }}
-      />
-    </div>
-    <div class="specimen-float" bind:clientWidth={specimenW}>
-      <SpecimenPlacard view={specimenView(store.state, treeStore)}>
-        {#snippet action()}
-          {#if ended && onnew}
-            <div class="actions">
-              <button type="button" class="btn-secondary" onclick={() => onnew?.()}>New round</button>
-            </div>
-          {/if}
-        {/snippet}
-      </SpecimenPlacard>
-    </div>
-  </div>
+<BoardLayout>
+  {#snippet cluster()}
+    {#if ended}
+      <div class="result" class:won class:lost={!won} aria-live="polite">
+        <span class="result-line">{#if won}Congratulations! {answerName} guessed in {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
+      </div>
+    {:else}
+      <div class="input-row">
+        <SearchBox entries={availableEntries} onpick={(id) => store.guess(id)} placeholder="Guess a dinosaur…" />
+        {#if store.hint && store.canHint}
+          <button type="button" class="btn-secondary" onclick={() => store.hint?.()} disabled={!store.canHint}>
+            Hint {#if store.nextHintCost != null} ({store.nextHintCost} move{store.nextHintCost === 1 ? "" : "s"}){/if}
+          </button>
+        {/if}
+        {#if store.forfeit && turnCount > 0}
+          <button type="button" class="btn-secondary btn-forfeit" onclick={() => store.forfeit?.()}>Forfeit</button>
+        {/if}
+        {#if budget.max == null}
+          <span class="budget">Moves used: {budget.used}</span>
+        {:else}
+          <span class="budget">Moves remaining: {budget.max - budget.used}</span>
+        {/if}
+      </div>
+    {/if}
+    <GuessList
+      guesses={store.state.guesses}
+      targetId={won ? store.state.target : null}
+      revealId={ended && !won ? store.state.target : null}
+      onselect={(id) => { highlightId = id; spine?.panTo(id); }}
+    />
+  {/snippet}
 
-  <div class="tree-body">
+  {#snippet placard()}
+    <SpecimenPlacard view={specimenView(store.state, treeStore)}>
+      {#snippet action()}
+        {#if ended && onnew}
+          <div class="actions">
+            <button type="button" class="btn-secondary" onclick={() => onnew?.()}>New round</button>
+          </div>
+        {/if}
+      {/snippet}
+    </SpecimenPlacard>
+  {/snippet}
+
+  {#snippet tree(rightInset)}
     <SpineTree
       bind:this={spine}
       revealed={treeRevealed}
@@ -158,38 +142,11 @@
       onnodeselect={ended && onexplore ? (id) => onexplore(id) : undefined}
       linkLabels={ended}
     />
-  </div>
-</div>
+  {/snippet}
+</BoardLayout>
 
 <style>
-  /* Structural only — input+chips cluster on top (plaque floats top-right), tree owns the body. */
-  .game { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-
-  /* Desktop: the cluster is a pegged top band holding the input row + wrapping guess chips at
-     left; the specimen FLOATS over its top-right, sized to its own content. The tree fills the
-     whole body below and centers into the area LEFT of the plaque (rightInset). No bottom band. */
-  @media (min-width: 641px) {
-    .game { flex: 1 1 auto; min-height: 0; gap: 0; padding: 0; }
-    /* top cluster: input + wrapping chips at left, plaque floats over the right */
-    .cluster {
-      position: relative; flex: 0 0 auto;
-      padding: var(--space-4) var(--space-5);
-      background: var(--bg-surface); border-bottom: 1px solid var(--hairline);
-      box-shadow: 0 6px 16px -8px rgba(51, 38, 26, 0.35); z-index: 4;
-    }
-    /* leave room on the right so wrapping chips never slide under the floating plaque */
-    .cluster-main { display: flex; flex-direction: column; gap: var(--space-3); padding-right: 22rem; }
-    .specimen-float { position: absolute; top: var(--space-4); right: var(--space-5); z-index: 5; width: max-content; }
-    .tree-body { position: relative; flex: 1 1 auto; min-height: 0; }
-    .tree-body :global(.tree-viewport) { position: absolute; inset: 0; }
-    /* SpineTree relies on its consumer to make .tree-scroll the flex row that seats the fixed
-       runway spacer beside the SVG (issue #32) and to enable vertical scroll+centering; the
-       restructure dropped this when .middle became .tree-body. Mirror Explorer.svelte:109. */
-    .tree-body :global(.tree-scroll) {
-      position: absolute; inset: 0; display: flex;
-      align-items: safe center; justify-content: flex-start; overflow: auto;
-    }
-  }
+  /* Region skeleton is owned by BoardLayout; these rules back the snippet CONTENT only. */
   .input-row { display: flex; gap: var(--space-3); align-items: center; }
   .budget {
     font-size: var(--type-body); font-weight: var(--fw-black);
@@ -207,14 +164,4 @@
     box-shadow: var(--gem-glow);
   }
   .result-line { font-size: var(--type-body); font-weight: var(--fw-bold); color: var(--ink); }
-  /* Narrow screens: tree fills the middle; specimen drops below it, above the pegged input. */
-  @media (max-width: 640px) {
-    /* single column: trail (above) -> tree (full-size, scrolls) -> specimen -> pegged input.
-       .middle becomes a column so the specimen naturally stacks under the tree; the SVG's own
-       min-width:max-content (Task 1) keeps the tree full-size and horizontally scrollable. */
-    .middle { flex-direction: column; }
-    .middle :global(.tree-viewport) { width: 100%; }
-    .middle :global(.tree-scroll) { width: 100%; }
-    .input-row { position: sticky; bottom: 0; background: var(--bg-page); padding-bottom: var(--space-3); z-index: 2; }
-  }
 </style>
