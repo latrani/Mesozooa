@@ -8,14 +8,18 @@
   import SpecimenPlacard from "../../game/components/SpecimenPlacard.svelte";
   import { nodeView } from "../../game/specimen-view";
   import BoardLayout from "../../game/components/BoardLayout.svelte";
+  import Chip from "../../game/components/Chip.svelte";
+  import type { Chip as ChipData } from "../../game/chip-view";
 
   const taxa = searchSource(treeStore);
 
-  // Recently-viewed taxa, most-recent first (the current node leads the list).
-  let recent = $derived(
+  // Recently-viewed taxa as crumb chips, most-recent first (the current node leads the list).
+  // Same <Chip> the guess list renders — the trail can't drift from the game's chips.
+  let recent = $derived<Array<Extract<ChipData, { kind: "crumb" }>>>(
     explorer.history
       .map((id) => ({ id, name: treeStore.getNode(id)?.name }))
-      .filter((r) => r.name),
+      .filter((r): r is { id: string; name: string } => r.name != null)
+      .map((r) => ({ kind: "crumb", nodeId: r.id, name: displayName(r.name) })),
   );
 
   function onnodeselect(id: string) {
@@ -35,11 +39,11 @@
     {#snippet cluster()}
       <SearchBox entries={taxa} onpick={(id) => explorer.jumpTo(id)} placeholder="Find any taxon…" />
       {#if recent.length}
-        <nav class="recent" aria-label="Recently viewed">
-          {#each recent as r (r.id)}
-            <button type="button" class="link" onclick={() => explorer.jumpTo(r.id)}>{displayName(r.name)}</button>
+        <ul class="recent" aria-label="Recently viewed">
+          {#each recent as c (c.nodeId)}
+            <Chip chip={c} onselect={(id) => explorer.jumpTo(id)} />
           {/each}
-        </nav>
+        </ul>
       {/if}
     {/snippet}
 
@@ -68,19 +72,8 @@
   /* Minimal wrapper — BoardLayout owns the board skeleton; .explorer just fills its slot. */
   .explorer { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 
-  /* Inline (flow-wrapping) recently-viewed trail; links echo the guess-name affordance. */
+  /* Inline (flow-wrapping) recently-viewed trail; the items are <Chip> crumbs. */
   .recent {
-    display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4);
-    font-size: var(--type-label);
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-2);
   }
-  .recent-label {
-    color: var(--ink-soft); font-size: var(--type-eyebrow); font-weight: var(--fw-black);
-    letter-spacing: .1em; text-transform: uppercase;
-  }
-  .recent .link {
-    background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--ink);
-    font-weight: var(--fw-medium); text-decoration: underline; text-decoration-thickness: 1px;
-    text-underline-offset: 2px; text-decoration-color: var(--sand-400);
-  }
-  .recent .link:hover { text-decoration-color: var(--turq); color: var(--turq-dp); }
 </style>

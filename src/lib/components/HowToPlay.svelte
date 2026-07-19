@@ -22,7 +22,7 @@
     font-weight: var(--fw-medium);
     color: var(--cream-dim);
     text-decoration: underline;
-    align-self: center;
+    align-self: baseline;   /* share the tagline's baseline, not the header's center line */
   }
   .how-to-play-link:hover {
     color: var(--cream);

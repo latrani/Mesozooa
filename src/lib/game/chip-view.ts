@@ -7,7 +7,11 @@ export type Chip =
   | { kind: "guess"; guessId: string; nodeId: string; name: string; dotColor: string; sharedNodeId: string; sharedName: string }
   | { kind: "branchHint"; nodeId: string; dotColor: string; sharedNodeId: string; sharedName: string }
   | { kind: "leafHint"; label: string }
-  | { kind: "answer"; nodeId: string; name: string; won: boolean; bgColor: string };
+  | { kind: "answer"; nodeId: string; name: string; won: boolean; bgColor: string }
+  // A plain node-reference chip: the Explore recents. Not produced by chipsFor (which maps the
+  // guess log); the explorer builds these directly. Kept in the shared union so <Chip> is the one
+  // renderer for every chip variant.
+  | { kind: "crumb"; nodeId: string; name: string };
 
 export interface ChipOpts {
   /** the answer node — present only at end state */
