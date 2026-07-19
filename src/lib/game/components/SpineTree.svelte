@@ -424,7 +424,7 @@
   <p class="tree-empty">{emptyLabel}</p>
 {/if}
 {#if layout.nodes.length}
-  <div class="zoom-controls" role="group" aria-label="Zoom">
+  <div class="zoom-controls btn-secondary" role="group" aria-label="Zoom">
     <button type="button" aria-label="Zoom out" onclick={() => zoomButton(-1)} disabled={zoom <= ZOOM_MIN}>&minus;</button>
     <button type="button" aria-label="Reset zoom" onclick={resetZoom} disabled={zoom === ZOOM_DEFAULT}>⌂</button>
     <button type="button" aria-label="Zoom in" onclick={() => zoomButton(1)} disabled={zoom >= ZOOM_MAX}>+</button>
@@ -483,11 +483,21 @@
   .node.highlight .lbl { font-weight: var(--fw-black); }
   .zoom-controls {
     position: absolute; z-index: 5; right: var(--space-4); bottom: var(--space-4);
-    display: flex; gap: 1px;
+    display: flex; align-items: stretch; padding: 0;
+    background: var(--bg-surface);
+    border: 2px solid var(--btn-secondary-ink); border-radius: var(--radius-pill);
+    overflow: hidden;
   }
   .zoom-controls button {
     display: flex; align-items: center; justify-content: center;
-    width: 2rem; height: 2rem; font-size: 1rem; cursor: pointer;
+    width: 2.2rem; height: 2rem; font-size: 1rem; cursor: pointer;
+    background: transparent; border: 0; color: var(--btn-secondary-ink);
+    font-weight: var(--fw-bold);
+  }
+  /* hairline dividers between segments */
+  .zoom-controls button + button { border-left: 1px solid var(--btn-secondary-ink); }
+  .zoom-controls button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--btn-secondary-ink) 12%, transparent);
   }
   .zoom-controls button:disabled { cursor: default; opacity: 0.5; }
   .tree-empty {
