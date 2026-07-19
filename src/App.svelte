@@ -17,6 +17,10 @@
   import clawSvg from "./assets/claw.svg?raw";
   const clawViewBox = clawSvg.match(/viewBox="([^"]+)"/)?.[1] ?? "0 0 255 305";
   const clawInner = clawSvg.replace(/[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+  // Outside the tree (header, PWA icon, favicon) the footprint is flipped 180° so it reads as an
+  // "M" for Mesozooa; the upright footprint stays in the circle in the tree view (genus.svg).
+  const [vx, vy, vw, vh] = clawViewBox.split(/\s+/).map(Number);
+  const clawSpin = `rotate(180 ${vx + vw / 2} ${vy + vh / 2})`;
 
   const rootId = treeStore.data.rootId;
 
@@ -64,7 +68,7 @@
 
 <header class="app-header">
   <span class="brand">
-    <svg class="brand-claw" viewBox={clawViewBox} aria-hidden="true">{@html clawInner}</svg>
+    <svg class="brand-claw" viewBox={clawViewBox} aria-hidden="true"><g transform={clawSpin}>{@html clawInner}</g></svg>
     <span class="wordmark">Mesozooa</span>
   </span>
   <span class="tagline">Find today's dinosaur!</span>

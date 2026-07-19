@@ -19,6 +19,19 @@ function footprintGroup(): string {
   return m[0].replace(/<path /g, `<path fill="${TURQ}" `);
 }
 
+// Flat single-color SVG favicon (transparent background), the primary <link rel="icon"> for modern
+// browsers; the favicon PNGs below are the Safari / legacy fallback. Turquoise reads on both a light
+// and a dark tab bar, so no dark-mode variant is needed. Flipped 180° to match the "M" branding.
+function faviconSvg(): string {
+  const w = Number(CLAW_W), h = Number(CLAW_H);
+  const pad = Math.round(h * 0.08); // a little breathing room so the toes don't touch the edge
+  const spin = `rotate(180 ${w / 2} ${h / 2})`;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-pad} ${-pad} ${w + pad * 2} ${h + pad * 2}">` +
+    `<g transform="${spin}">${footprintGroup()}</g></svg>`
+  );
+}
+
 // Master SVG at `canvas`px: paper square + footprint (native claw viewBox) centered at `frac` height.
 function masterSvg(canvas: number, frac: number): string {
   const g = footprintGroup();
@@ -26,10 +39,13 @@ function masterSvg(canvas: number, frac: number): string {
   const fw = Math.round((fh * Number(CLAW_W)) / Number(CLAW_H));
   const x = Math.round((canvas - fw) / 2);
   const y = Math.round((canvas - fh) / 2);
+  // Flip the footprint 180° so it reads as an "M" for Mesozooa — the app-icon / favicon / header
+  // orientation. (The upright footprint lives only inside the tree's circle, via genus.svg.)
+  const spin = `rotate(180 ${Number(CLAW_W) / 2} ${Number(CLAW_H) / 2})`;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas}" height="${canvas}" viewBox="0 0 ${canvas} ${canvas}">` +
     `<rect width="${canvas}" height="${canvas}" fill="${PAPER}"/>` +
-    `<svg x="${x}" y="${y}" width="${fw}" height="${fh}" viewBox="0 0 ${CLAW_W} ${CLAW_H}">${g}</svg>` +
+    `<svg x="${x}" y="${y}" width="${fw}" height="${fh}" viewBox="0 0 ${CLAW_W} ${CLAW_H}"><g transform="${spin}">${g}</g></svg>` +
     `</svg>`
   );
 }
@@ -48,4 +64,10 @@ render(standard, 180, "pwa-180.png");
 render(standard, 192, "pwa-192.png");
 render(standard, 512, "pwa-512.png");
 render(maskable, 512, "pwa-512-maskable.png");
+// Favicon: a flat transparent SVG (primary) + PNGs (fallback) at a tighter crop so the footprint
+// stays legible down at 16px in a browser tab.
+writeFileSync(`${OUT_DIR}/favicon.svg`, faviconSvg());
+const favicon = masterSvg(1024, 0.74);
+render(favicon, 32, "favicon-32.png");
+render(favicon, 16, "favicon-16.png");
 console.log("icons written to", OUT_DIR);

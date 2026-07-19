@@ -18,7 +18,8 @@ export default defineConfig({
         navigateFallbackDenylist: [/gallery/],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // GameBoard chunk is ~1MB; headroom
       },
-      includeAssets: ["icons/pwa-180.png"], // apple-touch-icon (not auto-picked from manifest)
+      // apple-touch-icon + favicons: these types aren't in globPatterns, so precache them explicitly for offline.
+      includeAssets: ["icons/pwa-180.png", "icons/favicon.svg", "icons/favicon-32.png", "icons/favicon-16.png"],
       manifest: {
         name: "Mesozooa",
         short_name: "Mesozooa",
