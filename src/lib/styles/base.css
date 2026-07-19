@@ -1,6 +1,13 @@
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-html, body { height: 100%; }
+/* The page "ground" is terracotta: it shows only at the edges (overscroll) and is what browsers
+   sample to tint window chrome (Orion's sidebar + toolbar; Safari/Chrome full-bleed). The cream
+   board floats on top via #app, so terracotta is never seen behind content. Set on both root
+   elements so every engine's canvas/overscroll propagation lands on terracotta. (#8) */
+html, body { height: 100%; background-color: var(--placard); }
+/* The cream board floats on the terracotta ground; min-height keeps it filling the viewport on
+   narrow, so terracotta shows only in overscroll, never as a gap below the footer. */
+#app { min-height: 100dvh; background: var(--bg-page); }
 /* Desktop: lock the app to the viewport and scroll WITHIN regions (tree, guess list),
    so the page itself never scrolls and interactive elements stay put. Narrow keeps normal
    document flow (the game's own narrow layout pegs its own input). */
@@ -12,8 +19,6 @@ html, body { height: 100%; }
 }
 body {
   margin: 0;
-  background:
-    radial-gradient(140% 100% at 12% 8%, #fbf8f0 0%, var(--bg-page) 55%) fixed;
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 24px;            /* +50% base — spec §2.2 (locked) */

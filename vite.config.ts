@@ -27,7 +27,7 @@ export default defineConfig({
         display: "standalone",
         start_url: "/",
         background_color: "#f8f4ea",
-        theme_color: "#0d9aa8",
+        theme_color: "#9a4a33", // --placard: matches the header so the browser frame melts into it (issue #8)
         icons: [
           { src: "/icons/pwa-192.png", sizes: "192x192", type: "image/png" },
           { src: "/icons/pwa-512.png", sizes: "512x512", type: "image/png" },
