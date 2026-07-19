@@ -61,3 +61,49 @@ describe("scrollForZoom", () => {
     expect(left).toBe(100); // unchanged from the no-runway case
   });
 });
+
+// Regression guard for the WebKit pinch drift: WebKit fires 100+ gesturechange events per
+// pinch, so how each event MAPS its baseline matters. Applied absolutely from a fixed gesturestart
+// snapshot, N tiny steps land exactly where one big step would. Chained off the live (rounded)
+// scroll each event, sub-pixel error compounds and walks the anchor into the corner.
+describe("scrollForZoom under many-event pinch (the WebKit anchor drift)", () => {
+  const geom = {
+    origin: { x: 400, y: 0 }, // pointer held still, right of center
+    viewport: { w: 600, h: 100 },
+    content: { w: 4000, h: 100 },
+    runway: 0,
+  };
+  const startScroll = { left: 1500, top: 0 };
+  const startZoom = 1;
+  const endZoom = 0.6; // a zoom-OUT sweep
+
+  it("absolute mapping from the start snapshot equals a single direct step", () => {
+    // 140 events, each mapped from the SAME (startScroll, startZoom) baseline — as the fixed
+    // WebKit handler does. The last event uses the final cumulative scale, so it must match a
+    // lone start->end step exactly.
+    const direct = scrollForZoom({ ...geom, scroll: startScroll, oldZoom: startZoom, newZoom: endZoom });
+    let last = { left: 0, top: 0 };
+    for (let i = 1; i <= 140; i++) {
+      const z = startZoom + (endZoom - startZoom) * (i / 140);
+      last = scrollForZoom({ ...geom, scroll: startScroll, oldZoom: startZoom, newZoom: z });
+    }
+    expect(last.left).toBeCloseTo(direct.left, 6);
+    expect(last.top).toBeCloseTo(direct.top, 6);
+  });
+
+  it("chaining off rounded live scroll drifts the anchor toward 0 (the bug the fix avoids)", () => {
+    // The OLD incremental path: each event maps from the previous event's rounded scrollLeft and
+    // the previous zoom. Rounding models the browser storing integer scroll. Over 140 events this
+    // must NOT equal the exact target — proving why the absolute mapping was necessary.
+    const direct = scrollForZoom({ ...geom, scroll: startScroll, oldZoom: startZoom, newZoom: endZoom });
+    let scroll = { ...startScroll };
+    let prevZoom = startZoom;
+    for (let i = 1; i <= 140; i++) {
+      const z = startZoom + (endZoom - startZoom) * (i / 140);
+      const step = scrollForZoom({ ...geom, scroll, oldZoom: prevZoom, newZoom: z });
+      scroll = { left: Math.round(step.left), top: Math.round(step.top) }; // browser rounds scroll
+      prevZoom = z;
+    }
+    expect(Math.abs(scroll.left - direct.left)).toBeGreaterThan(1); // drifted off target
+  });
+});

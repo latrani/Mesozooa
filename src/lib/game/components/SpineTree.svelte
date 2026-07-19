@@ -213,16 +213,27 @@
 
   // Sole mutator of zoom. Clamps, then keeps `origin` fixed under the pointer. The scroll is set
   // on the next frame so the SVG has resized to the new zoom before we clamp scrollLeft/Top.
-  function applyZoom(nextZoom: number, origin: { x: number; y: number }) {
+  //
+  // `from` is the (scroll, zoom) baseline the anchor math maps FROM. It defaults to the live
+  // scroller state, but a pinch passes a FIXED gesturestart snapshot: WebKit fires gesturechange
+  // 100+ times per pinch (often several per frame), and chaining each step off the live,
+  // integer-rounded scrollLeft compounds sub-pixel error until the anchor walks into the top-left
+  // corner and sticks (the WebKit-only pinch drift). Mapping every event absolutely from the same
+  // start baseline + cumulative scale makes 140 events as exact as one.
+  function applyZoom(
+    nextZoom: number,
+    origin: { x: number; y: number },
+    from?: { scroll: { left: number; top: number }; zoom: number },
+  ) {
     if (!scroller) return;
-    const oldZoom = zoom;
+    const oldZoom = from ? from.zoom : zoom;
     const z = clampZoom(nextZoom);
     if (z === oldZoom) return;
     const target = scrollForZoom({
       origin,
       oldZoom,
       newZoom: z,
-      scroll: { left: scroller.scrollLeft, top: scroller.scrollTop },
+      scroll: from ? from.scroll : { left: scroller.scrollLeft, top: scroller.scrollTop },
       viewport: { w: scroller.clientWidth, h: scroller.clientHeight },
       content: { w: contentWidth, h: vbH }, // tree-only; runway is the separate fixed gutter
       runway,
@@ -278,20 +289,27 @@
     const el = scroller;
 
     if ("GestureEvent" in window) {
-      // NOT `= zoom`: reading zoom here would make this $effect depend on it, so every applyZoom
-      // would tear down + re-attach these listeners and reset the baseline mid-pinch (compounding
-      // the cumulative e.scale to max). onStart captures the live zoom instead — an event handler
-      // runs outside the effect's tracked scope, so it creates no dependency.
-      let startZoom = ZOOM_DEFAULT;
-      const originOf = (e: { clientX: number; clientY: number }) => {
+      // Snapshot the ENTIRE baseline at gesturestart — zoom, scroll, and the pinch-centroid
+      // origin — and map every gesturechange absolutely from it (target zoom = startZoom * scale,
+      // since e.scale is cumulative). Reading zoom/scroll live per event would (a) make this
+      // $effect depend on zoom, tearing down + re-attaching listeners mid-pinch, and (b) chain
+      // off rounded live scroll across 100+ events, drifting the anchor to the corner.
+      // The origin is fixed at the start centroid too, matching how e.scale is measured from it.
+      let start = { zoom: ZOOM_DEFAULT, scroll: { left: 0, top: 0 }, origin: { x: 0, y: 0 } };
+      const onStart = (e: Event) => {
+        e.preventDefault();
+        const g = e as unknown as { clientX: number; clientY: number };
         const rect = el.getBoundingClientRect();
-        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        start = {
+          zoom,
+          scroll: { left: el.scrollLeft, top: el.scrollTop },
+          origin: { x: g.clientX - rect.left, y: g.clientY - rect.top },
+        };
       };
-      const onStart = (e: Event) => { e.preventDefault(); startZoom = zoom; };
       const onChange = (e: Event) => {
         e.preventDefault();
-        const g = e as unknown as { scale: number; clientX: number; clientY: number };
-        applyZoom(startZoom * g.scale, originOf(g));
+        const g = e as unknown as { scale: number };
+        applyZoom(start.zoom * g.scale, start.origin, { scroll: start.scroll, zoom: start.zoom });
       };
       el.addEventListener("gesturestart", onStart, { passive: false });
       el.addEventListener("gesturechange", onChange, { passive: false });
