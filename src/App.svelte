@@ -11,6 +11,7 @@
   import Daily from "./lib/game/components/Daily.svelte";
   import Practice from "./lib/game/components/Practice.svelte";
   import Explorer from "./lib/explorer/components/Explorer.svelte";
+  import HowToPlay from "./lib/components/HowToPlay.svelte";
   // Claw mark for the header, inlined so it inherits the header's cream color. ?raw gives the
   // file text; strip the wrapper to the drawing so a CSS `fill` reaches its (fill-less) path.
   import clawSvg from "./assets/claw.svg?raw";
@@ -67,6 +68,7 @@
     <span class="wordmark">Mesozooa</span>
   </span>
   <span class="tagline">Find today's dinosaur!</span>
+  <HowToPlay />
   <nav class="modes">
     <button type="button" class:active={nav.tab === "daily"} onclick={() => nav.set("daily")}>Daily{#if hasProgress(daily.state)} — in progress{/if}</button>
     <button type="button" class:active={nav.tab === "practice"} onclick={() => nav.set("practice")}>Practice{#if hasProgress(game.state)} — in progress{/if}</button>
