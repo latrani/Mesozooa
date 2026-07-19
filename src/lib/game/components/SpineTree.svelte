@@ -118,6 +118,7 @@
   // The always-on left scroll-fade mask softens where it meets the edge, so it reads as
   // trailing off into deep time rather than hard-stopping.
   const STEM = 40;
+  const CORNER_RADIUS = 16; // radius of the rounded elbow where a branch's riser meets its arm
 
   let layout = $derived(layoutSpine(treeStore, revealed, tipId));
   let posOf = $derived(new Map(layout.nodes.map((n) => [n.id, n])));
@@ -163,7 +164,17 @@
     const c = posOf.get(childId)!;
     // Square cladogram: diverge at the ANCESTOR marker — vertical riser at the parent's x,
     // then horizontal to the child. Keeps branches off the spine (they leave perpendicular).
-    return `M ${px(p.x)} ${py(p.y)} V ${py(c.y)} H ${px(c.x)}`;
+    const x0 = px(p.x), y0 = py(p.y);
+    const cx = px(p.x), cy = py(c.y); // the elbow corner
+    const x1 = px(c.x);
+    const dy = cy - y0; // riser direction: +down / -up (0 when child shares the parent's row)
+    // A same-row child has no riser, so no corner to round — draw the straight arm.
+    if (dy === 0) return `M ${x0} ${y0} H ${x1}`;
+    // Round the elbow with a quadratic whose control point is the sharp corner; clamp the radius
+    // to half of each leg so short segments don't over-round or overshoot.
+    const dirY = Math.sign(dy);
+    const r = Math.min(CORNER_RADIUS, Math.abs(dy) / 2, (x1 - cx) / 2);
+    return `M ${x0} ${y0} V ${cy - r * dirY} Q ${cx} ${cy} ${cx + r} ${cy} H ${x1}`;
   }
 
   // Prefers-reduced-motion => instant; otherwise the browser eases to a stop.
