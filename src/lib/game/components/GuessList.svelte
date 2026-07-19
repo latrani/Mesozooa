@@ -52,9 +52,11 @@
         <span class="hint-text">Hint: <button type="button" class="link" onclick={() => onselect(c.sharedNodeId)}>{c.sharedName}</button></span>
       {:else}
         <span class="dot" style="background: {c.dotColor}"></span>
-        <button type="button" class="link name" onclick={() => onselect(c.nodeId)}>{c.name}</button>
-        <span class="arrow" aria-hidden="true">→</span>
-        <button type="button" class="link" onclick={() => onselect(c.sharedNodeId)}>{c.sharedName}</button>
+          <span class="chip-text">
+            <button type="button" class="link name" onclick={() => onselect(c.nodeId)}>{c.name}</button>
+            shares
+            <button type="button" class="link" onclick={() => onselect(c.sharedNodeId)}>{c.sharedName}</button>    
+          </span>
       {/if}
     </li>
   {/each}
@@ -62,12 +64,18 @@
 
 <style>
   .chips {
-    display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3);
+    display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-1);
     align-items: center; min-width: 0;
   }
   .chip {
-    display: inline-flex; align-items: center; gap: var(--space-2);
+    display: flex; align-items: center; gap: var(--space-1);
     font-size: var(--type-label); color: var(--ink);
+    background: var(--cream-dim);
+    border-radius: 20px;
+    padding: 0 0.4rem 0 4px;
+  }
+  .chip.chip-answer {
+    padding: 0;
   }
   .dot {
     flex: none; width: .7rem; height: .7rem; border-radius: var(--radius-pill);

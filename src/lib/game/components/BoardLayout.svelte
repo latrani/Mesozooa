@@ -50,12 +50,12 @@
        content; the tree fills the whole body below and centers into the area LEFT of it. */
     .cluster {
       position: relative; flex: 0 0 auto;
-      padding: var(--space-4) var(--space-5);
+      padding: var(--space-4);
       background: var(--bg-surface); border-bottom: 1px solid var(--hairline);
       box-shadow: 0 6px 16px -8px rgba(51, 38, 26, 0.35); z-index: 4;
     }
     /* reserve room on the right so wrapping cluster content never slides under the floating placard */
-    .cluster-main { display: flex; flex-direction: column; gap: var(--space-3); padding-right: 22rem; }
+    .cluster-main { display: flex; flex-direction: column; gap: var(--space-4); padding-right: 22rem; }
     .specimen-float { position: absolute; top: var(--space-4); right: var(--space-5); z-index: 5; width: max-content; }
     .tree-body { position: relative; flex: 1 1 auto; min-height: 0; }
     .tree-body :global(.tree-viewport) { position: absolute; inset: 0; }

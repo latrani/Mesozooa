@@ -36,7 +36,6 @@
       <SearchBox entries={taxa} onpick={(id) => explorer.jumpTo(id)} placeholder="Find any taxon…" />
       {#if recent.length}
         <nav class="recent" aria-label="Recently viewed">
-          <span class="recent-label">Recent:</span>
           {#each recent as r (r.id)}
             <button type="button" class="link" onclick={() => explorer.jumpTo(r.id)}>{displayName(r.name)}</button>
           {/each}
@@ -72,7 +71,7 @@
   /* Inline (flow-wrapping) recently-viewed trail; links echo the guess-name affordance. */
   .recent {
     display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4);
-    margin-top: var(--space-3); font-size: var(--type-label);
+    font-size: var(--type-label);
   }
   .recent-label {
     color: var(--ink-soft); font-size: var(--type-eyebrow); font-weight: var(--fw-black);
