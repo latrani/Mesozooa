@@ -251,13 +251,45 @@
     lastInset = rightInset;
   });
 
-  // Touch two-finger pinch + trackpad ctrl+wheel, unified. Feeds the single applyZoom entry
-  // point. `from` starts each gesture at the current zoom; scaleBounds keeps the accumulated
-  // scale in range; passive:false lets it preventDefault the ctrl+wheel so the PAGE never zooms.
-  // Native one-finger scrolling (touch-action: pan-x pan-y on .tree-scroll) is untouched.
+  // Pinch-to-zoom, split by browser engine — both feed the single applyZoom entry point.
+  //
+  // WebKit (Safari, Orion, iOS/iPadOS): hand-handle the native WebKit GestureEvents. They fire
+  // for BOTH trackpad pinch and two-finger touch pinch on every WebKit browser, and we verified
+  // gesturechange fires identically (with a live e.scale) in Safari AND Orion. @use-gesture's own
+  // 'gesture'-device path uses these same events but silently fails to drive zoom in Orion (#33);
+  // owning them ourselves sidesteps its internals and can't regress Safari (same raw events).
+  // e.scale is cumulative since gesturestart, so target zoom = startZoom * scale.
+  //
+  // Blink/Gecko (Chrome, Firefox): no GestureEvent, so @use-gesture handles touch-pinch + trackpad
+  // ctrl+wheel there. Native one-finger scroll (touch-action: pan-x pan-y) is untouched either way.
   $effect(() => {
     if (!scroller) return;
     const el = scroller;
+
+    if ("GestureEvent" in window) {
+      // NOT `= zoom`: reading zoom here would make this $effect depend on it, so every applyZoom
+      // would tear down + re-attach these listeners and reset the baseline mid-pinch (compounding
+      // the cumulative e.scale to max). onStart captures the live zoom instead — an event handler
+      // runs outside the effect's tracked scope, so it creates no dependency.
+      let startZoom = ZOOM_DEFAULT;
+      const originOf = (e: { clientX: number; clientY: number }) => {
+        const rect = el.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      };
+      const onStart = (e: Event) => { e.preventDefault(); startZoom = zoom; };
+      const onChange = (e: Event) => {
+        e.preventDefault();
+        const g = e as unknown as { scale: number; clientX: number; clientY: number };
+        applyZoom(startZoom * g.scale, originOf(g));
+      };
+      el.addEventListener("gesturestart", onStart, { passive: false });
+      el.addEventListener("gesturechange", onChange, { passive: false });
+      return () => {
+        el.removeEventListener("gesturestart", onStart);
+        el.removeEventListener("gesturechange", onChange);
+      };
+    }
+
     const gesture = new PinchGesture(
       el,
       (state) => {
@@ -271,9 +303,7 @@
         eventOptions: { passive: false },
       },
     );
-    const stopGesture = (e: Event) => e.preventDefault();
-    el.addEventListener("gesturestart", stopGesture);
-    return () => { gesture.destroy(); el.removeEventListener("gesturestart", stopGesture); };
+    return () => gesture.destroy();
   });
 </script>
 
