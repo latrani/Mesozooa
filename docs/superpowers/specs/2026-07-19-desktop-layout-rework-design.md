@@ -71,7 +71,7 @@ Chips replace rows. Every item in the cluster is a chip; the guess/hint distinct
 guess        ● Diplodocus → Eusaurischia     dot = warmth (ore→gem ramp) · genus name (link) · → shared clade (link)
 branchHint   ● Hint: Eusaurischia            dot = warmth of the revealed clade · "Hint:" label · clade (link)
 leafHint     Field clue                      no dot, text only
-answer       ⬢ Tamarro                        outcome badge (win = gem end; loss = most-recent guess warmth)
+answer       Answer: Tamarro                   filled chip — outcome color as BACKGROUND (win = gem end; loss = most-recent guess warmth)
 ```
 
 - **guess:** warmth dot + genus name (link) + `→` + shared clade (link). The dot uses the same
@@ -85,8 +85,10 @@ answer       ⬢ Tamarro                        outcome badge (win = gem end; lo
   plaque's field clue. Text-only chip, **no dot or glyph**.
 - **Hint styling family:** branchHint and leafHint **share one consistent color/text styling**, set
   apart from guess chips, so "this was a hint, not my guess" reads at a glance without per-chip tags.
-- **answer:** outcome badge chip (win = gem end of ramp + glow; loss = most-recent guess's warmth),
-  pinned in the cluster as today. Newest-first ordering preserved.
+- **answer:** `Answer: {name}` — a filled chip whose **background** is the outcome color (win = gem
+  end of the ramp + glow; loss = most-recent guess's warmth), the name reading over it. The explicit
+  "Answer:" label carries the meaning; the color is the fill, not a separate badge. Pinned in the
+  cluster as today; newest-first ordering preserved.
 
 **Retired from the old rows:** the fixed-width warmth bar, the empty-bar special case for leafHint,
 the `HINT −n` / `CLUE −n` cost tags, and the `Name shared: Taxon` sentence scaffolding. **Move cost
