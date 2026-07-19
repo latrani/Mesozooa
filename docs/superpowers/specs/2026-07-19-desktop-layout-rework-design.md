@@ -87,8 +87,9 @@ answer       Answer: Tamarro                   filled chip — outcome color as 
   apart from guess chips, so "this was a hint, not my guess" reads at a glance without per-chip tags.
 - **answer:** `Answer: {name}` — a filled chip whose **background** is the outcome color (win = gem
   end of the ramp + glow; loss = most-recent guess's warmth), the name reading over it. The explicit
-  "Answer:" label carries the meaning; the color is the fill, not a separate badge. Pinned in the
-  cluster as today; newest-first ordering preserved.
+  "Answer:" label carries the meaning; the color is the fill, not a separate badge. The label text is
+  **cream ink over the fill** for contrast (matching the current badges' text-on-warmth treatment).
+  Pinned in the cluster as today; newest-first ordering preserved.
 
 **Retired from the old rows:** the fixed-width warmth bar, the empty-bar special case for leafHint,
 the `HINT −n` / `CLUE −n` cost tags, and the `Name shared: Taxon` sentence scaffolding. **Move cost
