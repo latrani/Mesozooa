@@ -11,6 +11,10 @@
     children: Snippet;
   } = $props();
 
+  // Unique per instance so the title can name the dialog even with multiple modals in the DOM.
+  const uid = $props.id();
+  const titleId = `modal-title-${uid}`;
+
   let dialog = $state<HTMLDialogElement | null>(null);
 
   // Sync the `open` prop to the native dialog. showModal() gives us focus-trap, top-layer
@@ -32,10 +36,10 @@
   }
 </script>
 
-<dialog bind:this={dialog} {onclose} {onclick} class="modal">
+<dialog bind:this={dialog} {onclose} {onclick} class="modal" aria-labelledby={titleId}>
   <div class="modal-inner">
     <header class="modal-head">
-      <h2>{title}</h2>
+      <h2 id={titleId}>{title}</h2>
       <button type="button" class="modal-close" aria-label="Close" onclick={() => (open = false)}>✕</button>
     </header>
     <div class="modal-body">
