@@ -3,7 +3,6 @@
   import type { GameState } from "../types";
   import SearchBox from "./SearchBox.svelte";
   import GuessList from "./GuessList.svelte";
-  import WarmestTrail from "./WarmestTrail.svelte";
   import SpineTree from "./SpineTree.svelte";
   import SpecimenPlacard from "./SpecimenPlacard.svelte";
   import { specimenView } from "../specimen-view";
@@ -103,23 +102,37 @@
 </script>
 
 <div class="game">
-  <!-- trail is desktop-hidden (the guess list covers lineage); kept for narrow layout -->
-  <div class="trail-slot">
-    <WarmestTrail warmestId={store.warmestId} onpan={(id) => spine?.panTo(id)} />
-  </div>
-
-  <div class="middle">
-    <SpineTree
-      bind:this={spine}
-      revealed={treeRevealed}
-      tipId={treeTipId}
-      {guessWarmth}
-      {highlightId}
-      {rightInset}
-      showCounts={false}
-      onnodeselect={ended && onexplore ? (id) => onexplore(id) : undefined}
-      linkLabels={ended}
-    />
+  <div class="cluster">
+    <div class="cluster-main">
+      {#if ended}
+        <div class="result" class:won class:lost={!won} aria-live="polite">
+          <span class="result-line">{#if won}Congratulations! {answerName} guessed in {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
+        </div>
+      {:else}
+        <div class="input-row">
+          <SearchBox entries={availableEntries} onpick={(id) => store.guess(id)} placeholder="Guess a dinosaur…" />
+          {#if store.hint && store.canHint}
+            <button type="button" class="btn-secondary" onclick={() => store.hint?.()} disabled={!store.canHint}>
+              Hint {#if store.nextHintCost != null} ({store.nextHintCost} move{store.nextHintCost === 1 ? "" : "s"}){/if}
+            </button>
+          {/if}
+          {#if store.forfeit && turnCount > 0}
+            <button type="button" class="btn-secondary btn-forfeit" onclick={() => store.forfeit?.()}>Forfeit</button>
+          {/if}
+          {#if budget.max == null}
+            <span class="budget">Moves used: {budget.used}</span>
+          {:else}
+            <span class="budget">Moves remaining: {budget.max - budget.used}</span>
+          {/if}
+        </div>
+      {/if}
+      <GuessList
+        guesses={store.state.guesses}
+        targetId={won ? store.state.target : null}
+        revealId={ended && !won ? store.state.target : null}
+        onselect={(id) => { highlightId = id; spine?.panTo(id); }}
+      />
+    </div>
     <div class="specimen-float" bind:clientWidth={specimenW}>
       <SpecimenPlacard view={specimenView(store.state, treeStore)}>
         {#snippet action()}
@@ -133,95 +146,51 @@
     </div>
   </div>
 
-  <div class="bottom">
-    {#if ended}
-      <!-- the correct guess (or revealed answer) fills the input area as a result banner -->
-      <div class="result" class:won class:lost={!won} aria-live="polite">
-        <span class="result-line">{#if won}Congratulations! {answerName} guessed in {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
-      </div>
-    {:else}
-      <div class="input-row">
-        <SearchBox entries={availableEntries} onpick={(id) => store.guess(id)} placeholder="Guess a dinosaur…" />
-        {#if store.hint && store.canHint}
-          <button type="button" class="btn-secondary" onclick={() => store.hint?.()} disabled={!store.canHint}>
-            Hint {#if store.nextHintCost != null} ({store.nextHintCost} move{store.nextHintCost === 1 ? "" : "s"}){/if}
-          </button>
-        {/if}
-        {#if store.forfeit && turnCount > 0}
-          <button type="button" class="btn-secondary btn-forfeit" onclick={() => store.forfeit?.()}>
-            Forfeit
-          </button>
-        {/if}
-        {#if budget.max == null}
-          <span class="budget">Moves used: {budget.used}</span>
-        {:else}
-          <span class="budget">Moves remaining: {budget.max - budget.used}</span>
-        {/if}
-      </div>
-    {/if}
-    <GuessList
-      guesses={store.state.guesses}
-      targetId={won ? store.state.target : null}
-      revealId={ended && !won ? store.state.target : null}
-      onselect={(id) => {
-        highlightId = id;
-        spine?.panTo(id);
-      }}
+  <div class="tree-body">
+    <SpineTree
+      bind:this={spine}
+      revealed={treeRevealed}
+      tipId={treeTipId}
+      {guessWarmth}
+      {highlightId}
+      {rightInset}
+      showCounts={false}
+      onnodeselect={ended && onexplore ? (id) => onexplore(id) : undefined}
+      linkLabels={ended}
     />
   </div>
 </div>
 
 <style>
-  /* Structural only — three stacked regions; the middle splits tree | specimen. */
-  .game { display: flex; flex-direction: column; gap: var(--space-5); padding: 0 var(--space-6) var(--space-6); }
-  .middle { display: flex; gap: var(--space-6); align-items: stretch; min-height: 0; }
-  .middle :global(.tree-viewport) { flex: 1 1 auto; min-width: 0; }
-  .bottom { display: flex; flex-direction: column; gap: var(--space-4); }
-  .input-row { display: flex; gap: var(--space-3); align-items: center; }
+  /* Structural only — input+chips cluster on top (plaque floats top-right), tree owns the body. */
+  .game { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
-  /* Desktop: the middle is a CANVAS. The tree fills it edge-to-edge and centers vertically;
-     the specimen FLOATS over the top-right, sized to its own content. The tree's scroll-to-
-     center targets the area left of the specimen (rightInset). Bottom region is pegged and
-     shows the input + ~5 recent guesses without pushing the page. The trail is dropped. */
+  /* Desktop: the cluster is a pegged top band holding the input row + wrapping guess chips at
+     left; the specimen FLOATS over its top-right, sized to its own content. The tree fills the
+     whole body below and centers into the area LEFT of the plaque (rightInset). No bottom band. */
   @media (min-width: 641px) {
-    /* edge-to-edge canvas: no padding on .game; the tree fills the full viewport, and the
-       guess list's own bottom fade softens the lower edge (no padding-bottom needed).
-       Horizontal padding returns only on the pegged bottom, aligned with the app header. */
     .game { flex: 1 1 auto; min-height: 0; gap: 0; padding: 0; }
-    /* edge-to-edge light placard (sunk): casts a soft shadow UP onto the tree, so the canvas
-       reads as inset between it and the (dark) header. Dark ink text — guess-list roles keep
-       their ink/light defaults, so nothing to re-point here. */
-    .bottom {
-      padding: var(--space-4) var(--space-5) var(--space-3); position: relative; z-index: 4;
-      background: var(--bg-surface);
-      border-top: 1px solid var(--hairline);
-      box-shadow: 0 -6px 16px -8px rgba(51, 38, 26, 0.35);
+    /* top cluster: input + wrapping chips at left, plaque floats over the right */
+    .cluster {
+      position: relative; flex: 0 0 auto;
+      padding: var(--space-4) var(--space-5);
+      background: var(--bg-surface); border-bottom: 1px solid var(--hairline);
+      box-shadow: 0 6px 16px -8px rgba(51, 38, 26, 0.35); z-index: 4;
     }
-    .trail-slot { display: none; }
-    .middle { position: relative; display: block; flex: 1 1 auto; min-height: 0; gap: 0; }
-    /* tree scroller fills the canvas. Horizontal is LEFT-pinned (issue #34): the tree's left edge
-       is a hard wall — nothing lives left of the root, so a small/zoomed-out tree anchors flush
-       left instead of floating to center. Vertical uses `safe center`: centered when the tree
-       fits, falls back to top-aligned scroll when it's taller — no clipping either way. */
-    .middle :global(.tree-viewport) { position: absolute; inset: 0; }
-    .middle :global(.tree-scroll) {
+    /* leave room on the right so wrapping chips never slide under the floating plaque */
+    .cluster-main { display: flex; flex-direction: column; gap: var(--space-3); padding-right: 22rem; }
+    .specimen-float { position: absolute; top: var(--space-4); right: var(--space-5); z-index: 5; width: max-content; }
+    .tree-body { position: relative; flex: 1 1 auto; min-height: 0; }
+    .tree-body :global(.tree-viewport) { position: absolute; inset: 0; }
+    /* SpineTree relies on its consumer to make .tree-scroll the flex row that seats the fixed
+       runway spacer beside the SVG (issue #32) and to enable vertical scroll+centering; the
+       restructure dropped this when .middle became .tree-body. Mirror Explorer.svelte:109. */
+    .tree-body :global(.tree-scroll) {
       position: absolute; inset: 0; display: flex;
       align-items: safe center; justify-content: flex-start; overflow: auto;
     }
-    .middle :global(.tree) { flex: none; }
-    .specimen-float {
-      position: absolute; top: 50%; right: var(--space-5); transform: translateY(-50%);
-      z-index: 3; width: max-content;
-    }
-    .bottom { flex: 0 0 auto; }
-    /* Always RESERVE ~5 rows of height: a stable landing zone for the autocomplete and no
-       layout shift as guesses accumulate. Fewer than 5 -> empty space held; more -> scrolls.
-       Height is on the frame; the inner list fills it and scrolls (fade lives on the list). */
-    .bottom :global(.guesses-frame) {
-      height: calc(5 * 2rem + 4 * var(--space-2));
-    }
-    .bottom :global(.guesses) { flex: 1 1 auto; overflow-y: auto; }
   }
+  .input-row { display: flex; gap: var(--space-3); align-items: center; }
   .budget {
     font-size: var(--type-body); font-weight: var(--fw-black);
     color: var(--btn-secondary-ink); 
