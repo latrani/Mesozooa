@@ -13,6 +13,7 @@
     disabled,
     onexplore,
     onnew,
+    onshare,
   }: {
     store: {
       state: GameState;
@@ -31,6 +32,7 @@
     disabled: boolean;
     onexplore?: (id: string) => void;
     onnew?: () => void;
+    onshare?: () => void;
   } = $props();
 
   const playableEntries = treeStore.playableGenera().map((n) => ({ id: n.id, name: n.name }));
@@ -121,9 +123,14 @@
   {#snippet placard()}
     <SpecimenPlacard view={specimenView(store.state, treeStore)}>
       {#snippet action()}
-        {#if ended && onnew}
+        {#if ended && (onnew || onshare)}
           <div class="actions">
-            <button type="button" class="btn-secondary" onclick={() => onnew?.()}>New round</button>
+            {#if onshare}
+              <button type="button" class="btn-secondary" onclick={() => onshare?.()}>Share</button>
+            {/if}
+            {#if onnew}
+              <button type="button" class="btn-secondary" onclick={() => onnew?.()}>New round</button>
+            {/if}
           </div>
         {/if}
       {/snippet}

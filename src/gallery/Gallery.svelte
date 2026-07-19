@@ -9,6 +9,8 @@
   import GuessList from "../lib/game/components/GuessList.svelte";
   import GameBoard from "../lib/game/components/GameBoard.svelte";
   import { warmthRampColor } from "../lib/game/warmth-ramp";
+  import HowToPlay from "../lib/components/HowToPlay.svelte";
+  import { buildShareText } from "../lib/game/share";
   import {
     fixtureStore,
     stateEmpty,
@@ -56,6 +58,8 @@
     ["--type-meta", "Meta 0.78rem"],
     ["--type-eyebrow", "Eyebrow 0.72rem"],
   ];
+
+  const sampleShareText = buildShareText(stateSolvedWon, "2026-07-18");
 </script>
 
 <div class="gallery">
@@ -196,6 +200,17 @@
         </div>
       {/each}
     </div>
+  </section>
+
+  <!-- MODAL & SHARING -->
+  <section>
+    <h2>Modal &amp; sharing</h2>
+    <p>Click to open the live How-to-play modal:</p>
+    <div style="background: var(--placard); padding: var(--space-3); display: inline-block;">
+      <HowToPlay />
+    </div>
+    <p>Share text (recolored ramp), as shown in the Share modal:</p>
+    <pre style="white-space: pre; line-height: 1.4;">{sampleShareText}</pre>
   </section>
 </div>
 

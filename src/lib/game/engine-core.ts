@@ -19,6 +19,11 @@ export function movesUsed(state: GameState): number {
   return movesUsedOf(state.guesses);
 }
 
+// A game that's been started but not finished — drives the "in progress" nav label (#3).
+export function hasProgress(state: GameState): boolean {
+  return state.guesses.length > 0 && state.status === "playing";
+}
+
 // Recompute every guess's warmth from the current provider + tree. Used on load so restored
 // games reflect the current warmth model (fractions are otherwise frozen at guess time). Keys
 // off each row's sharedNodeId, so guess identity and status are untouched.
