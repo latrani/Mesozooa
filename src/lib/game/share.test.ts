@@ -18,7 +18,7 @@ describe("buildShareText", () => {
     };
     const text = buildShareText(state, "2026-07-12");
     expect(text.split("\n")[0]).toBe("Mesozooa 2026-07-12  3/20 · 🔦1");
-    expect(text).toContain("🟦"); // cold guess
+    expect(text).toContain("⬛"); // cold guess
     expect(text).toContain("💡"); // hint
     expect(text).toContain("🎯"); // winning guess
   });

@@ -4,9 +4,9 @@ import { DAILY_MAX_GUESSES } from "./engine-core";
 function bucket(fraction: number): string {
   if (fraction >= 0.8) return "🟥";
   if (fraction >= 0.6) return "🟧";
-  if (fraction >= 0.4) return "🟨";
-  if (fraction >= 0.2) return "🟩";
-  return "🟦";
+  if (fraction >= 0.4) return "⬜";
+  if (fraction >= 0.2) return "🟦";
+  return "⬛";
 }
 
 export function buildShareText(state: GameState, dateStr: string): string {
