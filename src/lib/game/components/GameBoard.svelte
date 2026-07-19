@@ -199,13 +199,14 @@
     }
     .trail-slot { display: none; }
     .middle { position: relative; display: block; flex: 1 1 auto; min-height: 0; gap: 0; }
-    /* tree scroller fills the canvas. Horizontal stays start-aligned + scrollable (deep trees
-       overflow right; the pan sets scrollLeft). Vertical uses `safe center`: centered when the
-       tree fits, falls back to top-aligned scroll when it's taller — no clipping either way. */
+    /* tree scroller fills the canvas. Horizontal is LEFT-pinned (issue #34): the tree's left edge
+       is a hard wall — nothing lives left of the root, so a small/zoomed-out tree anchors flush
+       left instead of floating to center. Vertical uses `safe center`: centered when the tree
+       fits, falls back to top-aligned scroll when it's taller — no clipping either way. */
     .middle :global(.tree-viewport) { position: absolute; inset: 0; }
     .middle :global(.tree-scroll) {
       position: absolute; inset: 0; display: flex;
-      align-items: safe center; justify-content: safe center; overflow: auto;
+      align-items: safe center; justify-content: flex-start; overflow: auto;
     }
     .middle :global(.tree) { flex: none; }
     .specimen-float {

@@ -130,10 +130,13 @@
     return !!node && !node.isGenus && !hasLaidOutChildren.has(id);
   }
   let contentWidth = $derived(layout.nodes.length ? STEM + layout.width * X_GAP + PAD * 2 + 140 : 0);
-  // Trailing blank bleed = the specimen's covered width, so the tree can scroll far enough for
-  // the last node to clear out from under the floating specimen. viewBox width matches so the
-  // drawing (0..contentWidth) is never scaled — the bleed is just empty canvas on the right.
-  let scrollWidth = $derived(contentWidth ? contentWidth + rightInset : 0);
+  // The specimen clearance is a FIXED-px runway (a spacer element after the SVG), NOT canvas baked
+  // into the viewBox — so it stays a constant screen-px gutter at every zoom (issue #32). The SVG
+  // draws the tree only (0..contentWidth); `runway` is the scroll distance past its right edge.
+  let runway = $derived(contentWidth ? rightInset : 0);
+  // Total scrollable content width at zoom=1: scaled tree + fixed runway. centerOffsetFor and the
+  // scroll-fade dependency read this.
+  let scrollWidth = $derived(contentWidth ? contentWidth + runway : 0);
   let vbH = $derived((layout.maxY - layout.minY) * Y_GAP + PAD * 2 + LABEL_PAD);
 
   let scroller = $state<HTMLDivElement | null>(null);
@@ -210,7 +213,8 @@
       newZoom: z,
       scroll: { left: scroller.scrollLeft, top: scroller.scrollTop },
       viewport: { w: scroller.clientWidth, h: scroller.clientHeight },
-      content: { w: scrollWidth, h: vbH },
+      content: { w: contentWidth, h: vbH }, // tree-only; runway is the separate fixed gutter
+      runway,
     });
     zoom = z;
     requestAnimationFrame(() => scroller?.scrollTo({ left: target.left, top: target.top }));
@@ -247,13 +251,45 @@
     lastInset = rightInset;
   });
 
-  // Touch two-finger pinch + trackpad ctrl+wheel, unified. Feeds the single applyZoom entry
-  // point. `from` starts each gesture at the current zoom; scaleBounds keeps the accumulated
-  // scale in range; passive:false lets it preventDefault the ctrl+wheel so the PAGE never zooms.
-  // Native one-finger scrolling (touch-action: pan-x pan-y on .tree-scroll) is untouched.
+  // Pinch-to-zoom, split by browser engine — both feed the single applyZoom entry point.
+  //
+  // WebKit (Safari, Orion, iOS/iPadOS): hand-handle the native WebKit GestureEvents. They fire
+  // for BOTH trackpad pinch and two-finger touch pinch on every WebKit browser, and we verified
+  // gesturechange fires identically (with a live e.scale) in Safari AND Orion. @use-gesture's own
+  // 'gesture'-device path uses these same events but silently fails to drive zoom in Orion (#33);
+  // owning them ourselves sidesteps its internals and can't regress Safari (same raw events).
+  // e.scale is cumulative since gesturestart, so target zoom = startZoom * scale.
+  //
+  // Blink/Gecko (Chrome, Firefox): no GestureEvent, so @use-gesture handles touch-pinch + trackpad
+  // ctrl+wheel there. Native one-finger scroll (touch-action: pan-x pan-y) is untouched either way.
   $effect(() => {
     if (!scroller) return;
     const el = scroller;
+
+    if ("GestureEvent" in window) {
+      // NOT `= zoom`: reading zoom here would make this $effect depend on it, so every applyZoom
+      // would tear down + re-attach these listeners and reset the baseline mid-pinch (compounding
+      // the cumulative e.scale to max). onStart captures the live zoom instead — an event handler
+      // runs outside the effect's tracked scope, so it creates no dependency.
+      let startZoom = ZOOM_DEFAULT;
+      const originOf = (e: { clientX: number; clientY: number }) => {
+        const rect = el.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      };
+      const onStart = (e: Event) => { e.preventDefault(); startZoom = zoom; };
+      const onChange = (e: Event) => {
+        e.preventDefault();
+        const g = e as unknown as { scale: number; clientX: number; clientY: number };
+        applyZoom(startZoom * g.scale, originOf(g));
+      };
+      el.addEventListener("gesturestart", onStart, { passive: false });
+      el.addEventListener("gesturechange", onChange, { passive: false });
+      return () => {
+        el.removeEventListener("gesturestart", onStart);
+        el.removeEventListener("gesturechange", onChange);
+      };
+    }
+
     const gesture = new PinchGesture(
       el,
       (state) => {
@@ -267,9 +303,7 @@
         eventOptions: { passive: false },
       },
     );
-    const stopGesture = (e: Event) => e.preventDefault();
-    el.addEventListener("gesturestart", stopGesture);
-    return () => { gesture.destroy(); el.removeEventListener("gesturestart", stopGesture); };
+    return () => gesture.destroy();
   });
 </script>
 
@@ -279,9 +313,9 @@
     <svg
       class="tree"
       class:zoomed={zoom !== ZOOM_DEFAULT}
-      width={scrollWidth * zoom}
+      width={contentWidth * zoom}
       height={vbH * zoom}
-      viewBox={`0 0 ${scrollWidth} ${vbH}`}
+      viewBox={`0 0 ${contentWidth} ${vbH}`}
       role="img"
       aria-label="Cladogram"
     >
@@ -382,6 +416,9 @@
         </g>
       {/each}
     </svg>
+    <!-- fixed-px runway: reserves the specimen's covered width as scroll distance past the tree's
+         right edge, unscaled by zoom (issue #32). flex:none so it never shrinks. -->
+    {#if runway}<div class="runway" style={`width:${runway}px`} aria-hidden="true"></div>{/if}
   </div>
 {:else}
   <p class="tree-empty">{emptyLabel}</p>
@@ -403,6 +440,8 @@
   /* one-finger drag stays native scroll; two-finger goes to the pinch handler */
   .tree-scroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; touch-action: pan-x pan-y; }
   .tree { color: var(--ink); display: block; min-width: max-content; }
+  /* fixed-px specimen-clearance spacer; flex:none holds its width regardless of zoom (issue #32) */
+  .runway { flex: none; align-self: stretch; }
   /* min-width:max-content keeps the tree full-size at rest; release it while zoomed so zoom-out
      can shrink the SVG below its intrinsic content width. */
   .tree.zoomed { min-width: 0; }
