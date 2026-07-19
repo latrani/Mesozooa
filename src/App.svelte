@@ -4,6 +4,9 @@
   import { treeStore } from "./lib/game/treeData";
   import { taxonSlug, resolveTaxonRef } from "./lib/explorer/explorer-core";
   import { formatHash, parseHash, type Route } from "./lib/route";
+  import { hasProgress } from "./lib/game/engine-core";
+  import { daily } from "./lib/game/dailyStore.svelte";
+  import { game } from "./lib/game/gameStore.svelte";
   import meta from "./data/meta.json";
   import Daily from "./lib/game/components/Daily.svelte";
   import Practice from "./lib/game/components/Practice.svelte";
@@ -65,8 +68,8 @@
   </span>
   <span class="tagline">Find today's dinosaur!</span>
   <nav class="modes">
-    <button type="button" class:active={nav.tab === "daily"} onclick={() => nav.set("daily")}>Daily</button>
-    <button type="button" class:active={nav.tab === "practice"} onclick={() => nav.set("practice")}>Practice</button>
+    <button type="button" class:active={nav.tab === "daily"} onclick={() => nav.set("daily")}>Daily{#if hasProgress(daily.state)} — in progress{/if}</button>
+    <button type="button" class:active={nav.tab === "practice"} onclick={() => nav.set("practice")}>Practice{#if hasProgress(game.state)} — in progress{/if}</button>
     <button type="button" class:active={nav.tab === "explore"} onclick={() => nav.set("explore")}>Explore</button>
   </nav>
 </header>

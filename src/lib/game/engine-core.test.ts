@@ -14,6 +14,7 @@ import {
   playableDescendantCount,
   specimenState,
   refreshWarmth,
+  hasProgress,
   HINT_COST_MAX,
   HINT_COST_MIN,
   LEAF_HINT_COST,
@@ -434,5 +435,16 @@ describe("skip-through hint behavior", () => {
     expect(leafHintActive(s, monoStore)).toBe(true);
     s = applyHint(s, monoStore, monoWarmth); // now the leaf hint
     expect(s.guesses.at(-1)!.kind).toBe("leafHint");
+  });
+});
+
+describe("hasProgress", () => {
+  it("is false for a fresh game, true mid-play, false once ended", () => {
+    const fresh = newDailyState("TR");
+    expect(hasProgress(fresh)).toBe(false);
+    const mid = applyGuess(fresh, "TC", store, warmth); // one guess, still playing
+    expect(hasProgress(mid)).toBe(true);
+    const won = applyGuess(newDailyState("TC"), "TC", store, warmth); // guessed the target
+    expect(hasProgress(won)).toBe(false);
   });
 });
