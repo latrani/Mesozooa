@@ -16,6 +16,7 @@ import {
   refreshWarmth,
   HINT_COST_MAX,
   HINT_COST_MIN,
+  LEAF_HINT_COST,
   DAILY_MAX_GUESSES,
 } from "./engine-core";
 import { createTreeStore } from "./treeStore";
@@ -228,18 +229,18 @@ describe("hintCost and movesUsed", () => {
     const deeper = hintCost(s2, store);
     expect(deeper).toBeLessThan(shallow);
   });
-  it("charges HINT_COST_MIN at the leaf-terminal state (the clue)", () => {
-    // Once warmth has bottomed at TR's terminal clade, the press yields the clue at MIN cost.
+  it("charges LEAF_HINT_COST at the leaf-terminal state (the clue)", () => {
+    // Once warmth has bottomed at TR's terminal clade, the press yields the clue at a single move.
     const s0 = newDailyState("TR", 20);
     const s1 = applyGuess(s0, "TB", store, warmth); // TB shares TF with TR -> warmest at terminal clade
     expect(leafHintActive(s1, store)).toBe(true);
-    expect(hintCost(s1, store)).toBe(HINT_COST_MIN);
+    expect(hintCost(s1, store)).toBe(LEAF_HINT_COST);
   });
-  it("movesUsed sums each row's cost (guesses=1, clue=MIN)", () => {
+  it("movesUsed sums each row's cost (guesses=1, clue=LEAF_HINT_COST)", () => {
     const s0 = newDailyState("TR", 20);
     const s1 = applyGuess(s0, "TB", store, warmth); // guess = 1
-    const s2 = applyHint(s1, store, warmth); // clue = HINT_COST_MIN
-    expect(movesUsed(s2)).toBe(1 + HINT_COST_MIN);
+    const s2 = applyHint(s1, store, warmth); // clue = LEAF_HINT_COST
+    expect(movesUsed(s2)).toBe(1 + LEAF_HINT_COST);
   });
 });
 
@@ -250,7 +251,7 @@ describe("clue press does not spoil the target", () => {
     const s2 = applyHint(s1, store, warmth);
     expect(s2.guesses.at(-1)!.kind).toBe("leafHint");
     expect(revealedNodeIds(s2, store).has("TR")).toBe(false); // target not spoiled
-    expect(movesUsed(s2)).toBe(1 + HINT_COST_MIN); // guess(1) + clue(MIN)
+    expect(movesUsed(s2)).toBe(1 + LEAF_HINT_COST); // guess(1) + clue(1)
   });
 });
 

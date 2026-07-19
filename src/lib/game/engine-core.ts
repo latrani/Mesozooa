@@ -6,7 +6,8 @@ import { terminalClade } from "../tree/terminal";
 export const DAILY_MAX_GUESSES = 20;
 
 export const HINT_COST_MAX = 6; // a shallow (near-root) hint costs this many guess-slots
-export const HINT_COST_MIN = 2; // a leaf-adjacent hint, and the clue, cost this — nothing is free
+export const HINT_COST_MIN = 2; // a leaf-adjacent branch hint costs this — nothing is free
+export const LEAF_HINT_COST = 1; // the clue (leaf hint) costs a single move
 
 // Total guess-slots consumed by a set of rows (guesses=1 each, hints/clue carry their own cost).
 function movesUsedOf(guesses: GuessResult[]): number {
@@ -185,11 +186,11 @@ export function nextHintRun(state: GameState, store: TreeStore): string[] {
 }
 
 // Cost of the NEXT hint/clue press. At the leaf-terminal state the press yields the clue at
-// HINT_COST_MIN. Otherwise it walks a run down to the next narrowing branch point; cost scales
+// LEAF_HINT_COST (a single move). Otherwise it walks a run down to the next narrowing branch point; cost scales
 // by how far along the target's root->leaf lineage that branch point sits (shallow=MAX,
 // leaf-adjacent=MIN).
 export function hintCost(state: GameState, store: TreeStore): number {
-  if (leafHintActive(state, store)) return HINT_COST_MIN;
+  if (leafHintActive(state, store)) return LEAF_HINT_COST;
   const run = nextHintRun(state, store);
   if (run.length === 0) return HINT_COST_MIN;
   const nodeId = run[run.length - 1];
