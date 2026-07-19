@@ -182,6 +182,13 @@
     .specimen-float { position: absolute; top: var(--space-4); right: var(--space-5); z-index: 5; width: max-content; }
     .tree-body { position: relative; flex: 1 1 auto; min-height: 0; }
     .tree-body :global(.tree-viewport) { position: absolute; inset: 0; }
+    /* SpineTree relies on its consumer to make .tree-scroll the flex row that seats the fixed
+       runway spacer beside the SVG (issue #32) and to enable vertical scroll+centering; the
+       restructure dropped this when .middle became .tree-body. Mirror Explorer.svelte:109. */
+    .tree-body :global(.tree-scroll) {
+      position: absolute; inset: 0; display: flex;
+      align-items: safe center; justify-content: flex-start; overflow: auto;
+    }
   }
   .input-row { display: flex; gap: var(--space-3); align-items: center; }
   .budget {
