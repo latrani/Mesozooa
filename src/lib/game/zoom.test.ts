@@ -37,4 +37,27 @@ describe("scrollForZoom", () => {
     });
     expect(fits.left).toBe(0); // 1000*0.1=100 < viewport 200 -> maxLeft 0
   });
+  it("adds the runway (fixed screen px) to the max scroll without scaling it", () => {
+    // Scroll hard to the right so the result saturates the max: content 1000*2=2000 scaled px,
+    // plus a 300px runway that does NOT scale, minus viewport 200 -> maxLeft 2100.
+    const { left } = scrollForZoom({
+      ...base, origin: { x: 0, y: 0 }, scroll: { left: 9000, top: 0 },
+      oldZoom: 1, newZoom: 2, runway: 300,
+    });
+    expect(left).toBe(2100);
+  });
+  it("keeps the runway a FIXED gutter as zoom shrinks (the #32 fix)", () => {
+    // The tree fits the viewport when zoomed out, but the runway still reserves its full 300px
+    // regardless of zoom, so max scroll never collapses below runway - viewport.
+    const { left } = scrollForZoom({
+      ...base, origin: { x: 0, y: 0 }, scroll: { left: 9000, top: 0 },
+      oldZoom: 1, newZoom: 0.1, content: { w: 1000, h: 100 }, runway: 300,
+    });
+    // 1000*0.1=100 scaled tree + 300 runway - 200 viewport = 200. Not 0 (runway unscaled).
+    expect(left).toBe(200);
+  });
+  it("defaults runway to 0 (back-compatible)", () => {
+    const { left } = scrollForZoom({ ...base, oldZoom: 1, newZoom: 2 });
+    expect(left).toBe(100); // unchanged from the no-runway case
+  });
 });

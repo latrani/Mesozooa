@@ -105,9 +105,10 @@
     .explorer { flex: 1 1 auto; min-height: 0; gap: 0; padding: 0; }
     .middle { position: relative; display: block; flex: 1 1 auto; min-height: 0; }
     .middle :global(.tree-viewport) { position: absolute; inset: 0; }
+    /* horizontal LEFT-pinned (issue #34): the tree anchors flush left, no float-to-center. */
     .middle :global(.tree-scroll) {
       position: absolute; inset: 0; display: flex;
-      align-items: safe center; justify-content: safe center; overflow: auto;
+      align-items: safe center; justify-content: flex-start; overflow: auto;
     }
     .middle :global(.tree) { flex: none; }
     .detail-float {
