@@ -62,6 +62,20 @@ describe("chipsFor", () => {
     expect(chips[0].won).toBe(true);
   });
 
+  it("on a win, the winning guess appears once as the answer chip, not also as a guess chip", () => {
+    // last guess is the winner: guessId === sharedNodeId === target
+    const chips = chipsFor([row("guess", "TR", "TF"), row("guess", "TR", "TR")], store, {
+      answerId: "TR",
+      won: true,
+    });
+    const targetChips = chips.filter(
+      (c) => (c.kind === "guess" && c.guessId === "TR") || (c.kind === "answer" && c.nodeId === "TR"),
+    );
+    expect(targetChips).toHaveLength(1);
+    expect(targetChips[0].kind).toBe("answer");
+    expect(chips.some((c) => c.kind === "guess" && c.guessId === "TR")).toBe(false);
+  });
+
   it("prepends an answer chip on loss (outcome color = most-recent guess warmth)", () => {
     const chips = chipsFor([row("guess", "TR", "TF")], store, { answerId: "TB", won: false });
     expect(chips[0].kind).toBe("answer");

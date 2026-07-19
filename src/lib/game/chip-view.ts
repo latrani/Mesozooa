@@ -37,6 +37,9 @@ export function chipsFor(guesses: GuessResult[], store: TreeStore, opts: ChipOpt
         sharedName: displayName(shared?.name),
       });
     } else {
+      // On a win, the winning guess (guessId === answer) is collapsed into the answer chip
+      // below — skip it here so it doesn't also render as a self-referential guess chip.
+      if (opts.won && opts.answerId != null && g.guessId === opts.answerId) continue;
       const guess = store.getNode(g.guessId);
       const shared = store.getNode(g.sharedNodeId);
       chips.push({
