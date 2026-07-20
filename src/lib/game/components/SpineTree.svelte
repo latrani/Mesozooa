@@ -79,7 +79,7 @@
     warmthProvider?: import("../warmth").WarmthProvider;
   } = $props();
 
-  // Warmth along the spine: a node's own warmth (by descendant-genus count) drives its color,
+  // Warmth along the spine: a node's own warmth (two-phase spine depth) drives its color,
   // so the spine grows cold->warm from root to frontier. Guessed genus dots instead use the
   // guess's warmth fraction (matching its bar). Off-spine context stays neutral.
   // Resolve a node's color: injected nodeColor wins; otherwise the built-in warmth default
