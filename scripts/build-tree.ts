@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { pruneSubtree, assembleTree } from "../src/lib/tree/assemble";
 import { dedupeRaws } from "../src/lib/tree/dedupe";
 import { markPlayable, prunePlayable, playableGenera, adaptiveCap, DEFAULT_CAP_DIALS } from "../src/lib/tree/playable";
-import type { RawTaxon, TreeData } from "../src/lib/tree/types";
+import type { RawTaxon, TreeData, TreeNode } from "../src/lib/tree/types";
 import { AVES, DINOSAURIA, NEORNITHES } from "../src/lib/tree/types";
 import type { GenusAttribute, GenusAttributes } from "../src/lib/attributes";
 import { hasClue } from "../src/lib/attributes";
@@ -50,6 +50,24 @@ function generaUnder(tree: TreeData, rootId: string): string[] {
     stack.push(...node.childrenIds);
   }
   return out;
+}
+
+/**
+ * Build a name→node map for by-name resolution (ALWAYS_PLAYABLE / DAILY_CALENDAR), WARNING on any
+ * duplicate name so a homonym can't silently resolve last-writer-wins to the wrong node (#48). Genus
+ * names are effectively unique today (0 collisions), but a future harvest / taxonomy change (#13)
+ * could introduce one; this surfaces it loudly rather than mis-resolving a pin or calendar entry.
+ * `label` names the caller in the warning. Returns the map keyed by node name.
+ */
+function indexByName<T extends { name: string }>(nodes: T[], label: string): Map<string, T> {
+  const map = new Map<string, T>();
+  for (const n of nodes) {
+    if (map.has(n.name)) {
+      console.warn(`⚠ ${label}: duplicate genus name "${n.name}" — by-name resolution is last-writer-wins and may pick the wrong node (#48).`);
+    }
+    map.set(n.name, n);
+  }
+  return map;
 }
 
 async function main() {
@@ -168,9 +186,10 @@ async function main() {
   // Resolve the always-playable names (#46) to ids, cap-only: a pin is honored ONLY if the genus
   // exists, has a clue, and sits in a non-degenerate terminal clade. Report every outcome; a bad
   // pin warns but never fails the build (it's a curation typo, not data corruption).
-  const byName = new Map(Object.values(tree.nodes).filter((n) => n.isGenus).map((n) => [n.name, n]));
+  const byName = indexByName(Object.values(tree.nodes).filter((n) => n.isGenus), "ALWAYS_PLAYABLE");
   const pinned = new Set<string>();
   const pinReport: string[] = [];
+  const pinnedNames = new Map<string, string>(); // id -> source name, for the ✓ report (classified below)
   for (const name of ALWAYS_PLAYABLE) {
     const node = byName.get(name);
     if (!node) { pinReport.push(`  ⚠ "${name}": unknown / not a genus — skipped`); continue; }
@@ -183,14 +202,33 @@ async function main() {
       pinReport.push(`  ⚠ "${name}" (${node.id}): degenerate terminal clade — skipped`); continue;
     }
     pinned.add(node.id);
-    pinReport.push(`  ✓ "${name}" (${node.id}): pinned`);
+    pinnedNames.set(node.id, name);
   }
 
-  // Notability prune: needs a clue; keep ≤ diversity-scaled cap per terminal set.
-  prunePlayable(tree, attrs, (members) =>
-    adaptiveCap(members.map((n) => attrs[n.id]).filter((a): a is GenusAttribute => !!a), DEFAULT_CAP_DIALS),
-    pinned,
-  );
+  // Shared cap function so the counterfactual and real prunes can't diverge.
+  const capFn = (members: TreeNode[]) =>
+    adaptiveCap(members.map((n) => attrs[n.id]).filter((a): a is GenusAttribute => !!a), DEFAULT_CAP_DIALS);
+
+  // Counterfactual (#47): prune with NO pins to see which pinned genera are already natural cap
+  // winners (redundant) vs actually rescued by the pin (load-bearing). markPlayable is a full reset,
+  // so this is a clean throwaway pass before the real prune below.
+  let naturallyPlayable = new Set<string>();
+  if (pinned.size) {
+    prunePlayable(tree, attrs, capFn);
+    naturallyPlayable = new Set(playableGenera(tree).map((n) => n.id));
+    markPlayable(tree); // reset for the real prune
+  }
+
+  // Notability prune: needs a clue; keep ≤ diversity-scaled cap per terminal set. Pins survive it.
+  prunePlayable(tree, attrs, capFn, pinned);
+
+  // Classify each applied pin now that we know the counterfactual (redundant = would be playable
+  // anyway; rescued = the pin is doing real work).
+  for (const [id, name] of pinnedNames) {
+    pinReport.push(naturallyPlayable.has(id)
+      ? `  ✓ "${name}" (${id}): pinned (redundant — already a cap winner)`
+      : `  ✓ "${name}" (${id}): pinned (rescued from cap)`);
+  }
 
   const genera = Object.values(tree.nodes).filter((n) => n.isGenus);
   const playable = playableGenera(tree);
@@ -208,11 +246,11 @@ async function main() {
   // Resolve the daily calendar (#44) date→name against the PLAYABLE set → committed date→id map.
   // A name that isn't a playable genus is omitted + warned; that date falls back at runtime. The
   // calendar never pins (schedule and pin are separate) — an unplayable entry is a curation error.
-  const playableByName = new Map(playable.map((n) => [n.name, n.id]));
+  const playableByName = indexByName(playable, "DAILY_CALENDAR");
   const dailyCalendar: Record<string, string> = {};
   const calReport: string[] = [];
   for (const [date, name] of Object.entries(DAILY_CALENDAR)) {
-    const id = playableByName.get(name);
+    const id = playableByName.get(name)?.id;
     if (id) { dailyCalendar[date] = id; calReport.push(`  ✓ ${date}: ${name} (${id})`); }
     else { calReport.push(`  ⚠ ${date}: "${name}" not playable — falls back`); }
   }
