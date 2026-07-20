@@ -122,6 +122,27 @@ async function resolveRedirects(taxa: RawTaxon[]): Promise<void> {
 async function main() {
   const structure = await fetchStructure();
   const pruned = pruneSubtree(structure, NEORNITHES);
+  // Candidate report (#43, advisory): a taxon still rank-tagged species AFTER the Neornithes prune,
+  // whose parent is NOT itself a species, is a likely mis-tagged genus (the modern-bird species that
+  // dominate the raw set are pruned away with Neornithes). List any that aren't already overridden so
+  // a future harvest's new case is noticed. Warns, never blocks — a missed promotion is a quiet
+  // omission, not corruption.
+  {
+    const byId = new Map(pruned.map((r) => [r.id, r]));
+    const candidates = pruned.filter((r) => {
+      if (r.rankId !== RANK_SPECIES) return false;
+      if (RANK_OVERRIDES[r.id]) return false; // already handled
+      const parent = r.parentId ? byId.get(r.parentId) : undefined;
+      return parent ? parent.rankId !== RANK_SPECIES : true; // parent not a species (infraspecific)
+    });
+    if (candidates.length) {
+      console.warn(`\n⚠ ${candidates.length} species-ranked taxon(s) look like mis-tagged genera (not in RANK_OVERRIDES):`);
+      for (const c of candidates) console.warn(`    ${c.id} (parent ${c.parentId ?? "none"})`);
+      console.warn("  If any is a real dinosaur genus, add its Q-id to src/lib/tree/rank-overrides.ts. (#43)\n");
+    } else {
+      console.log("rank-override candidates: none (all mis-tagged genera are covered)");
+    }
+  }
   // Reduce to in-scope nodes (root -> genus paths) before enrichment.
   const scoped = assembleTree(pruned, DINOSAURIA, "structural");
   const scopedIds = Object.keys(scoped.nodes);
