@@ -120,8 +120,9 @@ cut   Tawa        sl=14   <- BUMPED to #8
 ```
 
 **Shipping rank-override alone bumps Tawa out of the playable pool.** Since Tawa (Ghost Ranch, camp
-week) is a must-keep, the always-playable **playable-override feature** (issue #44-adjacent) is a
-**prerequisite**, not a follow-on: pin Tawa first, then promote Eodromaeus. Sequencing:
+week) is a must-keep, the always-playable **playable-override feature** (a pool-membership pin,
+separate from the #44 daily-calendar feature — issue #46) is a **prerequisite**, not a
+follow-on: pin Tawa first, then promote Eodromaeus. Sequencing:
 
 1. Build the playable-override allowlist; add **Tawa** (and any other camp locals).
 2. *Then* ship this rank-override.
