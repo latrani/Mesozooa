@@ -183,35 +183,41 @@ async function main() {
 
   markPlayable(tree); // base eligibility: genus + enwiki + family ancestor
 
-  // Resolve the always-playable names (#46) to ids, cap-only: a pin is honored ONLY if the genus
-  // exists, has a clue, and sits in a non-degenerate terminal clade. Report every outcome; a bad
-  // pin warns but never fails the build (it's a curation typo, not data corruption).
+  // Resolve the always-playable names (#46) to ids. A pin overrides EVERY gate (#50) — image, clue,
+  // degenerate-clade, even the missing-article base gate — so the only reject is an unknown name.
+  // Report every outcome; a bad pin warns but never fails the build (it's a curation typo, not data
+  // corruption).
   const byName = indexByName(Object.values(tree.nodes).filter((n) => n.isGenus), "ALWAYS_PLAYABLE");
   const pinned = new Set<string>();
   const pinReport: string[] = [];
   const pinnedNames = new Map<string, string>(); // id -> source name, for the ✓ report (classified below)
+  const overrodeGate = new Set<string>(); // ids whose report line is already set (gate override)
   for (const name of ALWAYS_PLAYABLE) {
     const node = byName.get(name);
     if (!node) { pinReport.push(`  ⚠ "${name}": unknown / not a genus — skipped`); continue; }
-    // Base playability: prunePlayable only considers nodes markPlayable set true (genus + enwiki
-    // article). A pin can override the notability CAP, not the missing-article gate — so a genus
-    // with no article can never be pinned, and reporting it "pinned" would lie. Skip + warn.
-    if (!node.wikipediaUrl) { pinReport.push(`  ⚠ "${name}" (${node.id}): no enwiki article — skipped`); continue; }
-    if (!hasClue(attrs[node.id])) { pinReport.push(`  ⚠ "${name}" (${node.id}): no paleo-data — skipped`); continue; }
-    if (tree.nodes[terminalClade(tree, node.id)].branchDepth <= 1) {
-      pinReport.push(`  ⚠ "${name}" (${node.id}): degenerate terminal clade — skipped`); continue;
-    }
+    // Pins override EVERY gate (#50): image, clue, degenerate-clade, even the missing-article base
+    // gate. Record which gate(s) the pin is overriding for the report; base playability is forced
+    // below (after the counterfactual) so prunePlayable's `!n.playable` guard can't drop the pin.
     pinned.add(node.id);
     pinnedNames.set(node.id, name);
+    const overrides: string[] = [];
+    if (!node.wikipediaUrl) overrides.push("no article");
+    if (!hasClue(attrs[node.id])) overrides.push("no paleo-data");
+    if (tree.nodes[terminalClade(tree, node.id)].branchDepth <= 1) overrides.push("degenerate clade");
+    if (!node.imageUrl) overrides.push("no image");
+    if (overrides.length) {
+      pinReport.push(`  ✓ "${name}" (${node.id}): pinned (overriding: ${overrides.join(", ")})`);
+      overrodeGate.add(node.id);
+    }
   }
 
   // Shared cap function so the counterfactual and real prunes can't diverge.
   const capFn = (members: TreeNode[]) =>
     adaptiveCap(members.map((n) => attrs[n.id]).filter((a): a is GenusAttribute => !!a), DEFAULT_CAP_DIALS);
 
-  // Counterfactual (#47): prune with NO pins to see which pinned genera are already natural cap
-  // winners (redundant) vs actually rescued by the pin (load-bearing). markPlayable is a full reset,
-  // so this is a clean throwaway pass before the real prune below.
+  // Counterfactual (#47): prune with NO pins (against the clean markPlayable baseline from above) to
+  // classify clean pins as rescued vs redundant. This MUST run before pins are force-marked playable
+  // below — otherwise article-less pins would taint the no-pin baseline. Reset afterward.
   let naturallyPlayable = new Set<string>();
   if (pinned.size) {
     prunePlayable(tree, attrs, capFn);
@@ -219,12 +225,14 @@ async function main() {
     markPlayable(tree); // reset for the real prune
   }
 
-  // Notability prune: needs a clue; keep ≤ diversity-scaled cap per terminal set. Pins survive it.
+  // Force base playability for pins (bypasses the article gate), then the real prune (pins bypass all).
+  for (const id of pinned) tree.nodes[id].playable = true;
   prunePlayable(tree, attrs, capFn, pinned);
 
-  // Classify each applied pin now that we know the counterfactual (redundant = would be playable
-  // anyway; rescued = the pin is doing real work).
+  // Classify clean pins (those that didn't already get a gate-override line): redundant = would be
+  // playable anyway; rescued = the pin is doing real work.
   for (const [id, name] of pinnedNames) {
+    if (overrodeGate.has(id)) continue;
     pinReport.push(naturallyPlayable.has(id)
       ? `  ✓ "${name}" (${id}): pinned (redundant — already a cap winner)`
       : `  ✓ "${name}" (${id}): pinned (rescued from cap)`);
