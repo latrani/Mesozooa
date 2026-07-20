@@ -17,6 +17,7 @@ export interface RawTaxon {
   taxonName?: string;      // Wikidata P225 (taxon name); may differ from the en label
   enwikiTitle?: string;    // enwiki article title (independent name signal)
   redirectTarget?: string; // if the enwiki article redirects, its target title (advisory only)
+  resolvedFrom?: string;   // species Q-id whose article/sitelinks/image were folded onto this genus
 }
 
 export interface TreeNode {
