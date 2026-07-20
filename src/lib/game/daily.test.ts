@@ -28,6 +28,20 @@ describe("dailyAnswer", () => {
     );
     expect(answers.size).toBeGreaterThan(1);
   });
+  it("returns the calendar override when the date is present and the id is in the pool", () => {
+    expect(dailyAnswer("2026-07-28", pool, { "2026-07-28": "Q30" })).toBe("Q30");
+  });
+  it("ignores an override whose id is NOT in the pool (falls back to deterministic)", () => {
+    const cal = { "2026-07-28": "Q999" }; // Q999 not in pool
+    expect(dailyAnswer("2026-07-28", pool, cal)).toBe(dailyAnswer("2026-07-28", pool));
+  });
+  it("uses the deterministic pick for a date not in the calendar", () => {
+    const cal = { "2026-07-28": "Q30" };
+    expect(dailyAnswer("2026-07-12", pool, cal)).toBe(dailyAnswer("2026-07-12", pool));
+  });
+  it("defaults to no calendar (2-arg call unchanged)", () => {
+    expect(pool.map((p) => p.id)).toContain(dailyAnswer("2026-07-12", pool));
+  });
 });
 
 describe("todayString", () => {
