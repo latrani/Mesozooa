@@ -11,7 +11,6 @@ import {
   revealedNodeIds,
   nextHintRun,
   leafHintActive,
-  playableDescendantCount,
   specimenState,
   refreshWarmth,
   hasProgress,
@@ -345,17 +344,6 @@ describe("leafHintActive", () => {
   });
 });
 
-describe("playableDescendantCount", () => {
-  it("counts playable genera at or below a node", () => {
-    expect(playableDescendantCount(store, "TF")).toBe(2); // TR, TB
-    expect(playableDescendantCount(store, "Q430")).toBe(4); // TR, TB, TC, LO
-    expect(playableDescendantCount(store, "O")).toBe(1); // TC
-  });
-  it("counts a playable leaf as itself", () => {
-    expect(playableDescendantCount(store, "TR")).toBe(1);
-  });
-});
-
 describe("specimenState", () => {
   const daily1 = (target: string): GameState => ({
     target,
@@ -372,12 +360,12 @@ describe("specimenState", () => {
 
   it("is broad when the warmest clade is still large", () => {
     const s = applyGuess(practice("TR"), "TC", store, warmthTR); // mrca=Q430 (count 4)
-    expect(specimenState(s, store)).toEqual({ kind: "broad", count: 4 });
+    expect(specimenState(s, store)).toEqual({ kind: "broad" });
   });
 
-  it("is terminal (with sibling count) when warmth bottoms out at the terminal clade", () => {
+  it("is terminal when warmth bottoms out at the terminal clade", () => {
     const s = applyGuess(practice("TR"), "TB", store, warmthTR); // mrca=TF (count 2 = terminal)
-    expect(specimenState(s, store)).toEqual({ kind: "terminal", siblingCount: 2 });
+    expect(specimenState(s, store)).toEqual({ kind: "terminal" });
   });
 
   it("is solved/won on a correct guess (hints excluded from guessCount)", () => {

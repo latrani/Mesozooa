@@ -120,15 +120,10 @@ export function leafHintActive(state: GameState, store: TreeStore): boolean {
   return warmestCount <= terminalCount;
 }
 
-// Number of playable genera at or below `id` — the size of the still-hidden candidate set.
-export function playableDescendantCount(store: TreeStore, id: string): number {
-  return store.playableGenera().filter((g) => store.pathToRoot(g.id).includes(id)).length;
-}
-
 export type SpecimenState =
   | { kind: "empty" }
-  | { kind: "broad"; count: number }
-  | { kind: "terminal"; siblingCount: number }
+  | { kind: "broad" }
+  | { kind: "terminal" }
   | { kind: "solved"; outcome: "won" | "lost"; targetId: string; guessCount: number };
 
 // The specimen's progression (spec §5): broad -> terminal (+clue) -> solved.
@@ -145,10 +140,9 @@ export function specimenState(state: GameState, store: TreeStore): SpecimenState
   const warmestId = warmestSharedNodeId(state, store);
   if (warmestId === null) return { kind: "empty" };
   if (leafHintActive(state, store)) {
-    const terminalId = terminalClade(store.data, state.target);
-    return { kind: "terminal", siblingCount: playableDescendantCount(store, terminalId) };
+    return { kind: "terminal" };
   }
-  return { kind: "broad", count: store.getNode(warmestId)!.descendantGenusCount };
+  return { kind: "broad" };
 }
 
 export function revealedNodeIds(state: GameState, store: TreeStore): Set<string> {
