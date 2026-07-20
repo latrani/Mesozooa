@@ -58,6 +58,7 @@ export const NAME_DECISIONS: Record<string, { name: string; note: string }> = {
   Q192413:    { name: "Kuru", note: "enwiki 'Kuru (dinosaur)' disambiguator" },
   Q19842095:  { name: "Yi", note: "enwiki 'Yi (dinosaur)' disambiguator" },
   Q921551:    { name: "Kol", note: "enwiki 'Kol (dinosaur)' disambiguator" },
+  Q28219834:  { name: "Oksoko", note: "enwiki 'Oksoko (dinosaur)' disambiguator (genus's own article)" },
 
   // ── enwiki is a binomial, en = P225 the genus → use the genus (no-space preference) ──────
   Q108418977: { name: "Kurupi", note: "enwiki binomial 'Kurupi itaata'" },
@@ -100,4 +101,5 @@ export const NAME_DECISIONS: Record<string, { name: string; note: string }> = {
   // ── genus synonym-sinks: keep OWN name; MERGE deferred to a separate spec ────────────────
   Q21006710: { name: "Ugrunaaluk", note: "enwiki sinks into Edmontosaurus kuukpikensis; keep own name, merge deferred" },
   Q5404650:  { name: "Proornis", note: "enwiki '\"Proornis\"' (dubious); keep own name" },
+  Q1106617:  { name: "Coelosaurus", note: "species-resolved enwiki '\"Coelosaurus\" antiquus' (quoted dubious); keep bare genus" },
 };
