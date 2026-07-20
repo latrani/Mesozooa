@@ -52,12 +52,12 @@
     return { f, color: warmthRampColor(f) };
   });
   const typeTokens = [
-    ["--type-display", "Display 2rem"],
-    ["--type-h", "Heading 1.25rem"],
-    ["--type-body", "Body 1.05rem"],
-    ["--type-label", "Label 0.92rem"],
-    ["--type-meta", "Meta 0.78rem"],
-    ["--type-eyebrow", "Eyebrow 0.72rem"],
+    ["--type-display", "Display 2rem / 32px"],
+    ["--type-title", "Title 1.4rem / 22.4px"],
+    ["--type-heading", "Heading 1.2rem / 19.2px"],
+    ["--type-body", "Body 1rem / 16px"],
+    ["--type-label", "Label 0.9rem / 14.4px"],
+    ["--type-meta", "Meta 0.8rem / 12.8px"],
   ];
 
   const sampleShareText = buildShareText(stateSolvedWon, "2026-07-18");
@@ -244,7 +244,7 @@
   .g-head p { color: var(--ink-soft); font-size: var(--type-label); }
   .g-head code { background: var(--bg-sunk); padding: 0 .3em; border-radius: 4px; }
   section { display: flex; flex-direction: column; gap: var(--space-4); }
-  section > h2 { font-size: var(--type-h); font-weight: var(--fw-bold); border-bottom: 1px solid var(--hairline); padding-bottom: var(--space-2); }
+  section > h2 { font-size: var(--type-heading); font-weight: var(--fw-bold); border-bottom: 1px solid var(--hairline); padding-bottom: var(--space-2); }
 
   .panel-row { display: flex; flex-wrap: wrap; gap: var(--space-5); align-items: flex-start; }
   .panel { border: 1px dashed var(--hairline); border-radius: var(--radius-card); background: var(--bg-page); }
@@ -261,7 +261,7 @@
   .ramp-cell {
     width: 3rem; height: 2.4rem; display: flex; align-items: flex-end; justify-content: center;
   }
-  .ramp-pct { font-size: var(--type-eyebrow); font-weight: var(--fw-bold); color: var(--cream); opacity: .8; padding-bottom: 2px; }
+  .ramp-pct { font-size: var(--type-meta); font-weight: var(--fw-bold); color: var(--cream); opacity: .8; padding-bottom: 2px; }
 
   .frame-row { display: flex; flex-wrap: wrap; gap: var(--space-5); }
   .frame-wrap { display: flex; flex-direction: column; gap: var(--space-2); }
