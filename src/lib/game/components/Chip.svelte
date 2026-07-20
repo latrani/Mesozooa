@@ -66,10 +66,8 @@
   .link:hover { text-decoration-color: var(--turq); color: var(--turq-dp); }
   .name { font-weight: var(--fw-semibold); }
   .chip-crumb .name { font-weight: var(--fw-medium); }
-  /* hint styling family — branchHint + leafHint share this quieter treatment, set apart from guesses */
-  .hint-text { color: var(--ink-soft); font-style: italic; }
-  .hint-text .link { color: var(--ink-soft); }
-  .hint-text .link:hover { color: var(--turq-dp); }
+  /* .hint-text is left as a styling hook (no special treatment for now) — hint chips read as the
+     base cream-dim pill, pending a new hint style to match the guess-chip restyle. */
   /* guess chip — warmth color floods the whole pill; bold white text (>= 14pt bold = WCAG large,
      and the ramp clears white 3:1 across 0..90% where guesses live). The dot is gone (redundant). */
   .guess-fill {
