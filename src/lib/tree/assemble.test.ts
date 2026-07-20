@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { pruneSubtree, assembleTree } from "./assemble";
-import { FIXTURE_RAWS } from "./fixture";
+import { FIXTURE_RAWS, MONO_FIXTURE_RAWS } from "./fixture";
 import { NEORNITHES, DINOSAURIA } from "./types";
 
 describe("pruneSubtree", () => {
@@ -59,5 +59,17 @@ describe("assembleTree", () => {
       "test",
     );
     expect(withSl.nodes["TR"].sitelinks).toBe(42);
+  });
+});
+
+describe("assembleTree branchDepth", () => {
+  it("collapses monotypic runs (unchanged genus count adds 0 depth)", () => {
+    const tree = assembleTree(MONO_FIXTURE_RAWS, "MR", "test");
+    const bd = (id: string) => tree.nodes[id].branchDepth;
+    expect(bd("MR")).toBe(0);          // root
+    expect(bd("B1")).toBe(1);          // 3 < 4: a real narrowing
+    expect(bd("MA")).toBe(1);          // 3 == 3: monotypic, no step
+    expect(bd("MB")).toBe(1);          // 3 == 3: monotypic, no step
+    expect(bd("SA")).toBe(2);          // 2 < 3: a real narrowing
   });
 });

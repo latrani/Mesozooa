@@ -9,6 +9,7 @@
   import GuessList from "../lib/game/components/GuessList.svelte";
   import GameBoard from "../lib/game/components/GameBoard.svelte";
   import { warmthRampColor } from "../lib/game/warmth-ramp";
+  import { warmthForTarget } from "../lib/game/warmth";
   import HowToPlay from "../lib/components/HowToPlay.svelte";
   import { buildShareText } from "../lib/game/share";
   import {
@@ -60,6 +61,10 @@
   ];
 
   const sampleShareText = buildShareText(stateSolvedWon, "2026-07-18");
+
+  // Per-fixture-state provider for the standalone SpineTree panels below (GameBoard reads its
+  // own store.warmthProvider; these panels drive SpineTree directly with a raw revealed/tipId).
+  const galleryWarmth = (state: GameState) => warmthForTarget(treeStore.data, state.target);
 </script>
 
 <div class="gallery">
@@ -129,7 +134,12 @@
       <div class="panel wide">
         <span class="panel-label">{s.label}</span>
         <div class="panel-body">
-          <SpineTree revealed={fixtureStore(s.state).revealed} tipId={fixtureStore(s.state).warmestId} showCounts={false} />
+          <SpineTree
+            revealed={fixtureStore(s.state).revealed}
+            tipId={fixtureStore(s.state).warmestId}
+            showCounts={false}
+            warmthProvider={galleryWarmth(s.state)}
+          />
         </div>
       </div>
     {/each}
@@ -142,6 +152,7 @@
             tipId={fixtureStore(s.state).warmestId}
             highlightId={fixtureStore(s.state).warmestId}
             showCounts={false}
+            warmthProvider={galleryWarmth(s.state)}
           />
         </div>
       </div>

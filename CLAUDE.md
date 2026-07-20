@@ -111,13 +111,15 @@ durable *context* stays here:
   genera under Aves** (`AVES` in `tree/types.ts`), Aves being the only clade here that crosses the
   boundary and so the only place a missing date can hide a Cenozoic taxon. Undated genera elsewhere
   are kept: they're Mesozoic by construction, and ~57% of the pool has no PBDB data at all.
-- **Playable pool ≈ 785** — base = genus + enwiki; pruned to require a paleo clue (age AND
+- **Playable pool ≈ 769** — base = genus + enwiki; pruned to require a paleo clue (age AND
   location) and a diversity-scaled adaptive cap (3–7 per terminal set, tight on low-diversity
-  "boring bucket" clades, wide on well-spread ones). Gates guesses/autocomplete AND
+  "boring bucket" clades, wide on well-spread ones), plus exclude degenerate targets whose terminal clade has branchDepth ≤ 1 (the 16 genera hanging directly off Dinosauria/Saurischia/Ornithischia). Gates guesses/autocomplete AND
   daily/practice answers (one pool; `playable` flag). Cap dials = `DEFAULT_CAP_DIALS` in
   `src/lib/tree/playable.ts`.
-- **Warmth** = size of the shared clade (`descendantGenusCount`), via a swappable
-  `WarmthProvider` (`CountWarmth` now; `PercentWarmth` a config swap).
+- **Warmth** = two-phase spine depth: a linear ramp to a 0.9 anchor as the guess MRCA reaches the
+  target's terminal clade (phase 1, `branchDepth`-normalized), then flat until solved (phase 2,
+  where the field clue disambiguates). `createTwoPhaseWarmth` / `warmthForTarget` in `warmth.ts`;
+  the provider is target-scoped (rebuilt per game). Genus count no longer feeds closeness.
 - **Build:** `npm run fetch` runs the whole pipeline — `fetch:wikidata` → `fetch:pbdb` →
   `fetch:images` → `process:images` → `build:data` — regenerating the committed `src/data/*.json`
   (each stage stays runnable individually for debugging). `fetch:images` (Commons thumbnails +

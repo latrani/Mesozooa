@@ -7,6 +7,7 @@
   import SpecimenPlacard from "./SpecimenPlacard.svelte";
   import BoardLayout from "./BoardLayout.svelte";
   import { specimenView } from "../specimen-view";
+  import type { WarmthProvider } from "../warmth";
 
   let {
     store,
@@ -19,6 +20,7 @@
       state: GameState;
       warmestId: string | null;
       revealed: Set<string>;
+      warmthProvider: WarmthProvider;
       guess: (id: string) => void;
       canHint?: boolean;
       hint?: () => void;
@@ -146,6 +148,7 @@
       {highlightId}
       {rightInset}
       showCounts={false}
+      warmthProvider={store.warmthProvider}
       onnodeselect={ended && onexplore ? (id) => onexplore(id) : undefined}
       linkLabels={ended}
     />

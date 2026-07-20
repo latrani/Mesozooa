@@ -79,6 +79,12 @@ export function prunePlayable(
       continue;
     }
     const a = terminalClade(tree, n.id);
+    // Degenerate targets: a terminal clade with <=1 narrowing step of runway makes two-phase
+    // warmth unitary/binary (spec 3.3). Exclude them; keeps the phase-1 denominator >= 2.
+    if (tree.nodes[a].branchDepth <= 1) {
+      n.playable = false;
+      continue;
+    }
     const list = byClade.get(a);
     if (list) list.push(n);
     else byClade.set(a, [n]);

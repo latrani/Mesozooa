@@ -3,7 +3,7 @@ import { buildShareText } from "./share";
 import type { GameState, GuessResult } from "./types";
 
 function g(fraction: number, kind: "guess" | "branchHint" | "leafHint" = "guess", guessId = "x", cost = 1): GuessResult {
-  return { guessId, sharedNodeId: "s", warmth: { value: 1, display: "", fraction }, kind, cost };
+  return { guessId, sharedNodeId: "s", warmth: { fraction }, kind, cost };
 }
 
 describe("buildShareText", () => {

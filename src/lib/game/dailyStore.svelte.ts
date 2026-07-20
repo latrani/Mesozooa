@@ -1,6 +1,6 @@
 import type { GameState } from "./types";
 import { treeStore } from "./treeData";
-import { createCountWarmth } from "./warmth";
+import { warmthForTarget, type WarmthProvider } from "./warmth";
 import {
   applyGuess,
   applyHint,
@@ -16,8 +16,6 @@ import {
 import { dailyAnswer, todayString } from "./daily";
 import { serializeDaily, deserializeDaily, dailyKey, staleDailyKeys } from "./persistence";
 
-const warmth = createCountWarmth(treeStore.rootCount);
-
 // Drop persisted state from earlier days so keys don't accumulate.
 function pruneStale(today: string): void {
   if (typeof localStorage === "undefined") return;
@@ -31,7 +29,7 @@ function loadOrCreate(date: string): GameState {
     const raw = localStorage.getItem(dailyKey(date));
     const restored = raw ? deserializeDaily(raw) : null;
     // Recompute stored warmth so restored games reflect the current warmth model.
-    if (restored) return refreshWarmth(restored, treeStore, warmth);
+    if (restored) return refreshWarmth(restored, treeStore, warmthForTarget(treeStore.data, restored.target));
   }
   const pool = treeStore.playableGenera().map((n) => ({ id: n.id }));
   return newDailyState(dailyAnswer(date, pool));
@@ -41,6 +39,7 @@ function createDaily() {
   const date = todayString();
   pruneStale(date);
   let state = $state<GameState>(loadOrCreate(date));
+  const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore.data, state.target));
 
   function save() {
     if (typeof localStorage !== "undefined") {
@@ -52,6 +51,9 @@ function createDaily() {
     date,
     get state(): GameState {
       return state;
+    },
+    get warmthProvider(): WarmthProvider {
+      return warmth;
     },
     get warmestId(): string | null {
       return warmestSharedNodeId(state, treeStore);

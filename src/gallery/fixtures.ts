@@ -4,7 +4,7 @@
 import type { GameState } from "../lib/game/types";
 import type { GenusAttribute } from "../lib/attributes";
 import { treeStore } from "../lib/game/treeData";
-import { createCountWarmth } from "../lib/game/warmth";
+import { warmthForTarget, type WarmthProvider } from "../lib/game/warmth";
 import {
   newDailyState,
   applyGuess,
@@ -16,8 +16,6 @@ import {
   movesUsed,
 } from "../lib/game/engine-core";
 import { clueFor } from "../lib/game/clue";
-
-const warmth = createCountWarmth(treeStore.rootCount);
 
 // A frozen store snapshot matching the structural contract GameBoard/Specimen read.
 // No reactivity, no persistence — a fixed view of one GameState via the real selectors.
@@ -32,6 +30,7 @@ export interface FixtureStore {
   nextHintCost?: number;
   movesRemaining?: number;
   guessesUsed?: number;
+  readonly warmthProvider: WarmthProvider;
 }
 
 export function fixtureStore(state: GameState, opts: { daily?: boolean } = {}): FixtureStore {
@@ -41,6 +40,9 @@ export function fixtureStore(state: GameState, opts: { daily?: boolean } = {}): 
     revealed: revealedNodeIds(state, treeStore),
     clue: state.guesses.some((g) => g.kind === "leafHint") ? clueFor(state.target) : null,
     guess: () => {}, // no-op: gallery states are frozen
+    get warmthProvider() {
+      return warmthForTarget(treeStore.data, state.target);
+    },
   };
   if (opts.daily) {
     base.guessesUsed = state.guesses.length;
@@ -61,6 +63,9 @@ export function warmthFractionOf(state: GameState): number {
 // A target genus that HAS siblings + a clue, so the terminal-clue state is exercisable.
 // Archaeopteryx: playable, has attributes (Tithonian, Germany). Its terminal clade has siblings.
 const TARGET = "Q100196"; // Archaeopteryx
+
+// Every state in this file plays toward the same target, so one provider suffices.
+const warmth = warmthForTarget(treeStore.data, TARGET);
 
 function daily(target = TARGET): GameState {
   return newDailyState(target);

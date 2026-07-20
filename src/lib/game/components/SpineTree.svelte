@@ -3,7 +3,6 @@
   import { layoutSpine, centerOffsetFor } from "../spine-layout";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
-  import { createCountWarmth } from "../warmth";
   import { warmthRampColor } from "../warmth-ramp";
   import {
     ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, clampZoom, zoomStep, scrollForZoom,
@@ -51,6 +50,7 @@
     showCounts = true,
     gradeByPlayable = false,
     linkLabels = false,
+    warmthProvider,
   }: {
     revealed: Set<string>;
     tipId: string | null;
@@ -74,17 +74,21 @@
         clicks become portals into Explore — a new affordance appearing mid-session, so it has
         to announce itself. Off in Explore, where clicking the tree IS the mode. */
     linkLabels?: boolean;
+    /** drives on-spine node warmth colors; built per-game (target-aware). Absent in Explore,
+        which injects nodeColor instead and never reaches ownWarmthColor. */
+    warmthProvider?: import("../warmth").WarmthProvider;
   } = $props();
 
-  // Warmth along the spine: a node's own warmth (by descendant-genus count) drives its color,
+  // Warmth along the spine: a node's own warmth (two-phase spine depth) drives its color,
   // so the spine grows cold->warm from root to frontier. Guessed genus dots instead use the
   // guess's warmth fraction (matching its bar). Off-spine context stays neutral.
   // Resolve a node's color: injected nodeColor wins; otherwise the built-in warmth default
   // (guess warmth for a guessed genus dot, own-warmth for spine nodes, null off-spine).
-  const warmthProvider = createCountWarmth(treeStore.rootCount);
   function ownWarmthColor(id: string): string {
     const node = treeStore.getNode(id);
-    return node ? warmthRampColor(warmthProvider.warmth(node).fraction) : "var(--node-context)";
+    return node && warmthProvider
+      ? warmthRampColor(warmthProvider.warmth(node).fraction)
+      : "var(--node-context)";
   }
   function colorOf(id: string, onSpine: boolean, isGenusDot: boolean): string | null {
     // Per the spec contract, the injected nodeColor receives the node's isGenus flag; the

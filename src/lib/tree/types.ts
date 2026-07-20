@@ -26,6 +26,7 @@ export interface TreeNode {
   parentId: string | null;
   childrenIds: string[];
   depth: number;
+  branchDepth: number; // narrowing edges from root (monotypic runs collapsed); warmth ruler
   descendantGenusCount: number;
   isGenus: boolean;
   playable: boolean;

@@ -17,7 +17,7 @@
   {#each trail as id, i (id)}
     {@const node = treeStore.getNode(id)}
     <button type="button" class="crumb" class:active={i === trail.length - 1} onclick={() => onpan?.(id)} disabled={!onpan}>
-      <span class="rung-dot" aria-hidden="true"></span>{displayName(node?.name)} <em>({node?.descendantGenusCount})</em>
+      <span class="rung-dot" aria-hidden="true"></span>{displayName(node?.name)}
     </button>
     {#if i < trail.length - 1}<span class="sep"> › </span>{/if}
   {/each}
@@ -39,7 +39,6 @@
     padding: var(--space-1) var(--space-2); border-radius: var(--radius-pill);
     transition: background var(--dur-fast) var(--ease);
   }
-  .crumb :global(em), .crumb em { font-style: normal; color: var(--trail-text-dim); font-size: var(--type-meta); font-weight: var(--fw-bold); }
   .crumb:hover:not(:disabled), .crumb.active {
     background: rgba(247,239,224,.18);
     box-shadow: inset 0 0 0 1px rgba(247,239,224,.35);
@@ -60,7 +59,6 @@
       padding: var(--space-2) var(--space-4); font-size: 1.2rem; border-radius: 0; position: relative;
     }
     .crumb.active { font-weight: var(--fw-black); font-size: 1.35rem; }
-    .crumb :global(em), .crumb em { margin-left: auto; font-size: .95rem; }
     .rung-dot {
       display: block; width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto;
       background: var(--turq); box-shadow: 0 0 0 3px rgba(13,154,168,.18);

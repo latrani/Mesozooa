@@ -54,6 +54,7 @@ export function assembleTree(
       parentId: id === rootId ? null : r.parentId,
       childrenIds: [],
       depth: 0,
+      branchDepth: 0,
       descendantGenusCount: 0,
       isGenus: r.rankId === RANK_GENUS,
       playable: false,
@@ -83,6 +84,19 @@ export function assembleTree(
     let count = n.isGenus ? 1 : 0;
     for (const c of n.childrenIds) count += nodes[c].descendantGenusCount;
     n.descendantGenusCount = count;
+  }
+
+  // branchDepth: BFS from root, incremented only on a real narrowing (count drops from parent).
+  // Monotypic runs (count unchanged) add 0, matching revealedNodeIds' narrowing test.
+  const bfs: string[] = [rootId];
+  nodes[rootId].branchDepth = 0;
+  while (bfs.length) {
+    const id = bfs.shift()!;
+    for (const c of nodes[id].childrenIds) {
+      const narrows = nodes[c].descendantGenusCount < nodes[id].descendantGenusCount;
+      nodes[c].branchDepth = nodes[id].branchDepth + (narrows ? 1 : 0);
+      bfs.push(c);
+    }
   }
 
   return { dataVersion, rootId, nodes };
