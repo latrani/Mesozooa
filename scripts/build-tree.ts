@@ -173,6 +173,10 @@ async function main() {
   for (const name of ALWAYS_PLAYABLE) {
     const node = byName.get(name);
     if (!node) { pinReport.push(`  ⚠ "${name}": unknown / not a genus — skipped`); continue; }
+    // Base playability: prunePlayable only considers nodes markPlayable set true (genus + enwiki
+    // article). A pin can override the notability CAP, not the missing-article gate — so a genus
+    // with no article can never be pinned, and reporting it "pinned" would lie. Skip + warn.
+    if (!node.wikipediaUrl) { pinReport.push(`  ⚠ "${name}" (${node.id}): no enwiki article — skipped`); continue; }
     if (!hasClue(attrs[node.id])) { pinReport.push(`  ⚠ "${name}" (${node.id}): no paleo-data — skipped`); continue; }
     if (tree.nodes[terminalClade(tree, node.id)].branchDepth <= 1) {
       pinReport.push(`  ⚠ "${name}" (${node.id}): degenerate terminal clade — skipped`); continue;

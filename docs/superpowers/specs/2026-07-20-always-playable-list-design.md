@@ -88,10 +88,13 @@ per listed name, each reported:
   (Report: `always-playable: pinned N`.)
 - **No-op** — name resolved to a genus that was *already* playable (didn't need the pin). Not an
   error; report it so a redundant entry is visible (`already playable, pin redundant`).
-- **Skipped with warning** — name didn't resolve to a genus at all (`unknown / not a genus`), OR
-  resolved but has no clue / degenerate clade (`can't pin: no paleo-data` / `can't pin: degenerate
-  clade`). The build continues (does NOT fail closed — a bad pin is a curation typo, not data
-  corruption), but the warning is loud in the report.
+- **Skipped with warning** — name didn't resolve to a genus (`unknown / not a genus`), OR resolved to
+  a genus that fails a gate `prunePlayable` also enforces: no enwiki article (`no enwiki article` —
+  base playability, `markPlayable`), no clue (`no paleo-data`), or degenerate clade (`degenerate
+  terminal clade`). The build gate is a strict SUPERSET of prunePlayable's requirements, so a name
+  reported `✓ pinned` is guaranteed to actually survive the prune — the report never lies. The build
+  continues (does NOT fail closed — a bad pin is a curation typo, not data corruption); the warning is
+  loud in the report.
 
 This realizes #46's "assumes dino exists; if it doesn't, the app warns but keeps running" — moved to
 build time, which is strictly better (caught before ship, not in a player's console).
