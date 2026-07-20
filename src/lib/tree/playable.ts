@@ -70,6 +70,7 @@ export function prunePlayable(
   tree: TreeData,
   attrs: GenusAttributes,
   capFn: (members: TreeNode[]) => number,
+  pinned: Set<string> = new Set(),
 ): void {
   const byClade = new Map<string, TreeNode[]>();
   for (const n of Object.values(tree.nodes)) {
@@ -81,6 +82,7 @@ export function prunePlayable(
     const a = terminalClade(tree, n.id);
     // Degenerate targets: a terminal clade with <=1 narrowing step of runway makes two-phase
     // warmth unitary/binary (spec 3.3). Exclude them; keeps the phase-1 denominator >= 2.
+    // NOTE: pins do NOT bypass this gate (nor the clue gate above) — cap-only override.
     if (tree.nodes[a].branchDepth <= 1) {
       n.playable = false;
       continue;
@@ -90,8 +92,20 @@ export function prunePlayable(
     else byClade.set(a, [n]);
   }
   for (const members of byClade.values()) {
-    members.sort((x, y) => y.sitelinks - x.sitelinks || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+    // Pinned genera sort to the TOP of the clade (guaranteed past the cap); ties then fall back to
+    // the notability rule (descending sitelinks, ascending id). The trim below keeps the leading
+    // `cap` entries, so pins survive and the lowest-ranked NON-pinned winner is evicted.
+    members.sort((x, y) => {
+      const px = pinned.has(x.id) ? 1 : 0;
+      const py = pinned.has(y.id) ? 1 : 0;
+      if (px !== py) return py - px;
+      return y.sitelinks - x.sitelinks || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0);
+    });
     const cap = capFn(members);
-    for (let i = cap; i < members.length; i++) members[i].playable = false;
+    // Trim to cap, but never evict a pin: sort-to-top guarantees pins survive when pins <= cap,
+    // and this guard keeps them even when a clade has MORE pins than the cap allows.
+    for (let i = cap; i < members.length; i++) {
+      if (!pinned.has(members[i].id)) members[i].playable = false;
+    }
   }
 }

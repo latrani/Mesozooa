@@ -101,6 +101,46 @@ describe("prunePlayable", () => {
     // TC & LO excluded by branchDepth rule; among TR/TB tie, TB wins (ascending id)
     expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB"]);
   });
+  it("pins a cap-bumped genus, evicting the lowest non-pinned winner", () => {
+    const t = freshTree();
+    // TR(5) & TB(3) share terminal clade TF; cap 1 normally keeps TR. Pin TB -> TB survives, TR evicted.
+    prunePlayable(t, clue, () => 1, new Set(["TB"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB"]);
+  });
+  it("pin is a no-op when the genus already wins its cap slot", () => {
+    const t = freshTree();
+    // Pin TR, which already wins cap 1 in TF. Result unchanged: just TR.
+    prunePlayable(t, clue, () => 1, new Set(["TR"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TR"]);
+  });
+  it("does NOT pin a genus with no clue (cap-only override)", () => {
+    const t = freshTree();
+    // Clue map omits TB -> TB has no clue. Pinning it must NOT rescue it; TR wins cap 1 alone.
+    const noTB: GenusAttributes = { TR: clue.TR, TC: clue.TC, LO: clue.LO };
+    prunePlayable(t, noTB, () => 1, new Set(["TB"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TR"]);
+  });
+  it("pinning both members of a clade keeps both even past cap", () => {
+    const t = freshTree();
+    // Pin TR and TB, cap 1. Both pinned -> both sort to top -> both survive the cap-1 trim.
+    prunePlayable(t, clue, () => 1, new Set(["TR", "TB"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB", "TR"]);
+  });
+  it("keeps a low-sitelinks pin AND the top non-pin, trimming the middle (pin sits above notability)", () => {
+    // TF clade holds TR(5), TB(3). Add a third genus TX(9, highest) to TF so cap 2 must choose 2 of 3.
+    // Pin the LOWEST (TB=3), cap 2: TB survives as a pin on top; the one remaining slot goes to the
+    // highest NON-pin (TX=9), and TR(5) — higher than the pin but not pinned — is trimmed. Proves the
+    // pin key sits ABOVE the sitelinks order while non-pins still rank among themselves by notability.
+    const t = freshTree();
+    // Inject TX into clade TF (sibling of TR/TB under family TF).
+    t.nodes["TX"] = {
+      ...t.nodes["TR"], id: "TX", name: "TXsaurus", sitelinks: 9,
+    };
+    t.nodes["TF"].childrenIds = [...t.nodes["TF"].childrenIds, "TX"];
+    const attrs: GenusAttributes = { ...clue, TX: { ageLabel: "Campanian", discoveryLocation: "USA" } };
+    prunePlayable(t, attrs, () => 2, new Set(["TB"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB", "TX"]);
+  });
 });
 
 describe("prunePlayable shallow-terminal exclusion", () => {

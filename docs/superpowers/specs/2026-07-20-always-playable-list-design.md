@@ -71,8 +71,12 @@ members.sort((x, y) => {
 });
 ```
 
-If a clade's pin count exceeds its cap (not a concern at current list size), pins fill the cap and the
-excess pins are still trimmed — acceptable and reported; revisit only if it ever happens.
+A pin is **never** trimmed: the trim loop skips pinned ids. So if a clade's pin count exceeds its cap
+(not a concern at current list size), all its pins survive and the clade simply exceeds cap by the
+overflow — a deliberate curation act, visible in the report. "A pinned genus is always playable" is a
+stronger, simpler guarantee than "pins survive unless there are too many," and matches the intent of
+an always-playable list; the cost (a clade over cap) only occurs if someone pins more than cap-many
+genera into one clade.
 
 ## Graceful failure + build report
 
@@ -84,10 +88,13 @@ per listed name, each reported:
   (Report: `always-playable: pinned N`.)
 - **No-op** — name resolved to a genus that was *already* playable (didn't need the pin). Not an
   error; report it so a redundant entry is visible (`already playable, pin redundant`).
-- **Skipped with warning** — name didn't resolve to a genus at all (`unknown / not a genus`), OR
-  resolved but has no clue / degenerate clade (`can't pin: no paleo-data` / `can't pin: degenerate
-  clade`). The build continues (does NOT fail closed — a bad pin is a curation typo, not data
-  corruption), but the warning is loud in the report.
+- **Skipped with warning** — name didn't resolve to a genus (`unknown / not a genus`), OR resolved to
+  a genus that fails a gate `prunePlayable` also enforces: no enwiki article (`no enwiki article` —
+  base playability, `markPlayable`), no clue (`no paleo-data`), or degenerate clade (`degenerate
+  terminal clade`). The build gate is a strict SUPERSET of prunePlayable's requirements, so a name
+  reported `✓ pinned` is guaranteed to actually survive the prune — the report never lies. The build
+  continues (does NOT fail closed — a bad pin is a curation typo, not data corruption); the warning is
+  loud in the report.
 
 This realizes #46's "assumes dino exists; if it doesn't, the app warns but keeps running" — moved to
 build time, which is strictly better (caught before ship, not in a player's console).
