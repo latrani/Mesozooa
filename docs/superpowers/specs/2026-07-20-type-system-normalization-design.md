@@ -122,8 +122,8 @@ label as a documented off-scale exception; the rest still tokenize.
 
 ## Non-goals
 
-- Not growing the app to a 24px base (the "preserve current look" decision). A future
-  intentional-scale-up pass could set `html { font-size: 150% }` so `1rem = 24px = 18pt`, but
-  that's a separate, deliberate visual change — out of scope here.
+- Not growing the app to a 24px base — explicitly declined in favor of "preserve current look."
+  The `html { font-size: 150% }` mechanism was considered and rejected; this is a record of that
+  decision, not a deferred plan.
 - Not touching `--fw-*` weights, `--font-*` families, or `--space-*` (already consistent /
   separate concern).
