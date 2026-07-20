@@ -27,6 +27,17 @@ This is not monotypy-specific and not an edge case. Measured over our **2,074 ha
   species) appears **710** times across Dinosauria — proof that the fields scatter *per field*, not
   as a block.
 
+What actually changes for the **114 rescued** (scoped) genera, by field:
+
+- **60** — the Cryolophosaurus pattern: image already on the genus item, so they gain **article +
+  sitelinks**; the image is unchanged (the resolution rule keeps the genus's own image).
+- **27** — no genus image but a species has one: gain **article + sitelinks + image**.
+- **27** — no image anywhere: gain **article + sitelinks** only.
+
+So for the Cryolophosaurus-pattern majority, the improvement is the article (which unlocks
+playability + the Explore link) and the corrected notability count — *not* the image, which was the
+one field already filed on the right entity.
+
 ### Why this matters — the three downstream consumers
 
 The scattered fields drive three things, all corrupted at once when we read the genus item:
