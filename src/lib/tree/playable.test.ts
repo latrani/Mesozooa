@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { markPlayable, playableGenera, prunePlayable, adaptiveCap, DEFAULT_CAP_DIALS } from "./playable";
 import type { CapDials } from "./playable";
 import { assembleTree, pruneSubtree } from "./assemble";
+import { terminalClade } from "./terminal";
 import { FIXTURE_RAWS } from "./fixture";
 import { NEORNITHES, DINOSAURIA } from "./types";
 import type { GenusAttributes, GenusAttribute } from "../attributes";
@@ -77,24 +78,50 @@ describe("prunePlayable", () => {
 
   it("keeps the top-cap most-notable per terminal set", () => {
     const t = freshTree();
-    // TR & TB share terminal clade TF; cap 1 -> keep TR (5>3). TC & LO are alone in theirs.
+    // TR & TB share terminal clade TF; cap 1 -> keep TR (5>3). LO & TC excluded by branchDepth rule.
     prunePlayable(t, clue, () => 1);
-    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["LO", "TC", "TR"]);
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TR"]);
   });
   it("keeps everyone when cap >= set size", () => {
     const t = freshTree();
     prunePlayable(t, clue, () => 7);
-    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["LO", "TB", "TC", "TR"]);
+    // LO & TC excluded by branchDepth rule (their terminal clades have branchDepth <= 1)
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB", "TR"]);
   });
   it("drops genera with no clue regardless of notability", () => {
     const t = freshTree();
     prunePlayable(t, { TR: { ageLabel: "x", discoveryLocation: "y" }, TB: { ageLabel: "x", discoveryLocation: "y" }, LO: { ageLabel: "x", discoveryLocation: "y" } }, () => 7); // TC no clue
-    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["LO", "TB", "TR"]);
+    // LO excluded by branchDepth rule (terminal clade T has branchDepth = 1)
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB", "TR"]);
   });
   it("breaks sitelink ties by ascending id", () => {
     const t = freshTree();
     t.nodes["TR"].sitelinks = 3; // tie with TB in clade TF
     prunePlayable(t, clue, () => 1);
-    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["LO", "TB", "TC"]);
+    // TC & LO excluded by branchDepth rule; among TR/TB tie, TB wins (ascending id)
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB"]);
+  });
+});
+
+describe("prunePlayable shallow-terminal exclusion", () => {
+  it("drops genera whose terminal clade has branchDepth <= 1", () => {
+    const tree = assembleTree(FIXTURE_RAWS, "Q430", "test");
+    // Give every genus a clue so only the branchDepth rule can exclude them.
+    const attrs: GenusAttributes = {};
+    for (const n of Object.values(tree.nodes)) {
+      if (n.isGenus) attrs[n.id] = { discoveryLocation: "US", ageStartMa: 80, ageEndMa: 70 };
+    }
+    markPlayable(tree);
+    prunePlayable(tree, attrs, () => 99); // cap high so only the rule prunes
+    let foundShallow = false;
+    for (const n of Object.values(tree.nodes)) {
+      if (!n.isGenus) continue;
+      const bd = tree.nodes[terminalClade(tree, n.id)].branchDepth;
+      if (bd <= 1) {
+        foundShallow = true;
+        expect(n.playable).toBe(false);
+      }
+    }
+    expect(foundShallow).toBe(true); // Verify the test actually found a shallow case
   });
 });
