@@ -74,7 +74,9 @@
      (the museum "coming soon" conceit), without shrinking the identified/solved rows. */
   .field dd.placeholder { opacity: .5; font-size: var(--type-label); font-weight: var(--fw-medium); }
   .field .detail { display: block; opacity: .72; font-size: var(--type-label); }
-  .note { color: var(--specimen-text-dim); font-size: var(--type-body); }
+  /* De-emphasized: honest reference context (genera count), not a primary signal — smaller so it
+     reads as minor caption beneath the title. See two-phase warmth work / #41. */
+  .note { color: var(--specimen-text-dim); font-size: var(--type-label); }
   .wiki { font-weight: var(--fw-semibold); font-size: var(--type-label); align-self: flex-start; color: var(--sand-200); }
   /* image credit — small, understated provenance; hugs the photo via the figure's 2px gap. */
   .credit { margin: 0; font-size: var(--type-meta); opacity: .55; display: flex; max-width: 100%; }

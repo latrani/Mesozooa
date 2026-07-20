@@ -497,7 +497,10 @@
      the context clades. Non-playable genera recede to the mute end. */
   .node.genus.playable .lbl { fill: var(--ink); }
   .node.genus.nonplayable .lbl { fill: var(--node-nonplayable); }
-  .count { fill: var(--ink-soft); font-size: 0.78rem; font-weight: var(--fw-bold); }
+  /* De-emphasized: genera-count is honest reference context in Explore, NOT a closeness signal
+     (retired as such in the two-phase warmth work). Muted fill + regular weight so it recedes
+     beside the clade name. */
+  .count { fill: var(--ink-mute); font-size: 0.78rem; font-weight: var(--fw-regular); }
   /* fill is inherited into each <use>'s instanced path, so setting it on the glyph recolors
      the shape; inline style (resolved color) still wins over these structural defaults. */
   .glyph-bg { fill: var(--bg-page); }                        /* page-color backing disc */
