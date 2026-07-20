@@ -14,6 +14,7 @@ import {
   leafHintActive,
 } from "./engine-core";
 import { dailyAnswer, todayString } from "./daily";
+import dailyCalendar from "../../data/daily-calendar.json";
 import { serializeDaily, deserializeDaily, dailyKey, staleDailyKeys } from "./persistence";
 
 // Drop persisted state from earlier days so keys don't accumulate.
@@ -32,7 +33,7 @@ function loadOrCreate(date: string): GameState {
     if (restored) return refreshWarmth(restored, treeStore, warmthForTarget(treeStore.data, restored.target));
   }
   const pool = treeStore.playableGenera().map((n) => ({ id: n.id }));
-  return newDailyState(dailyAnswer(date, pool));
+  return newDailyState(dailyAnswer(date, pool, dailyCalendar as Record<string, string>));
 }
 
 function createDaily() {
