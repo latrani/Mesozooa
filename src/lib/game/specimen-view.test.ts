@@ -14,7 +14,7 @@ import type { GameState } from "./types";
 function node(over: Partial<TreeNode>): TreeNode {
   return {
     id: "Q1", name: "Testosaurus", rankId: null, parentId: null, childrenIds: [],
-    depth: 5, descendantGenusCount: 1, isGenus: true, playable: true, sitelinks: 3,
+    depth: 5, branchDepth: 0, descendantGenusCount: 1, isGenus: true, playable: true, sitelinks: 3,
     ...over,
   };
 }

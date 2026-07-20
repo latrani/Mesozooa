@@ -5,7 +5,7 @@ import type { TreeNode } from "../tree/types";
 function node(count: number): TreeNode {
   return {
     id: "x", name: "X", rankId: null, parentId: null, childrenIds: [],
-    depth: 0, descendantGenusCount: count, isGenus: false, playable: false, sitelinks: 0,
+    depth: 0, branchDepth: 0, descendantGenusCount: count, isGenus: false, playable: false, sitelinks: 0,
   };
 }
 
