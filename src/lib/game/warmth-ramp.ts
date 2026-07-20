@@ -1,20 +1,19 @@
-// Dark earth (cold/far) -> turquoise gem (hot/near). CSS-var refs so token edits flow through.
-// Positioned control STOPS: `at` places each stop along 0..1, so we can STRETCH the varied
-// earth->green range across most of the bar and COMPRESS the near-identical turquoise cluster
-// (warm-3/4/5) into the hot end, where even spacing wasted the top fifth. warmthRampColor
-// interpolates continuously between stops (color-mix) so it reads as a smooth gradient.
+// Deep ore (cold/far) -> luminous cyan (hot/near). CSS-var refs so token edits flow through.
+// Two-segment "elbow" shape: `at` positions hold the earthy->green range across the lower ~80%,
+// then compress the brighten into the top: teal at 0.85 (the elbow), a bright "almost there" at
+// 0.95, and the luminous "fully lit" solved cyan at 1. Every stop clears white >= 3:1, since guess
+// chips flood-fill with white text. warmthRampColor interpolates continuously (color-mix).
 export interface WarmthStop {
   at: number;
   color: string;
 }
 export const WARMTH_RAMP: readonly WarmthStop[] = [
-  { at: 0, color: "var(--placard-edge)" }, // deep ore
-  { at: 0.28, color: "var(--warm-0)" }, // dark tan
-  { at: 0.52, color: "var(--warm-1)" }, // olive
-  { at: 0.74, color: "var(--warm-2)" }, // green
-  { at: 0.88, color: "var(--warm-3)" }, // teal-green — turquoise cluster begins
-  { at: 0.95, color: "var(--warm-4)" }, // near-turquoise
-  { at: 1, color: "var(--warm-5)" }, // gem turquoise
+  { at: 0, color: "var(--warm-0)" }, // deep ore
+  { at: 0.2, color: "var(--warm-1)" }, // umber
+  { at: 0.5, color: "var(--warm-2)" }, // olive-green
+  { at: 0.85, color: "var(--warm-3)" }, // teal — the elbow
+  { at: 0.95, color: "var(--warm-4)" }, // bright teal-cyan — "almost there"
+  { at: 1, color: "var(--warm-5)" }, // luminous cyan — "fully lit" / solved
 ] as const;
 
 function clamp01(x: number): number {

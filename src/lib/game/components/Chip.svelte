@@ -20,8 +20,9 @@
 
 <li class="chip chip-{chip.kind}" in:fly={{ y: -10, duration: animateIn ? 200 : 0 }}>
   {#if chip.kind === "answer"}
-    <span class="answer-fill" class:win={chip.won} style="background: {chip.bgColor}">
-      Answer: <button type="button" class="link on-fill" onclick={() => onselect(chip.nodeId)}>{chip.name}</button>
+    <span class="guess-fill answer" style="background: {chip.bgColor}; --glow: {chip.bgColor}">
+      <span class="conn">Answer:</span>
+      <button type="button" class="link name on-fill" onclick={() => onselect(chip.nodeId)}>{chip.name}</button>
     </span>
   {:else if chip.kind === "leafHint"}
     <span class="hint-text">{chip.label}</span>
@@ -31,11 +32,10 @@
   {:else if chip.kind === "crumb"}
     <button type="button" class="link name" onclick={() => onselect(chip.nodeId)}>{chip.name}</button>
   {:else}
-    <span class="dot" style="background: {chip.dotColor}"></span>
-    <span class="chip-text">
-      <button type="button" class="link name" onclick={() => onselect(chip.nodeId)}>{chip.name}</button>
-      shares
-      <button type="button" class="link" onclick={() => onselect(chip.sharedNodeId)}>{chip.sharedName}</button>
+    <span class="guess-fill" style="background: {chip.dotColor}">
+      <button type="button" class="link name on-fill" onclick={() => onselect(chip.nodeId)}>{chip.name}</button>
+      <span class="conn">shares</span>
+      <button type="button" class="link on-fill" onclick={() => onselect(chip.sharedNodeId)}>{chip.sharedName}</button>
     </span>
   {/if}
 </li>
@@ -49,8 +49,8 @@
     background: var(--cream-dim); border-radius: var(--radius-pill);
     padding: 0 0.4rem 0 4px;
   }
-  /* the answer chip's fill IS the pill, so strip the outer pill's padding to let it fill edge-to-edge */
-  .chip.chip-answer { padding: 0; }
+  /* the answer + guess chips' fill IS the pill, so strip the outer pill's padding to fill edge-to-edge */
+  .chip.chip-answer, .chip.chip-guess { padding: 0; }
   /* crumb + leafHint carry no dot — even up the padding so text isn't lopsided toward the left */
   .chip.chip-crumb, .chip.chip-leafHint { padding: 0 .55rem; }
 
@@ -70,14 +70,22 @@
   .hint-text { color: var(--ink-soft); font-style: italic; }
   .hint-text .link { color: var(--ink-soft); }
   .hint-text .link:hover { color: var(--turq-dp); }
-  /* answer chip — outcome color as the fill, cream ink over it */
-  .answer-fill {
-    display: inline-flex; align-items: center; gap: .35rem;
-    /* no vertical padding: match the dot-carrying chips, whose height is their text line box. */
-    padding: 0 .6rem; border-radius: var(--radius-pill);
-    font-weight: var(--fw-bold); color: var(--cream);
+  /* guess chip — warmth color floods the whole pill; bold white text (>= 14pt bold = WCAG large,
+     and the ramp clears white 3:1 across 0..90% where guesses live). The dot is gone (redundant). */
+  .guess-fill {
+    display: inline-flex; align-items: center; gap: .3em;
+    padding: .16rem .7rem; border-radius: var(--radius-pill);
+    font-size: 1.2rem; font-weight: var(--fw-bold); color: #fff;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 14%, transparent);
   }
-  .answer-fill.win { box-shadow: var(--gem-glow); }
-  .answer-fill .link.on-fill { color: var(--cream); text-decoration-color: color-mix(in srgb, var(--cream) 60%, transparent); }
-  .answer-fill .link.on-fill:hover { color: var(--cream); text-decoration-color: var(--cream); }
+  .guess-fill .conn { font-weight: var(--fw-semibold); opacity: .85; }
+  .guess-fill .name { font-weight: var(--fw-black); }
+  .guess-fill .link.on-fill { color: #fff; text-decoration-color: color-mix(in srgb, #fff 55%, transparent); }
+  .guess-fill .link.on-fill:hover { color: #fff; text-decoration-color: #fff; }
+  /* answer chip = a guess-fill pill (same fill + white text) with a prominent glow in its OWN
+     warmth color (win = fully-lit; loss = your warmest guess's color), set via --glow inline. */
+  .guess-fill.answer {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 14%, transparent),
+                0 0 20px 3px color-mix(in srgb, var(--glow) 75%, transparent);
+  }
 </style>

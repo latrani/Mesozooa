@@ -25,7 +25,7 @@ describe("warmthRampColor", () => {
     expect(warmthRampColor(2)).toBe(WARMTH_RAMP[WARMTH_RAMP.length - 1].color);
   });
   it("stops run cold->hot with strictly increasing positions from 0 to 1", () => {
-    expect(WARMTH_RAMP[0]).toEqual({ at: 0, color: "var(--placard-edge)" });
+    expect(WARMTH_RAMP[0]).toEqual({ at: 0, color: "var(--warm-0)" });
     expect(WARMTH_RAMP[WARMTH_RAMP.length - 1]).toEqual({ at: 1, color: "var(--warm-5)" });
     for (let i = 1; i < WARMTH_RAMP.length; i++) {
       expect(WARMTH_RAMP[i].at).toBeGreaterThan(WARMTH_RAMP[i - 1].at);

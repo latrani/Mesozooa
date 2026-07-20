@@ -29,13 +29,15 @@
   --sand-200: #e6be93;
   --sand-400: #c8a578;
 
-  /* WARMTH RAMP — ore (cold/far) -> turquoise gem (hot/near) */
-  --warm-0: #7a6a4c;
-  --warm-1: #8f7f4a;
-  --warm-2: #7f9257;
-  --warm-3: #4f9f8a;
-  --warm-4: #1aa39f;
-  --warm-5: #0d9aa8;
+  /* WARMTH RAMP — deep ore (cold/far) -> luminous cyan (hot/near). Two-segment "elbow": earthy
+     green holds through the mid, then a brighten from ~0.85 up. Every stop clears white >= 3:1
+     (guess chips are flood-filled with white text). Positions live in warmth-ramp.ts. */
+  --warm-0: #331d0c;  /* deep ore */
+  --warm-1: #5c3f26;  /* umber */
+  --warm-2: #6f7342;  /* olive-green */
+  --warm-3: #43887a;  /* teal (the elbow) */
+  --warm-4: #1799a7;  /* bright teal-cyan — "almost there" */
+  --warm-5: #0ba2b2;  /* luminous cyan — "fully lit" / solved */
 
   /* ============================================================
      SEMANTIC LAYER — roles map to primitives above; components
@@ -85,7 +87,7 @@
      by design; genus-vs-clade is carried by the dot, not the label fill. */
   --node-nonplayable: var(--ink-mute);
   --leader: var(--hairline);
-  --gem-glow: 0 0 8px rgba(13,154,168,.55);
+  --gem-glow: 0 0 8px rgba(11,162,178,.55);  /* matches --warm-5 (ramp hot end) */
 
   /* Active-tab / focus accent */
   --accent: var(--turq);

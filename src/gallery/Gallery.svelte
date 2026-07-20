@@ -65,6 +65,7 @@
   // Per-fixture-state provider for the standalone SpineTree panels below (GameBoard reads its
   // own store.warmthProvider; these panels drive SpineTree directly with a raw revealed/tipId).
   const galleryWarmth = (state: GameState) => warmthForTarget(treeStore.data, state.target);
+
 </script>
 
 <div class="gallery">
@@ -226,7 +227,12 @@
 </div>
 
 <style>
-  .gallery { max-width: none; padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-7); }
+  /* Lay the light board color over the terracotta body ground (base.css only does this for #app,
+     not the gallery's #gallery mount) so the gallery is readable, without touching the load-bearing
+     terracotta body bg that feeds the Safari/Orion window-chrome tint. */
+  .gallery { max-width: none; padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-7);
+    min-height: 100dvh; background: var(--bg-page); }
+
   .g-head h1 { font-family: var(--font-head); font-size: var(--type-display); font-weight: var(--fw-bold); letter-spacing: .03em; }
   .g-head p { color: var(--ink-soft); font-size: var(--type-label); }
   .g-head code { background: var(--bg-sunk); padding: 0 .3em; border-radius: 4px; }

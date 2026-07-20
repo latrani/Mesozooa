@@ -17,7 +17,7 @@ export interface ChipOpts {
   /** the answer node — present only at end state */
   answerId?: string | null;
   won?: boolean;
-  /** warmth fraction of the most-recent real guess (drives the loss answer color) */
+  /** warmth fraction of the most-recent real guess — colors the loss answer chip */
   lastGuessFraction?: number;
 }
 
@@ -61,6 +61,8 @@ export function chipsFor(guesses: GuessResult[], store: TreeStore, opts: ChipOpt
   // answer chip pinned on top at end state
   if (opts.answerId) {
     const node = store.getNode(opts.answerId);
+    // Win: the answer was found -> fully lit (fraction 1). Loss: colored by your most-recent
+    // (warmest) guess's warmth, so the reveal reflects how close you got. Both fill + glow.
     const bgColor = opts.won ? warmthRampColor(1) : warmthRampColor(opts.lastGuessFraction ?? 0);
     chips.unshift({
       kind: "answer",

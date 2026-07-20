@@ -4,6 +4,7 @@
   import { searchSource, pathPositions } from "../explorer-core";
   import SpineTree from "../../game/components/SpineTree.svelte";
   import { displayName } from "../../game/displayName";
+  import { warmthRampColor } from "../../game/warmth-ramp";
   import SearchBox from "../../game/components/SearchBox.svelte";
   import SpecimenPlacard from "../../game/components/SpecimenPlacard.svelte";
   import { nodeView } from "../../game/specimen-view";
@@ -28,10 +29,11 @@
     else explorer.focus(id);
   }
 
-  // Explore highlights the selected path only (issue #6): on-path (spine) nodes turquoise,
-  // everything else ore. Intentionally diverges from game mode's warmth coloring.
+  // Explore highlights the selected path only (issue #6): on-path (spine) nodes hot, everything
+  // else cold. Pinned to the GAME ramp's two endpoints via warmthRampColor(1)/(0) — not hand-picked
+  // tokens — so Explore and game can never drift to different warmth colors again.
   let pathPos = $derived(pathPositions(treeStore, explorer.highlightId));
-  const nodeColor = (id: string) => (pathPos.has(id) ? "var(--turq)" : "var(--placard-edge)");
+  const nodeColor = (id: string) => (pathPos.has(id) ? warmthRampColor(1) : warmthRampColor(0));
 </script>
 
 <main class="explorer">
