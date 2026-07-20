@@ -255,11 +255,15 @@ export function resolveCluster(genus: RawTaxon, species: RawTaxon[]): ClusterRes
     return { sitelinks: sl(genus), imageUrl };
   }
 
-  // Only suppress the enwikiTitle name-candidate for a SPECIES rep whose binomial starts with the
-  // genus name; a genus rep keeps its own title, and a non-matching species title is kept for the gate.
+  // Only suppress the enwikiTitle name-candidate for a SPECIES rep whose BINOMIAL starts with the
+  // genus name ("Afrovenator abakensis"); a genus rep keeps its own title, a title that IS the bare
+  // genus name ("Cryolophosaurus") is kept (it confirms, no false conflict — it dedupes against the
+  // genus's own name), and a non-matching species title ('"Coelosaurus" antiquus') is kept for the
+  // gate to flag. The length>1 guard is what distinguishes a confirming binomial from a bare title.
   const repIsSpecies = rep.id !== genus.id;
-  const titleConfirmsGenus = rep.enwikiTitle?.split(" ")[0] === genus.name;
-  const enwikiTitle = repIsSpecies && titleConfirmsGenus ? undefined : rep.enwikiTitle;
+  const titleParts = rep.enwikiTitle?.split(" ") ?? [];
+  const titleIsConfirmingBinomial = titleParts.length > 1 && titleParts[0] === genus.name;
+  const enwikiTitle = repIsSpecies && titleIsConfirmingBinomial ? undefined : rep.enwikiTitle;
 
   return {
     wikipediaUrl: rep.wikipediaUrl,
