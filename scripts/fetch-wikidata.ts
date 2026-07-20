@@ -2,7 +2,7 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { sparql, qid } from "./wikidata";
 import { pruneSubtree, assembleTree } from "../src/lib/tree/assemble";
 import type { RawTaxon } from "../src/lib/tree/types";
-import { DINOSAURIA, NEORNITHES } from "../src/lib/tree/types";
+import { DINOSAURIA, NEORNITHES, RANK_SPECIES } from "../src/lib/tree/types";
 import { enwikiTitleFromUrl } from "./enwiki-title";
 
 const PAGE = 10000;
@@ -32,6 +32,28 @@ async function fetchStructure(): Promise<RawTaxon[]> {
     raws.push({ id: DINOSAURIA, name: DINOSAURIA, rankId: null, parentId: null });
   }
   return raws;
+}
+
+// Child species of the in-scope genera, for cluster resolution. VALUES-bound to OUR genus
+// ids (not all Dinosauria species) so orphan/hybrid junk — which has no valid genus parent —
+// can never attach. Returns bare records; enrich() fills article/sitelinks/image just like genera.
+async function fetchClusterSpecies(genusIds: string[]): Promise<RawTaxon[]> {
+  const BATCH = 400;
+  const out: RawTaxon[] = [];
+  for (let i = 0; i < genusIds.length; i += BATCH) {
+    const values = genusIds.slice(i, i + BATCH).map((id) => `wd:${id}`).join(" ");
+    const rows = await sparql(`
+      SELECT ?sp ?genus WHERE {
+        VALUES ?genus { ${values} }
+        ?sp wdt:P171 ?genus .
+        ?sp wdt:P105 wd:${RANK_SPECIES} .
+      }`);
+    for (const r of rows) {
+      out.push({ id: qid(r.sp!), name: qid(r.sp!), rankId: RANK_SPECIES, parentId: qid(r.genus!) });
+    }
+    console.log(`cluster species: ${out.length} (genus batch ${Math.min(i + BATCH, genusIds.length)}/${genusIds.length})`);
+  }
+  return out;
 }
 
 async function enrich(ids: string[], byId: Map<string, RawTaxon>): Promise<void> {

@@ -5,6 +5,7 @@ export const NEORNITHES = "Q19163";
 export const AVES = "Q5113";
 export const RANK_GENUS = "Q34740";
 export const RANK_FAMILY = "Q35409";
+export const RANK_SPECIES = "Q7432";
 
 export interface RawTaxon {
   id: string;
