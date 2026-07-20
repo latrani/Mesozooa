@@ -185,7 +185,10 @@ Then, immediately BEFORE the `prunePlayable(tree, attrs, ...)` call (currently ~
   }
 ```
 
-`hasClue` and `terminalClade` must be imported in `build-tree.ts` if not already. Check the existing imports; add whichever is missing:
+`hasClue` and `terminalClade` are NOT currently imported in `build-tree.ts` (only the TYPES
+`GenusAttribute`/`GenusAttributes` are, via `import type`). Add these as separate VALUE imports — do
+NOT merge `hasClue` into the existing `import type { … }` line (that would break `verbatimModuleSyntax`,
+since `hasClue` is a runtime value, not a type):
 
 ```typescript
 import { hasClue } from "../src/lib/attributes";
