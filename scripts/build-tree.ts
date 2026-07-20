@@ -8,6 +8,7 @@ import type { GenusAttribute, GenusAttributes } from "../src/lib/attributes";
 import { hasClue } from "../src/lib/attributes";
 import { terminalClade } from "../src/lib/tree/terminal";
 import { ALWAYS_PLAYABLE } from "../src/lib/tree/always-playable";
+import { DAILY_CALENDAR } from "../src/lib/game/daily-calendar";
 import type { ImageCredits } from "../src/lib/image-credits";
 import { enrichAge, isMesozoic, MESOZOIC_END_MA } from "../src/lib/geologic-time";
 import { findConflicts, findDecisionCollisions, type NameConflict } from "../src/lib/tree/names";
@@ -204,6 +205,18 @@ async function main() {
   const clueOut: GenusAttributes = {};
   for (const n of genera) if (attrs[n.id]) clueOut[n.id] = attrs[n.id];
 
+  // Resolve the daily calendar (#44) date→name against the PLAYABLE set → committed date→id map.
+  // A name that isn't a playable genus is omitted + warned; that date falls back at runtime. The
+  // calendar never pins (schedule and pin are separate) — an unplayable entry is a curation error.
+  const playableByName = new Map(playable.map((n) => [n.name, n.id]));
+  const dailyCalendar: Record<string, string> = {};
+  const calReport: string[] = [];
+  for (const [date, name] of Object.entries(DAILY_CALENDAR)) {
+    const id = playableByName.get(name);
+    if (id) { dailyCalendar[date] = id; calReport.push(`  ✓ ${date}: ${name} (${id})`); }
+    else { calReport.push(`  ⚠ ${date}: "${name}" not playable — falls back`); }
+  }
+
   // GUARD 2 (output regression): compare this build against the CURRENTLY-COMMITTED data and
   // fail-closed if key coverage drops sharply — a rebuild should never ship materially LESS than
   // what's committed unless a data change is intended. Catches any silent degradation (stale raw,
@@ -269,6 +282,7 @@ async function main() {
   await writeFile("src/data/genera-index.json", JSON.stringify(index));
   await writeFile("src/data/genus-attributes.json", JSON.stringify(clueOut));
   await writeFile("src/data/meta.json", JSON.stringify({ dataPulledAt }));
+  await writeFile("src/data/daily-calendar.json", JSON.stringify(dailyCalendar));
 
   // Data-quality report.
   console.log("=== Mesozooa data build ===");
@@ -282,6 +296,8 @@ async function main() {
   console.log("playable (pruned):  ", playable.length, `(adaptive cap ${DEFAULT_CAP_DIALS.capMin}–${DEFAULT_CAP_DIALS.capMax})`);
   console.log(`always-playable pins (${pinned.size}/${ALWAYS_PLAYABLE.length} applied):`);
   for (const line of pinReport) console.log(line);
+  console.log(`daily calendar: ${Object.keys(dailyCalendar).length}/${Object.keys(DAILY_CALENDAR).length} dates resolved`);
+  for (const line of calReport) console.log(line);
   console.log("clue attributes:    ", Object.keys(clueOut).length);
   console.log("genera w/o sitelink:", genera.filter((n) => n.sitelinks === 0).length);
   console.log("root count:         ", tree.nodes[DINOSAURIA].descendantGenusCount);
