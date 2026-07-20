@@ -1,7 +1,5 @@
 export interface Warmth {
-  value: number;
-  display: string;
-  fraction: number;
+  fraction: number; // 0..1 color driver (two-phase spine warmth); the only field consumed
 }
 
 export type GuessKind = "guess" | "branchHint" | "leafHint";
