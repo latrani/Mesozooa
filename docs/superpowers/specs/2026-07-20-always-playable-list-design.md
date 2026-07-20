@@ -23,7 +23,12 @@ past the cap — with the app degrading gracefully if a listed name is wrong.
 > (`pinned (overriding: no image, no paleo-data)`). Rationale (user): "Pins override gates. Period.
 > It's on me not to pin something stupid." The warmth math self-guards the degenerate case
 > (`warmth.ts` `denom = Math.max(1, …)`), so a degenerate-clade pin yields flat warmth, not a crash.
-> Everything from here to the end of this section describes the retired cap-only behavior.
+> **This supersedes the cap-only contract THROUGHOUT THIS DOCUMENT**, not just this section. Later
+> sections (Mechanism, Graceful failure, Out of scope, Success criteria, Verification) still describe
+> the retired cap-only behavior in the active voice — read every "warned and skipped" / "NOT pinned" /
+> "cap-only" claim below as HISTORICAL. The live contract and its tests are in
+> `2026-07-20-image-gate-design.md` and `src/lib/tree/playable.test.ts`, which now assert the opposite
+> (e.g. "pins a genus with no clue").
 
 ### Original (cap-only) scope — RETIRED
 
