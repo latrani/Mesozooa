@@ -55,7 +55,7 @@
     padding: var(--space-5); color: var(--specimen-text);
     --btn-secondary-ink: var(--cream);
   }
-  .title { font-size: var(--type-h); font-weight: var(--fw-bold); }
+  .title { font-size: var(--type-heading); font-weight: var(--fw-bold); }
   .figure { margin: 0; display: flex; flex-direction: column; gap: 2px; }
   .shadowbox {
     border-radius: 5px; position: relative; overflow: hidden;
