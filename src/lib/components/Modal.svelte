@@ -73,7 +73,7 @@
   }
   .modal-head h2 {
     font-family: var(--font-head);
-    font-size: var(--type-h);
+    font-size: var(--type-heading);
     margin: 0;
   }
   .modal-close {

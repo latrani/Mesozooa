@@ -8,8 +8,8 @@
   // always inner .link buttons; the pill itself is a list item.
   //
   // ONE pill for everything: the .chip <li> IS the pill (size + geometry + cream-dim fill live
-  // here, not in an inner span). Every variant is the SAME 14pt cream-dim pill by default —
-  // guess/answer differentiate by FLOODING it with a warmth color (via .flood), NOT by size.
+  // here, not in an inner span). Every variant is the SAME --type-heading cream-dim pill by
+  // default — guess/answer differentiate by FLOODING it with a warmth color (via .flood), NOT by size.
   // There is deliberately no small/quiet opt-out: a new chip kind that styles nothing inherits
   // the right look. (Hints kept drifting because prominence used to hide in an opt-in span keyed
   // to size — unifying size and differentiating by paint is what fixes it.)
@@ -54,12 +54,12 @@
 </li>
 
 <style>
-  /* THE pill — one capsule for every chip. Default: 14pt normal, ink, cream-dim fill. Variants
+  /* THE pill — one capsule for every chip. Default: --type-heading, normal weight, ink, cream-dim fill. Variants
      override FROM here; nothing opts into size, so a new chip kind can't drift to a quiet look. */
   .chip {
     display: inline-flex; align-items: center; gap: .3em;
     padding: .2rem .7rem; border-radius: var(--radius-pill);
-    font-size: var(--type-label); font-weight: var(--fw-regular);
+    font-size: var(--type-heading); font-weight: var(--fw-regular);  /* WCAG-large floor; see tokens.css */
     background: var(--cream-dim); color: var(--ink);
   }
   /* hint family (branch + leaf) — same pill, set apart by italic + light weight. */

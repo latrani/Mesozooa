@@ -16,7 +16,7 @@
     background: #faf6fc; /* lighter than the tan mount, so it reads as a slip laid on top */
     color: #6a5947; /* pen-ink brown */
     font-family: var(--font-hand);
-    font-size: 1.35rem;
+    font-size: var(--type-title);
     line-height: 1.1;
     white-space: nowrap;
     border-radius: 2px;

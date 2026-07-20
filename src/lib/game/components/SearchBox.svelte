@@ -60,6 +60,6 @@
   }
   .searchbox li button:hover { background: var(--bg-sunk); }
   @media (max-width: 640px) {
-    .searchbox input { font-size: 1.1rem; padding: var(--space-3) var(--space-4); }
+    .searchbox input { font-size: var(--type-body); padding: var(--space-3) var(--space-4); }
   }
 </style>

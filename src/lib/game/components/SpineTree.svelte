@@ -489,9 +489,9 @@
      count in Safari.) The name + count share this baseline, so they stay aligned everywhere;
      vertical centering in the box is done by the text's y offset (LABEL_BASELINE_DY), not a
      baseline keyword. */
-  .lbl { fill: var(--ink); font-size: 0.9rem; font-weight: var(--fw-semibold); text-anchor: start; }
-  .node:not(.spine) .lbl { fill: var(--node-context); font-size: 0.82rem; font-weight: var(--fw-medium); }
-  .node.genus .lbl { font-weight: var(--fw-black); font-size: 1rem; }
+  .lbl { fill: var(--ink); font-size: var(--type-label); font-weight: var(--fw-semibold); text-anchor: start; }
+  .node:not(.spine) .lbl { fill: var(--node-context); font-size: var(--type-meta); font-weight: var(--fw-medium); }
+  .node.genus .lbl { font-weight: var(--fw-black); font-size: var(--type-body); }
   /* Explore only (gradeByPlayable). Playable genera hold full ink wherever they sit, so they
      stay scannable off the spine — where the base rule would otherwise mute them along with
      the context clades. Non-playable genera recede to the mute end. */
@@ -500,7 +500,7 @@
   /* De-emphasized: genera-count is honest reference context in Explore, NOT a closeness signal
      (retired as such in the two-phase warmth work). Muted fill + regular weight so it recedes
      beside the clade name. */
-  .count { fill: var(--ink-mute); font-size: 0.78rem; font-weight: var(--fw-regular); }
+  .count { fill: var(--ink-mute); font-size: var(--type-meta); font-weight: var(--fw-regular); }
   /* fill is inherited into each <use>'s instanced path, so setting it on the glyph recolors
      the shape; inline style (resolved color) still wins over these structural defaults. */
   .glyph-bg { fill: var(--bg-page); }                        /* page-color backing disc */
@@ -527,7 +527,7 @@
   }
   .zoom-controls button {
     display: flex; align-items: center; justify-content: center;
-    width: 2.2rem; height: 2rem; font-size: 1rem; cursor: pointer;
+    width: 2.2rem; height: 2rem; font-size: var(--type-body); cursor: pointer;
     background: transparent; border: 0; color: var(--btn-secondary-ink);
     font-weight: var(--fw-bold);
   }

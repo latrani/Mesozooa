@@ -21,7 +21,6 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 24px;            /* +50% base — spec §2.2 (locked) */
   line-height: 1.4;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
@@ -58,7 +57,7 @@ a { color: var(--mahogany); }
 }
 .btn-primary:disabled, .btn-secondary:disabled { opacity: .5; cursor: default; }
 .eyebrow {
-  font-size: var(--type-eyebrow); font-weight: var(--fw-bold);
+  font-size: var(--type-meta); font-weight: var(--fw-bold);
   letter-spacing: .16em; text-transform: uppercase; color: var(--ink-mute);
 }
 @media (prefers-reduced-motion: reduce) {

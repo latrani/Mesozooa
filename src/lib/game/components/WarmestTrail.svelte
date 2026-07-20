@@ -56,9 +56,9 @@
     }
     .crumb {
       display: flex; align-items: center; gap: var(--space-2); width: 100%;
-      padding: var(--space-2) var(--space-4); font-size: 1.2rem; border-radius: 0; position: relative;
+      padding: var(--space-2) var(--space-4); font-size: var(--type-heading); border-radius: 0; position: relative;
     }
-    .crumb.active { font-weight: var(--fw-black); font-size: 1.35rem; }
+    .crumb.active { font-weight: var(--fw-black); font-size: var(--type-title); }
     .rung-dot {
       display: block; width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto;
       background: var(--turq); box-shadow: 0 0 0 3px rgba(13,154,168,.18);
