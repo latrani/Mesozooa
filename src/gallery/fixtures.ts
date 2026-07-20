@@ -4,7 +4,7 @@
 import type { GameState } from "../lib/game/types";
 import type { GenusAttribute } from "../lib/attributes";
 import { treeStore } from "../lib/game/treeData";
-import { warmthForTarget } from "../lib/game/warmth";
+import { warmthForTarget, type WarmthProvider } from "../lib/game/warmth";
 import {
   newDailyState,
   applyGuess,
@@ -30,6 +30,7 @@ export interface FixtureStore {
   nextHintCost?: number;
   movesRemaining?: number;
   guessesUsed?: number;
+  readonly warmthProvider: WarmthProvider;
 }
 
 export function fixtureStore(state: GameState, opts: { daily?: boolean } = {}): FixtureStore {
@@ -39,6 +40,9 @@ export function fixtureStore(state: GameState, opts: { daily?: boolean } = {}): 
     revealed: revealedNodeIds(state, treeStore),
     clue: state.guesses.some((g) => g.kind === "leafHint") ? clueFor(state.target) : null,
     guess: () => {}, // no-op: gallery states are frozen
+    get warmthProvider() {
+      return warmthForTarget(treeStore.data, state.target);
+    },
   };
   if (opts.daily) {
     base.guessesUsed = state.guesses.length;
