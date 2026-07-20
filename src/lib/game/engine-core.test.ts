@@ -21,7 +21,7 @@ import {
   DAILY_MAX_GUESSES,
 } from "./engine-core";
 import { createTreeStore } from "./treeStore";
-import { createCountWarmth } from "./warmth";
+import { warmthForTarget } from "./warmth";
 import { assembleTree, pruneSubtree } from "../tree/assemble";
 import { markPlayable } from "../tree/playable";
 import { FIXTURE_RAWS, MONO_FIXTURE_RAWS } from "../tree/fixture";
@@ -31,12 +31,14 @@ import type { GameState } from "./types";
 const tree = assembleTree(pruneSubtree(FIXTURE_RAWS, NEORNITHES), DINOSAURIA, "test");
 markPlayable(tree);
 const store = createTreeStore(tree);
-const warmth = createCountWarmth(store.rootCount);
+// Providers scoped per target used across this file's states (TC and TR).
+const warmthTC = warmthForTarget(store.data, "TC");
+const warmthTR = warmthForTarget(store.data, "TR");
 
 const monoTree = assembleTree(MONO_FIXTURE_RAWS, "MR", "test");
 markPlayable(monoTree);
 const monoStore = createTreeStore(monoTree);
-const monoWarmth = createCountWarmth(monoStore.rootCount);
+const monoWarmth = warmthForTarget(monoStore.data, "GA1");
 
 const practice = (target: string): GameState => ({
   target,
@@ -49,16 +51,16 @@ const practice = (target: string): GameState => ({
 
 describe("refreshWarmth", () => {
   it("recomputes each guess's warmth from the current provider (for restored games)", () => {
-    const s = applyGuess(practice("TC"), "TR", store, warmth);
+    const s = applyGuess(practice("TC"), "TR", store, warmthTC);
     // Simulate a stored game whose fraction was frozen under an old formula.
     const stale: GameState = {
       ...s,
       guesses: s.guesses.map((g) => ({ ...g, warmth: { ...g.warmth, fraction: 0.123 } })),
     };
-    const fresh = refreshWarmth(stale, store, warmth);
+    const fresh = refreshWarmth(stale, store, warmthTC);
     // fraction is recomputed from the shared node (not the stored 0.123)
     expect(fresh.guesses[0].warmth.fraction).toBeCloseTo(
-      warmth.warmth(store.getNode("Q430")!).fraction,
+      warmthTC.warmth(store.getNode("Q430")!).fraction,
       6,
     );
     // identity preserved
@@ -69,21 +71,21 @@ describe("refreshWarmth", () => {
   });
   it("returns an empty-guess game unchanged in shape", () => {
     const s = practice("TC");
-    expect(refreshWarmth(s, store, warmth).guesses).toEqual([]);
+    expect(refreshWarmth(s, store, warmthTC).guesses).toEqual([]);
   });
 });
 
 describe("applyForfeit", () => {
   it("ends a playing round as a loss (reveals the answer)", () => {
-    const s = applyForfeit(applyGuess(practice("TC"), "TR", store, warmth));
+    const s = applyForfeit(applyGuess(practice("TC"), "TR", store, warmthTC));
     expect(s.status).toBe("lost");
   });
   it("keeps the guess record intact", () => {
-    const played = applyGuess(practice("TC"), "TR", store, warmth);
+    const played = applyGuess(practice("TC"), "TR", store, warmthTC);
     expect(applyForfeit(played).guesses).toEqual(played.guesses);
   });
   it("is a no-op once the round is already over", () => {
-    const won = applyGuess(practice("TC"), "TC", store, warmth);
+    const won = applyGuess(practice("TC"), "TC", store, warmthTC);
     expect(won.status).toBe("won");
     expect(applyForfeit(won)).toBe(won); // same reference, unchanged
   });
@@ -91,26 +93,28 @@ describe("applyForfeit", () => {
 
 describe("applyGuess", () => {
   it("appends a guess result referencing mrca(guess, target)", () => {
-    const s = applyGuess(practice("TC"), "TR", store, warmth);
+    const s = applyGuess(practice("TC"), "TR", store, warmthTC);
     expect(s.guesses).toHaveLength(1);
     expect(s.guesses[0].sharedNodeId).toBe("Q430");
     expect(s.guesses[0].kind).toBe("guess");
-    expect(s.guesses[0].warmth.value).toBe(4);
+    // Q430 is the root; terminalClade(TC) is also Q430 here (TC's ancestors up to root are
+    // monotypic), so the root already sits at-or-below the terminal clade -> flat anchor.
+    expect(s.guesses[0].warmth.fraction).toBeCloseTo(0.9);
     expect(s.status).toBe("playing");
   });
   it("wins when the guess is the target", () => {
-    expect(applyGuess(practice("TC"), "TC", store, warmth).status).toBe("won");
+    expect(applyGuess(practice("TC"), "TC", store, warmthTC).status).toBe("won");
   });
   it("rejects a non-playable id", () => {
-    expect(() => applyGuess(practice("TC"), "TF", store, warmth)).toThrow();
+    expect(() => applyGuess(practice("TC"), "TF", store, warmthTC)).toThrow();
   });
   it("no-ops a duplicate guess", () => {
-    const s1 = applyGuess(practice("TC"), "TR", store, warmth);
-    expect(applyGuess(s1, "TR", store, warmth).guesses).toHaveLength(1);
+    const s1 = applyGuess(practice("TC"), "TR", store, warmthTC);
+    expect(applyGuess(s1, "TR", store, warmthTC).guesses).toHaveLength(1);
   });
   it("practice is never lost (unlimited)", () => {
     let s = practice("TC");
-    for (const id of ["TR", "TB"]) s = applyGuess(s, id, store, warmth);
+    for (const id of ["TR", "TB"]) s = applyGuess(s, id, store, warmthTC);
     expect(s.status).toBe("playing");
   });
 });
@@ -118,15 +122,15 @@ describe("applyGuess", () => {
 describe("daily budget", () => {
   it("is lost when the budget is exhausted without a win", () => {
     let s = newDailyState("TC", 2);
-    s = applyGuess(s, "TR", store, warmth);
+    s = applyGuess(s, "TR", store, warmthTC);
     expect(s.status).toBe("playing");
-    s = applyGuess(s, "TB", store, warmth);
+    s = applyGuess(s, "TB", store, warmthTC);
     expect(s.status).toBe("lost");
   });
   it("a winning final guess wins, not loses", () => {
     let s = newDailyState("TC", 2);
-    s = applyGuess(s, "TR", store, warmth);
-    s = applyGuess(s, "TC", store, warmth);
+    s = applyGuess(s, "TR", store, warmthTC);
+    s = applyGuess(s, "TC", store, warmthTC);
     expect(s.status).toBe("won");
   });
 });
@@ -134,7 +138,7 @@ describe("daily budget", () => {
 describe("nextHintRun", () => {
   it("returns a single-node run to the next narrowing when it's not monotypic", () => {
     let s = newDailyState("TC");
-    s = applyGuess(s, "TR", store, warmth); // mrca(TR,TC)=Q430
+    s = applyGuess(s, "TR", store, warmthTC); // mrca(TR,TC)=Q430
     expect(nextHintRun(s, store)).toEqual(["O"]); // Q430 -> O (count 1 < 4): one strict step
   });
   it("is empty with no guesses", () => {
@@ -152,14 +156,14 @@ describe("nextHintRun", () => {
 
 describe("applyHint", () => {
   it("no-ops without a prior guess", () => {
-    const s = applyHint(newDailyState("TR"), store, warmth);
+    const s = applyHint(newDailyState("TR"), store, warmthTR);
     expect(s.guesses).toHaveLength(0);
     expect(s.hintsUsed).toBe(0);
   });
   it("appends a hint step and increments hintsUsed", () => {
     let s = newDailyState("TR");
-    s = applyGuess(s, "TC", store, warmth); // mrca Q430
-    s = applyHint(s, store, warmth); // -> T
+    s = applyGuess(s, "TC", store, warmthTR); // mrca Q430
+    s = applyHint(s, store, warmthTR); // -> T
     expect(s.guesses).toHaveLength(2);
     expect(s.guesses[1].kind).toBe("branchHint");
     expect(s.guesses[1].sharedNodeId).toBe("T");
@@ -168,36 +172,36 @@ describe("applyHint", () => {
   });
   it("walks one step deeper each hint until the terminal clade, then the clue takes over", () => {
     let s = newDailyState("TR");
-    s = applyGuess(s, "TC", store, warmth); // mrca Q430
-    s = applyHint(s, store, warmth); // -> hint T (3)
-    s = applyHint(s, store, warmth); // -> hint TF (2) == terminalClade(TR)
+    s = applyGuess(s, "TC", store, warmthTR); // mrca Q430
+    s = applyHint(s, store, warmthTR); // -> hint T (3)
+    s = applyHint(s, store, warmthTR); // -> hint TF (2) == terminalClade(TR)
     expect(s.guesses.filter((g) => g.kind === "branchHint").map((g) => g.sharedNodeId)).toEqual(["T", "TF"]);
     // Now at the terminal clade: the next press yields the clue, not a target-revealing hint.
     expect(leafHintActive(s, store)).toBe(true);
-    s = applyHint(s, store, warmth);
+    s = applyHint(s, store, warmthTR);
     expect(s.guesses.at(-1)!.kind).toBe("leafHint");
   });
   it("counts toward the budget and can lose the game", () => {
     let s = newDailyState("TR", 2);
-    s = applyGuess(s, "TC", store, warmth); // moves 1
-    s = applyHint(s, store, warmth); // hint T costs > 1 -> exceeds budget
+    s = applyGuess(s, "TC", store, warmthTR); // moves 1
+    s = applyHint(s, store, warmthTR); // hint T costs > 1 -> exceeds budget
     expect(s.status).toBe("lost");
   });
   it("no-ops when the game is over", () => {
-    const won = applyGuess(newDailyState("TC"), "TC", store, warmth);
-    expect(applyHint(won, store, warmth)).toBe(won);
+    const won = applyGuess(newDailyState("TC"), "TC", store, warmthTC);
+    expect(applyHint(won, store, warmthTC)).toBe(won);
   });
 });
 
 describe("clue does not block the winning guess", () => {
   it("the clue press records a clue row and leaves the game playing so the win still works", () => {
     let s = newDailyState("TR");
-    s = applyGuess(s, "TB", store, warmth); // mrca TF == terminalClade(TR) -> clue active
-    s = applyHint(s, store, warmth); // clue (does not reveal the target genus)
+    s = applyGuess(s, "TB", store, warmthTR); // mrca TF == terminalClade(TR) -> clue active
+    s = applyHint(s, store, warmthTR); // clue (does not reveal the target genus)
     expect(s.guesses.at(-1)!.kind).toBe("leafHint");
     expect(revealedNodeIds(s, store).has("TR")).toBe(false);
     expect(s.status).toBe("playing");
-    s = applyGuess(s, "TR", store, warmth); // the deserved winning guess must still work
+    s = applyGuess(s, "TR", store, warmthTR); // the deserved winning guess must still work
     expect(s.status).toBe("won");
   });
 });
@@ -205,8 +209,8 @@ describe("clue does not block the winning guess", () => {
 describe("selectors with hint rows", () => {
   it("warmest and revealed include the hinted clade", () => {
     let s = newDailyState("TR");
-    s = applyGuess(s, "TC", store, warmth); // mrca Q430 (count 4)
-    s = applyHint(s, store, warmth); // reveals T (count 3)
+    s = applyGuess(s, "TC", store, warmthTR); // mrca Q430 (count 4)
+    s = applyHint(s, store, warmthTR); // reveals T (count 3)
     expect(warmestSharedNodeId(s, store)).toBe("T");
     expect(revealedNodeIds(s, store).has("T")).toBe(true);
   });
@@ -217,30 +221,30 @@ describe("hintCost and movesUsed", () => {
     // target TR: lineage [Q430,T,TF,TR]; guessing TC shares only Q430, so next hint node is
     // T (index 1) — a shallow hint. Cost sits above MIN and no higher than MAX.
     const s0 = newDailyState("TR", 20);
-    const s1 = applyGuess(s0, "TC", store, warmth); // TC shares only Q430 with TR
+    const s1 = applyGuess(s0, "TC", store, warmthTR); // TC shares only Q430 with TR
     const c = hintCost(s1, store);
     expect(c).toBeGreaterThan(HINT_COST_MIN);
     expect(c).toBeLessThanOrEqual(HINT_COST_MAX);
   });
   it("charges less for a deeper next hint than a shallower one", () => {
     const s0 = newDailyState("TR", 20);
-    const s1 = applyGuess(s0, "TC", store, warmth); // next hint node T (shallow)
+    const s1 = applyGuess(s0, "TC", store, warmthTR); // next hint node T (shallow)
     const shallow = hintCost(s1, store);
-    const s2 = applyHint(s1, store, warmth); // reveal T; next hint node now TF (deeper)
+    const s2 = applyHint(s1, store, warmthTR); // reveal T; next hint node now TF (deeper)
     const deeper = hintCost(s2, store);
     expect(deeper).toBeLessThan(shallow);
   });
   it("charges LEAF_HINT_COST at the leaf-terminal state (the clue)", () => {
     // Once warmth has bottomed at TR's terminal clade, the press yields the clue at a single move.
     const s0 = newDailyState("TR", 20);
-    const s1 = applyGuess(s0, "TB", store, warmth); // TB shares TF with TR -> warmest at terminal clade
+    const s1 = applyGuess(s0, "TB", store, warmthTR); // TB shares TF with TR -> warmest at terminal clade
     expect(leafHintActive(s1, store)).toBe(true);
     expect(hintCost(s1, store)).toBe(LEAF_HINT_COST);
   });
   it("movesUsed sums each row's cost (guesses=1, clue=LEAF_HINT_COST)", () => {
     const s0 = newDailyState("TR", 20);
-    const s1 = applyGuess(s0, "TB", store, warmth); // guess = 1
-    const s2 = applyHint(s1, store, warmth); // clue = LEAF_HINT_COST
+    const s1 = applyGuess(s0, "TB", store, warmthTR); // guess = 1
+    const s2 = applyHint(s1, store, warmthTR); // clue = LEAF_HINT_COST
     expect(movesUsed(s2)).toBe(1 + LEAF_HINT_COST);
   });
 });
@@ -248,8 +252,8 @@ describe("hintCost and movesUsed", () => {
 describe("clue press does not spoil the target", () => {
   it("records a clue row without revealing the target on the tree", () => {
     const s0 = newDailyState("TR", 20);
-    const s1 = applyGuess(s0, "TB", store, warmth); // lands at terminal clade
-    const s2 = applyHint(s1, store, warmth);
+    const s1 = applyGuess(s0, "TB", store, warmthTR); // lands at terminal clade
+    const s2 = applyHint(s1, store, warmthTR);
     expect(s2.guesses.at(-1)!.kind).toBe("leafHint");
     expect(revealedNodeIds(s2, store).has("TR")).toBe(false); // target not spoiled
     expect(movesUsed(s2)).toBe(1 + LEAF_HINT_COST); // guess(1) + clue(1)
@@ -258,7 +262,7 @@ describe("clue press does not spoil the target", () => {
 
 describe("revealedNodeIds reveals the answer once the round ends", () => {
   it("adds the target's lineage on a loss, but not while still playing", () => {
-    const playing = applyGuess(practice("TC"), "TR", store, warmth); // wrong guess, still playing
+    const playing = applyGuess(practice("TC"), "TR", store, warmthTC); // wrong guess, still playing
     expect(revealedNodeIds(playing, store).has("TC")).toBe(false); // not spoiled mid-play
     const lost = applyForfeit(playing);
     expect(lost.status).toBe("lost");
@@ -313,29 +317,29 @@ describe("leafHintActive", () => {
   });
   it("is inactive while the warmest clade is above the terminal clade", () => {
     // guess TC: mrca(TC,TR)=Q430 (count 4) > terminalClade(TR)=TF (count 2)
-    const s = applyGuess(practice("TR"), "TC", store, warmth);
+    const s = applyGuess(practice("TR"), "TC", store, warmthTR);
     expect(leafHintActive(s, store)).toBe(false);
   });
   it("is active when the warmest clade equals the terminal clade", () => {
     // guess TB: mrca(TB,TR)=TF == terminalClade(TR)
-    const s = applyGuess(practice("TR"), "TB", store, warmth);
+    const s = applyGuess(practice("TR"), "TB", store, warmthTR);
     expect(leafHintActive(s, store)).toBe(true);
   });
   it("stays active once a later guess drops warmth to the terminal clade", () => {
-    let s = applyGuess(practice("TR"), "TC", store, warmth); // warmest Q430 -> inactive
-    s = applyGuess(s, "TB", store, warmth); // warmest now TF -> active
+    let s = applyGuess(practice("TR"), "TC", store, warmthTR); // warmest Q430 -> inactive
+    s = applyGuess(s, "TB", store, warmthTR); // warmest now TF -> active
     expect(leafHintActive(s, store)).toBe(true);
   });
   it("is active once a hint drives warmth to the terminal clade", () => {
     let s = newDailyState("TR");
-    s = applyGuess(s, "TC", store, warmth); // warmest Q430 (4)
-    s = applyHint(s, store, warmth); // -> T (3)
-    s = applyHint(s, store, warmth); // -> TF (2) == terminal
+    s = applyGuess(s, "TC", store, warmthTR); // warmest Q430 (4)
+    s = applyHint(s, store, warmthTR); // -> T (3)
+    s = applyHint(s, store, warmthTR); // -> TF (2) == terminal
     expect(warmestSharedNodeId(s, store)).toBe("TF");
     expect(leafHintActive(s, store)).toBe(true);
   });
   it("is inactive once the game is no longer playing", () => {
-    const won = applyGuess(practice("TR"), "TR", store, warmth); // status "won"
+    const won = applyGuess(practice("TR"), "TR", store, warmthTR); // status "won"
     expect(won.status).toBe("won");
     expect(leafHintActive(won, store)).toBe(false);
   });
@@ -367,17 +371,17 @@ describe("specimenState", () => {
   });
 
   it("is broad when the warmest clade is still large", () => {
-    const s = applyGuess(practice("TR"), "TC", store, warmth); // mrca=Q430 (count 4)
+    const s = applyGuess(practice("TR"), "TC", store, warmthTR); // mrca=Q430 (count 4)
     expect(specimenState(s, store)).toEqual({ kind: "broad", count: 4 });
   });
 
   it("is terminal (with sibling count) when warmth bottoms out at the terminal clade", () => {
-    const s = applyGuess(practice("TR"), "TB", store, warmth); // mrca=TF (count 2 = terminal)
+    const s = applyGuess(practice("TR"), "TB", store, warmthTR); // mrca=TF (count 2 = terminal)
     expect(specimenState(s, store)).toEqual({ kind: "terminal", siblingCount: 2 });
   });
 
   it("is solved/won on a correct guess (hints excluded from guessCount)", () => {
-    const s = applyGuess(practice("TR"), "TR", store, warmth);
+    const s = applyGuess(practice("TR"), "TR", store, warmthTR);
     expect(specimenState(s, store)).toEqual({
       kind: "solved",
       outcome: "won",
@@ -387,7 +391,7 @@ describe("specimenState", () => {
   });
 
   it("is solved/lost when the daily budget is exhausted, revealing the target", () => {
-    const s = applyGuess(daily1("TR"), "TC", store, warmth); // wrong, budget=1 -> lost
+    const s = applyGuess(daily1("TR"), "TC", store, warmthTR); // wrong, budget=1 -> lost
     expect(specimenState(s, store)).toEqual({
       kind: "solved",
       outcome: "lost",
@@ -412,8 +416,9 @@ describe("skip-through hint behavior", () => {
     const revealed = revealedNodeIds(s, monoStore);
     expect(revealed.has("MA")).toBe(true);
     expect(revealed.has("MB")).toBe(true);
-    // warmth reads the branch point's real narrowing (count 2)
-    expect(row.warmth.value).toBe(monoStore.getNode("SA")!.descendantGenusCount);
+    // warmth reads the branch point's real narrowing: SA IS GA1's terminal clade
+    // (branchDepth 2), so the branch point already sits at the flat anchor.
+    expect(row.warmth.fraction).toBeCloseTo(0.9);
     // the target genus is NEVER revealed by a hint
     expect(revealed.has("GA1")).toBe(false);
     expect(s.hintsUsed).toBe(2);
@@ -442,9 +447,9 @@ describe("hasProgress", () => {
   it("is false for a fresh game, true mid-play, false once ended", () => {
     const fresh = newDailyState("TR");
     expect(hasProgress(fresh)).toBe(false);
-    const mid = applyGuess(fresh, "TC", store, warmth); // one guess, still playing
+    const mid = applyGuess(fresh, "TC", store, warmthTR); // one guess, still playing
     expect(hasProgress(mid)).toBe(true);
-    const won = applyGuess(newDailyState("TC"), "TC", store, warmth); // guessed the target
+    const won = applyGuess(newDailyState("TC"), "TC", store, warmthTC); // guessed the target
     expect(hasProgress(won)).toBe(false);
   });
 });

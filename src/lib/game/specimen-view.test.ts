@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { clueFieldsFrom, nodeView, specimenView } from "./specimen-view";
 import { applyGuess } from "./engine-core";
 import { createTreeStore } from "./treeStore";
-import { createCountWarmth } from "./warmth";
+import { warmthForTarget } from "./warmth";
 import { assembleTree, pruneSubtree } from "../tree/assemble";
 import { markPlayable } from "../tree/playable";
 import { FIXTURE_RAWS } from "../tree/fixture";
@@ -71,7 +71,8 @@ describe("nodeView", () => {
 const tree = assembleTree(pruneSubtree(FIXTURE_RAWS, NEORNITHES), DINOSAURIA, "test");
 markPlayable(tree);
 const store = createTreeStore(tree);
-const warmth = createCountWarmth(store.rootCount);
+// Only "TC" is guessed against warmth in this file; scope the provider to that target.
+const warmth = warmthForTarget(tree, "TC");
 const practice = (target: string): GameState => ({
   target, guesses: [], status: "playing", mode: "practice", maxGuesses: null, hintsUsed: 0,
 });

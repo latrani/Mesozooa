@@ -5,7 +5,7 @@ import type { GameState } from "./types";
 const sample: GameState = {
   target: "Q100",
   guesses: [
-    { guessId: "Q9", sharedNodeId: "Q1", warmth: { value: 5, display: "5 genera", fraction: 0.3 }, kind: "guess", cost: 1 },
+    { guessId: "Q9", sharedNodeId: "Q1", warmth: { fraction: 0.3 }, kind: "guess", cost: 1 },
   ],
   status: "playing",
   mode: "daily",
@@ -35,10 +35,10 @@ describe("serializeDaily / deserializeDaily", () => {
     const legacy = JSON.stringify({
       target: "T",
       guesses: [
-        { guessId: "a", sharedNodeId: "s", warmth: { value: 1, display: "", fraction: 0.2 }, kind: "guess" },
+        { guessId: "a", sharedNodeId: "s", warmth: { fraction: 0.2 }, kind: "guess" },
         // Pre-rename shipped literals — must map onto the current kind names.
-        { guessId: "b", sharedNodeId: "s", warmth: { value: 1, display: "", fraction: 0.5 }, kind: "hint" },
-        { guessId: "c", sharedNodeId: "s", warmth: { value: 1, display: "", fraction: 0.6 }, kind: "clue" },
+        { guessId: "b", sharedNodeId: "s", warmth: { fraction: 0.5 }, kind: "hint" },
+        { guessId: "c", sharedNodeId: "s", warmth: { fraction: 0.6 }, kind: "clue" },
       ],
       status: "playing",
       mode: "daily",

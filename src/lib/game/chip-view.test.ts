@@ -3,12 +3,13 @@ import { chipsFor } from "./chip-view";
 import { createTreeStore } from "./treeStore";
 import { assembleTree } from "../tree/assemble";
 import { FIXTURE_RAWS } from "../tree/fixture";
-import { createCountWarmth } from "./warmth";
+import { warmthForTarget } from "./warmth";
 import type { GuessResult } from "./types";
 
 const tree = assembleTree(FIXTURE_RAWS, "Q430", "test");
 const store = createTreeStore(tree);
-const warmth = createCountWarmth(store.rootCount);
+// These tests only need a valid provider (colors, not fraction values); any playable target works.
+const warmth = warmthForTarget(tree, "TR");
 
 // helper to build a GuessResult row
 function row(kind: GuessResult["kind"], guessId: string, sharedNodeId: string): GuessResult {
