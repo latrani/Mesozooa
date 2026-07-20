@@ -88,7 +88,7 @@ misleading "base 24px, +50%" comment to state the truth (rem resolves against th
 
 | File | Current | → New token | Δpx |
 |---|---|---|---|
-| Chip.svelte | 1.2rem | `--type-heading` | 0 |
+| Chip.svelte | `--type-label` (0.9rem) | `--type-heading` | **+4.8** (intended — chips to 14pt-bold WCAG size per user direction; the "preserve look / ~1px" rule does NOT apply to the chip) |
 | WarmestTrail crumb | 1.2rem | `--type-heading` | 0 |
 | WarmestTrail active | 1.35rem | `--type-title` | +0.8 |
 | PaperSlip | 1.35rem | `--type-title` | +0.8 |
