@@ -121,6 +121,22 @@ For a genus `g` with cluster `C = {g} ∪ species(g)`:
   representative (not `max()` over the whole cluster) keeps notability coherent with linkability: the
   number always describes the exact entity a player can click through to. An articleless species with
   a higher count does not inflate the rank of an unreachable thing.
+- `enwikiTitle` (the article's *title string*, a **name candidate** consumed by the name-disagreement
+  gate — distinct from `wikipediaUrl`, the link) is handled specially when the representative is a
+  **species**: a species article is usually titled with a **binomial** ("Afrovenator abakensis") or a
+  Wikipedia disambiguator ("Oksoko (dinosaur)"). Folding that raw onto the genus manufactures a false
+  name disagreement (genus label "Afrovenator" vs. candidate "Afrovenator abakensis") that trips the
+  build's name gate — a self-inflicted conflict, since a species' binomial is not a competing opinion
+  about the *genus's* name. Rule: **donate `enwikiTitle` only when its first whitespace-delimited
+  token equals the genus's own `name`** (`rep.enwikiTitle.split(" ")[0] === genus.name`). When it
+  matches, the binomial merely confirms genus membership → drop it (the link still rides on
+  `wikipediaUrl`; the genus keeps its own name candidate). When it does **not** match (a quoted dubious
+  taxon like `"Coelosaurus" antiquus`, or a genuinely mis-resolved article pointing at another genus),
+  **keep** `enwikiTitle` so the name gate still surfaces it for a human `NAME_DECISIONS` entry — the
+  gate's protective value is preserved for the odd cases while the ~18 ordinary binomials absorb
+  automatically. This is self-limiting: future harvests resolving new binomial-titled species need no
+  new decisions. (When the representative IS the genus itself, `enwikiTitle` is its own and passes
+  through unchanged.)
 - If **no** entity in `C` has an article → no representative → the genus keeps whatever it natively
   had (normally: no article, `sitelinks: 0`) → remains not playable. This is the correct outcome for
   the 327 genera with no English coverage anywhere.

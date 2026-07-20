@@ -94,17 +94,47 @@ const species = (id: string, over: Partial<RawTaxon> = {}): RawTaxon => ({
 
 describe("resolveCluster", () => {
   it("prefers a more-notable articled species over the genus (Cryolophosaurus case)", () => {
-    const g = genus({ id: "Q18511006", sitelinks: 0, imageUrl: "commons://cryo.jpg" });
+    // Species article titled with the bare genus name — enwikiTitle passes through (first token matches).
+    const g = genus({ id: "Q18511006", name: "Cryolophosaurus", sitelinks: 0, imageUrl: "commons://cryo.jpg" });
     const sp = [species("Q131166", {
+      name: "Cryolophosaurus ellioti",
       wikipediaUrl: "https://en.wikipedia.org/wiki/Cryolophosaurus",
       enwikiTitle: "Cryolophosaurus", sitelinks: 36,
     })];
     const r = resolveCluster(g, sp);
     expect(r.wikipediaUrl).toBe("https://en.wikipedia.org/wiki/Cryolophosaurus");
-    expect(r.enwikiTitle).toBe("Cryolophosaurus");
+    expect(r.enwikiTitle).toBe("Cryolophosaurus"); // first token == genus name → kept
     expect(r.sitelinks).toBe(36);
     expect(r.resolvedFrom).toBe("Q131166");
     expect(r.imageUrl).toBe("commons://cryo.jpg"); // genus's own image kept
+  });
+
+  it("drops a species' BINOMIAL enwikiTitle whose first token matches the genus (Afrovenator case)", () => {
+    // The link still resolves; the name-candidate is suppressed so the name gate sees no false conflict.
+    const g = genus({ id: "Q18511003", name: "Afrovenator", sitelinks: 0 });
+    const sp = [species("Qsp", {
+      name: "Afrovenator abakensis",
+      wikipediaUrl: "https://en.wikipedia.org/wiki/Afrovenator_abakensis",
+      enwikiTitle: "Afrovenator abakensis", sitelinks: 20,
+    })];
+    const r = resolveCluster(g, sp);
+    expect(r.wikipediaUrl).toBe("https://en.wikipedia.org/wiki/Afrovenator_abakensis"); // link kept
+    expect(r.enwikiTitle).toBeUndefined(); // binomial name-candidate dropped
+    expect(r.resolvedFrom).toBe("Qsp");
+  });
+
+  it("keeps a species enwikiTitle whose first token does NOT match the genus (quoted-dubious / gate case)", () => {
+    // e.g. '"Coelosaurus" antiquus' — first token '"Coelosaurus"' (with quotes) != 'Coelosaurus'.
+    const g = genus({ id: "Q1106617", name: "Coelosaurus", sitelinks: 0 });
+    const sp = [species("Qsp", {
+      name: '"Coelosaurus" antiquus',
+      wikipediaUrl: "https://en.wikipedia.org/wiki/%22Coelosaurus%22_antiquus",
+      enwikiTitle: '"Coelosaurus" antiquus', sitelinks: 5,
+    })];
+    const r = resolveCluster(g, sp);
+    expect(r.wikipediaUrl).toBe("https://en.wikipedia.org/wiki/%22Coelosaurus%22_antiquus");
+    expect(r.enwikiTitle).toBe('"Coelosaurus" antiquus'); // kept → name gate will flag it
+    expect(r.resolvedFrom).toBe("Qsp");
   });
 
   it("keeps the genus's own article when the genus is the most notable", () => {
@@ -200,6 +230,13 @@ const sl = (t: RawTaxon): number => t.sitelinks ?? 0;
  * (ties by ascending id, matching playable.ts). Article + sitelinks come from that
  * representative; image resolves independently (genus's own → representative's → any
  * species'). If no entity has an article, the genus keeps its own values.
+ *
+ * enwikiTitle is a NAME CANDIDATE (the name-disagreement gate consumes it), distinct from
+ * wikipediaUrl (the link). When the representative is a species, its title is usually a binomial
+ * ("Afrovenator abakensis") — folding that raw manufactures a false name conflict with the genus's
+ * own label. So donate the species' enwikiTitle ONLY when its first token equals the genus name
+ * (the binomial merely confirms membership → drop it, keep the link). If the first token differs
+ * (a quoted dubious taxon, or a mis-resolved article), keep it so the gate flags it for a human.
  */
 export function resolveCluster(genus: RawTaxon, species: RawTaxon[]): ClusterResolution {
   const cluster = [genus, ...species];
@@ -218,9 +255,19 @@ export function resolveCluster(genus: RawTaxon, species: RawTaxon[]): ClusterRes
     return { sitelinks: sl(genus), imageUrl };
   }
 
+  // Only suppress the enwikiTitle name-candidate for a SPECIES rep whose BINOMIAL starts with the
+  // genus name ("Afrovenator abakensis"); a genus rep keeps its own title, a title that IS the bare
+  // genus name ("Cryolophosaurus") is kept (it confirms, no false conflict — it dedupes against the
+  // genus's own name), and a non-matching species title ('"Coelosaurus" antiquus') is kept for the
+  // gate to flag. The length>1 guard is what distinguishes a confirming binomial from a bare title.
+  const repIsSpecies = rep.id !== genus.id;
+  const titleParts = rep.enwikiTitle?.split(" ") ?? [];
+  const titleIsConfirmingBinomial = titleParts.length > 1 && titleParts[0] === genus.name;
+  const enwikiTitle = repIsSpecies && titleIsConfirmingBinomial ? undefined : rep.enwikiTitle;
+
   return {
     wikipediaUrl: rep.wikipediaUrl,
-    enwikiTitle: rep.enwikiTitle,
+    enwikiTitle,
     sitelinks: sl(rep),
     imageUrl,
     resolvedFrom: rep.id === genus.id ? undefined : rep.id,
@@ -231,7 +278,7 @@ export function resolveCluster(genus: RawTaxon, species: RawTaxon[]): ClusterRes
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run scripts/resolve-cluster.test.ts`
-Expected: PASS (7 tests).
+Expected: PASS (9 tests).
 
 - [ ] **Step 5: Verify types compile**
 

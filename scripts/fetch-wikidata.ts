@@ -2,8 +2,9 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { sparql, qid } from "./wikidata";
 import { pruneSubtree, assembleTree } from "../src/lib/tree/assemble";
 import type { RawTaxon } from "../src/lib/tree/types";
-import { DINOSAURIA, NEORNITHES } from "../src/lib/tree/types";
+import { DINOSAURIA, NEORNITHES, RANK_SPECIES, RANK_GENUS } from "../src/lib/tree/types";
 import { enwikiTitleFromUrl } from "./enwiki-title";
+import { resolveCluster } from "./resolve-cluster";
 
 const PAGE = 10000;
 
@@ -32,6 +33,28 @@ async function fetchStructure(): Promise<RawTaxon[]> {
     raws.push({ id: DINOSAURIA, name: DINOSAURIA, rankId: null, parentId: null });
   }
   return raws;
+}
+
+// Child species of the in-scope genera, for cluster resolution. VALUES-bound to OUR genus
+// ids (not all Dinosauria species) so orphan/hybrid junk — which has no valid genus parent —
+// can never attach. Returns bare records; enrich() fills article/sitelinks/image just like genera.
+async function fetchClusterSpecies(genusIds: string[]): Promise<RawTaxon[]> {
+  const BATCH = 400;
+  const out: RawTaxon[] = [];
+  for (let i = 0; i < genusIds.length; i += BATCH) {
+    const values = genusIds.slice(i, i + BATCH).map((id) => `wd:${id}`).join(" ");
+    const rows = await sparql(`
+      SELECT ?sp ?genus WHERE {
+        VALUES ?genus { ${values} }
+        ?sp wdt:P171 ?genus .
+        ?sp wdt:P105 wd:${RANK_SPECIES} .
+      }`);
+    for (const r of rows) {
+      out.push({ id: qid(r.sp!), name: qid(r.sp!), rankId: RANK_SPECIES, parentId: qid(r.genus!) });
+    }
+    console.log(`cluster species: ${out.length} (genus batch ${Math.min(i + BATCH, genusIds.length)}/${genusIds.length})`);
+  }
+  return out;
 }
 
 async function enrich(ids: string[], byId: Map<string, RawTaxon>): Promise<void> {
@@ -100,12 +123,43 @@ async function main() {
   const scopedIds = Object.keys(scoped.nodes);
   const byId = new Map(pruned.map((r) => [r.id, r]));
   const inScope = scopedIds.map((id) => byId.get(id)!).filter(Boolean);
-  await enrich(scopedIds, new Map(inScope.map((r) => [r.id, r])));
+
+  // Genus ids among the in-scope nodes drive the species fetch.
+  const genusIds = inScope.filter((r) => r.rankId === RANK_GENUS).map((r) => r.id);
+  const species = await fetchClusterSpecies(genusIds);
+
+  // Enrich genera AND their child species in one pass (same query), then resolve each
+  // genus's representative across its cluster and fold article/sitelinks/image onto the genus.
+  const enrichable = [...inScope, ...species];
+  const enrichMap = new Map(enrichable.map((r) => [r.id, r]));
+  await enrich([...scopedIds, ...species.map((s) => s.id)], enrichMap);
+
+  const speciesByGenus = new Map<string, RawTaxon[]>();
+  for (const s of species) {
+    const g = s.parentId;
+    if (!g) continue;
+    const list = speciesByGenus.get(g);
+    if (list) list.push(enrichMap.get(s.id)!);
+    else speciesByGenus.set(g, [enrichMap.get(s.id)!]);
+  }
+
+  let resolvedCount = 0;
+  for (const r of inScope) {
+    if (r.rankId !== RANK_GENUS) continue;
+    const res = resolveCluster(enrichMap.get(r.id)!, speciesByGenus.get(r.id) ?? []);
+    r.wikipediaUrl = res.wikipediaUrl;
+    r.enwikiTitle = res.enwikiTitle;
+    r.sitelinks = res.sitelinks;
+    r.imageUrl = res.imageUrl;
+    if (res.resolvedFrom) { r.resolvedFrom = res.resolvedFrom; resolvedCount++; }
+  }
+
   await resolveRedirects(inScope);
 
   await mkdir("data", { recursive: true });
   await writeFile("data/raw-taxa.json", JSON.stringify(inScope, null, 0));
   console.log(`wrote data/raw-taxa.json (${inScope.length} taxa)`);
+  console.log(`resolved via species: ${resolvedCount} genera`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

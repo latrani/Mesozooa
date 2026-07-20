@@ -5,6 +5,7 @@ export const NEORNITHES = "Q19163";
 export const AVES = "Q5113";
 export const RANK_GENUS = "Q34740";
 export const RANK_FAMILY = "Q35409";
+export const RANK_SPECIES = "Q7432";
 
 export interface RawTaxon {
   id: string;
@@ -17,6 +18,7 @@ export interface RawTaxon {
   taxonName?: string;      // Wikidata P225 (taxon name); may differ from the en label
   enwikiTitle?: string;    // enwiki article title (independent name signal)
   redirectTarget?: string; // if the enwiki article redirects, its target title (advisory only)
+  resolvedFrom?: string;   // species Q-id whose article/sitelinks/image were folded onto this genus
 }
 
 export interface TreeNode {
