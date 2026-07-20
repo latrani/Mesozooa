@@ -59,7 +59,7 @@
   .chip {
     display: inline-flex; align-items: center; gap: .3em;
     padding: .2rem .7rem; border-radius: var(--radius-pill);
-    font-size: var(--type-label); font-weight: var(--fw-regular);
+    font-size: var(--type-heading); font-weight: var(--fw-regular);  /* WCAG-large floor; see tokens.css */
     background: var(--cream-dim); color: var(--ink);
   }
   /* hint family (branch + leaf) — same pill, set apart by italic + light weight. */
