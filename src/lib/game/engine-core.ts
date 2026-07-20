@@ -108,7 +108,7 @@ export function warmestSharedNodeId(state: GameState, store: TreeStore): string 
 }
 
 // True once warmth has bottomed out at (or, via hints, below) the target's terminal clade —
-// the state in which the available hint is a leaf-hint (which surfaces the paleo clue) rather
+// the state in which the available hint is a leaf-hint (which surfaces the paleo-data) rather
 // than a branch walk. Count-based, so a monotypic node below the terminal clade still counts.
 export function leafHintActive(state: GameState, store: TreeStore): boolean {
   if (state.status !== "playing") return false;

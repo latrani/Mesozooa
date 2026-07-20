@@ -172,9 +172,12 @@ async function main() {
     .map((n) => ({ id: n.id, name: n.name }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Emit clue attributes only for the final playable set.
+  // Emit paleo-data for EVERY genus that has it — Explore shows it as reference content, so it is
+  // NOT gated on playability (the game answer pool is genera-index.json, emitted from `playable`
+  // above). Decoupling these means a cap-bumped-but-documented genus (e.g. Suskityrannus) still
+  // shows its paleo-data in Explore while staying out of the answer pool.
   const clueOut: GenusAttributes = {};
-  for (const n of playable) if (attrs[n.id]) clueOut[n.id] = attrs[n.id];
+  for (const n of genera) if (attrs[n.id]) clueOut[n.id] = attrs[n.id];
 
   // GUARD 2 (output regression): compare this build against the CURRENTLY-COMMITTED data and
   // fail-closed if key coverage drops sharply — a rebuild should never ship materially LESS than

@@ -3,8 +3,9 @@ import attrsJson from "../../data/genus-attributes.json";
 
 const attrs = attrsJson as GenusAttributes;
 
-// The paleo clue for a genus id, or null if none was harvested. (Every playable genus has one
-// — guaranteed by the Plan A clue-eligibility filter — but callers should still handle null.)
+// The paleo-data for a genus id, or null if none was harvested. Emitted for every genus that has
+// it (not just playable ones — Explore shows it as reference content), so many non-playable genera
+// have paleo-data too; the reverse still holds (every playable genus has it). Callers handle null.
 export function clueFor(id: string): GenusAttribute | null {
   return attrs[id] ?? null;
 }

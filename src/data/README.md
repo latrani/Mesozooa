@@ -8,5 +8,6 @@ Do not edit by hand. Regenerate with:
 
 `tree.json` is the full Mesozoic cladogram (reference pool); genera carry `sitelinks`.
 `genera-index.json` is the notability-pruned playable pool (≤ CAP=7 per terminal set).
-`genus-attributes.json` holds the paleo clue (age + discovery location) for each playable
-genus. See docs/superpowers/specs for design.
+`genus-attributes.json` holds the paleo-data (age + discovery location) for every genus that
+has it — NOT just playable ones, since Explore shows it as reference content. See
+docs/superpowers/specs for design.
