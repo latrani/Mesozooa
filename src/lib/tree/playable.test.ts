@@ -101,6 +101,31 @@ describe("prunePlayable", () => {
     // TC & LO excluded by branchDepth rule; among TR/TB tie, TB wins (ascending id)
     expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB"]);
   });
+  it("pins a cap-bumped genus, evicting the lowest non-pinned winner", () => {
+    const t = freshTree();
+    // TR(5) & TB(3) share terminal clade TF; cap 1 normally keeps TR. Pin TB -> TB survives, TR evicted.
+    prunePlayable(t, clue, () => 1, new Set(["TB"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB"]);
+  });
+  it("pin is a no-op when the genus already wins its cap slot", () => {
+    const t = freshTree();
+    // Pin TR, which already wins cap 1 in TF. Result unchanged: just TR.
+    prunePlayable(t, clue, () => 1, new Set(["TR"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TR"]);
+  });
+  it("does NOT pin a genus with no clue (cap-only override)", () => {
+    const t = freshTree();
+    // Clue map omits TB -> TB has no clue. Pinning it must NOT rescue it; TR wins cap 1 alone.
+    const noTB: GenusAttributes = { TR: clue.TR, TC: clue.TC, LO: clue.LO };
+    prunePlayable(t, noTB, () => 1, new Set(["TB"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TR"]);
+  });
+  it("pinning both members of a clade keeps both even past cap", () => {
+    const t = freshTree();
+    // Pin TR and TB, cap 1. Both pinned -> both sort to top -> both survive the cap-1 trim.
+    prunePlayable(t, clue, () => 1, new Set(["TR", "TB"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB", "TR"]);
+  });
 });
 
 describe("prunePlayable shallow-terminal exclusion", () => {
