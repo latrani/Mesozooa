@@ -153,6 +153,17 @@ correct.
   **not tagged `rankId = genus`** in Wikidata, so our `RANK_GENUS` filter in `assembleTree` drops the
   whole lineage. This is a distinct mechanism (rank inference, not cluster resolution) and a distinct
   fix. **File as a separate GitHub issue** (`tech-debt`); out of scope here.
+- **Homonym-poisoned PBDB clues (#13).** The PBDB join is by bare genus name (`build-tree.ts:116`),
+  so a genus sharing its name with a non-dino taxon inherits the wrong occurrences — a confident-wrong
+  clue. Resolution does **not** touch the join key (it donates only article/sitelinks/image, never
+  `name`), so it introduces **zero** new mismatches. But it *does* change one thing: a poisoned genus
+  that was hidden by non-playability can now become playable and thus *surface* its latent bad clue.
+  Audit of all 108 newly-exposed clues (2026-07-20, against `raw-pbdb.json`) found exactly **one**
+  poisoned case — **Alocodon** (a Jurassic ornithischian PBDB dates to the Eocene via a homonym) — and
+  it is already dropped by the Mesozoic date gate (`isMesozoic` false), so it never actually reaches a
+  specimen card. No **Mesozoic-vs-Mesozoic** homonym (the class the date gate *cannot* catch) is
+  present in the rescued set. Net: resolution un-masks one latent lie that another guard already
+  swallows; the general fix (a `base_name=Dinosauria`-scoped PBDB join) remains #13's job.
 
 ## Success criteria
 
