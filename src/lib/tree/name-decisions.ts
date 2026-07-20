@@ -73,6 +73,12 @@ export const NAME_DECISIONS: Record<string, { name: string; note: string }> = {
   Q6752264:   { name: "Manu", note: "enwiki binomial 'Manu antiquus'" },
   Q878443:    { name: "Saturnalia", note: "enwiki binomial 'Saturnalia tupiniquim'" },
 
+  // ── P225 is a binomial, en = enwiki the genus → use the genus. Surfaced by the #43 rank override
+  //    (these genus items were mis-tagged P105=species; once promoted, their P225 binomial disagrees
+  //    with the plain-genus en/enwiki). Same resolution as the enwiki-binomial block above. ──────
+  Q95715804:  { name: "Overoraptor", note: "P225 binomial 'Overoraptor chimentoi'; en+enwiki agree on genus (#43)" },
+  Q72914385:  { name: "Nemegtonykus", note: "P225 binomial 'Nemegtonykus citus'; en+enwiki agree on genus (#43)" },
+
   // ── enwiki is a sibling clade name that ALREADY EXISTS as its own node → keep en+P225 (renaming
   //    to the enwiki name would collide and trigger a dedupe MERGE, which is deferred) ──────────
   Q132824:   { name: "Hesperornithiformes", note: "en+P225 agree; enwiki 'Hesperornithes' is a distinct node (Q21446301) — merge deferred" },
