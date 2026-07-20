@@ -152,17 +152,24 @@ and grown-up, not cute, not a serif label voice. **Tabular figures on** (`font-v
 tabular-nums`) everywhere counts appear (clade counts, budget, guess counts) so numbers don't
 jitter.
 
-**Base size is 24px, and the whole scale is +50% over a conventional web app** (locked, per
-explicit direction — the app has ample width and was reading too small/timid). Default to bold,
-legible, confident sizing; resist the instinct to shrink. Scale (exact rem):
+**The root stays at the browser default (16px) and all sizes are `rem`** — so text honors the
+user's chosen base-size preference (accessibility; px would pin it). An earlier draft of this
+section claimed a "24px base, +50% scale (locked)"; that was never implemented — `rem` resolves
+against the 16px root, not the `body` (which briefly carried a dead `font-size: 24px` that
+nothing inherited), so the real delivered sizes were always ~⅔ of that claim. The scale below is
+the **normalized** type system (see `docs/superpowers/specs/2026-07-20-type-system-normalization-design.md`):
+role-named, single-decimal rem, near-duplicate steps merged. Default to legible, confident sizing.
 ```
---type-display  2rem/800    wordmark, solved answer name
---type-h        1.25rem/700 region/specimen headline
---type-body     1.05rem/400 default (on 24px root)
---type-label    0.92rem/600 crumb names, node labels, captions
---type-meta     0.78rem/700 tabular counts, budget, "Ma"
---type-eyebrow  0.72rem/700 uppercase tracked overline
+--type-display  2rem/800     32px    wordmark, solved answer name
+--type-title    1.4rem/—     22.4px  paper slips, active trail crumb
+--type-heading  1.2rem/700   19.2px  region/specimen headlines, chips, crumbs
+                                      (≥ 14pt bold → WCAG large / 3:1; don't lower — flooded chips depend on it)
+--type-body     1rem/400     16px    default body text
+--type-label    0.9rem/600   14.4px  field + node labels, captions
+--type-meta     0.8rem/700   12.8px  tabular counts, credits, "Ma"
 ```
+(`--type-eyebrow` retired — it was unused in the app; its uppercase-tracked identity is weight +
+letter-spacing, not a distinct size, so eyebrows now use `--type-meta`.)
 Voice touches that evoke the interpretive-panel feel without serifs or kitsch: an **overline
 eyebrow** (uppercase, tracked; `--ink-mute` on light, `--cream-dim` on placards) above
 specimen/section headings (e.g. `SPECIMEN · UNIDENTIFIED`, `FIELD CLUE`).
