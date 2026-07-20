@@ -92,13 +92,16 @@
   /* Active-tab / focus accent */
   --accent: var(--turq);
 
-  /* TYPE — base 24px, +50% scale (spec §2.2) */
-  --type-display: 2rem;
-  --type-h: 1.25rem;
-  --type-body: 1.05rem;
-  --type-label: 0.92rem;
-  --type-meta: 0.78rem;
-  --type-eyebrow: 0.72rem;
+  /* TYPE — role-named scale, single-decimal rem. rem resolves against the 16px browser-default
+     root (NOT a 24px base — that earlier claim was never implemented). Sizes are the delivered
+     px at standard zoom. Normalized 2026-07-20; see specs/2026-07-20-type-system-normalization-design.md */
+  --type-display: 2rem;     /* 32px   — h1 / wordmark, solved answer name */
+  --type-title: 1.4rem;     /* 22.4px — paper slips, active trail crumb */
+  --type-heading: 1.2rem;   /* 19.2px — headings, modal/placard titles, chips, crumbs.
+                               WCAG-large floor: >= 14pt bold (18.66px) -> 3:1. DON'T lower — flooded chips depend on it. */
+  --type-body: 1rem;        /* 16px   — default body text */
+  --type-label: 0.9rem;     /* 14.4px — field + node labels, captions */
+  --type-meta: 0.8rem;      /* 12.8px — credits, clade counts, off-spine context */
   --fw-light: 300; --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700; --fw-black: 800;
 
   /* FONTS — Hanken Grotesk (variable, full weight range) for body/UI; Arsenal 700 for
