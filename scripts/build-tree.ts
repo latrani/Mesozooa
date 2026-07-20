@@ -5,6 +5,9 @@ import { markPlayable, prunePlayable, playableGenera, adaptiveCap, DEFAULT_CAP_D
 import type { RawTaxon, TreeData } from "../src/lib/tree/types";
 import { AVES, DINOSAURIA, NEORNITHES } from "../src/lib/tree/types";
 import type { GenusAttribute, GenusAttributes } from "../src/lib/attributes";
+import { hasClue } from "../src/lib/attributes";
+import { terminalClade } from "../src/lib/tree/terminal";
+import { ALWAYS_PLAYABLE } from "../src/lib/tree/always-playable";
 import type { ImageCredits } from "../src/lib/image-credits";
 import { enrichAge, isMesozoic, MESOZOIC_END_MA } from "../src/lib/geologic-time";
 import { findConflicts, findDecisionCollisions, type NameConflict } from "../src/lib/tree/names";
@@ -161,9 +164,27 @@ async function main() {
 
   markPlayable(tree); // base eligibility: genus + enwiki + family ancestor
 
+  // Resolve the always-playable names (#46) to ids, cap-only: a pin is honored ONLY if the genus
+  // exists, has a clue, and sits in a non-degenerate terminal clade. Report every outcome; a bad
+  // pin warns but never fails the build (it's a curation typo, not data corruption).
+  const byName = new Map(Object.values(tree.nodes).filter((n) => n.isGenus).map((n) => [n.name, n]));
+  const pinned = new Set<string>();
+  const pinReport: string[] = [];
+  for (const name of ALWAYS_PLAYABLE) {
+    const node = byName.get(name);
+    if (!node) { pinReport.push(`  ⚠ "${name}": unknown / not a genus — skipped`); continue; }
+    if (!hasClue(attrs[node.id])) { pinReport.push(`  ⚠ "${name}" (${node.id}): no paleo-data — skipped`); continue; }
+    if (tree.nodes[terminalClade(tree, node.id)].branchDepth <= 1) {
+      pinReport.push(`  ⚠ "${name}" (${node.id}): degenerate terminal clade — skipped`); continue;
+    }
+    pinned.add(node.id);
+    pinReport.push(`  ✓ "${name}" (${node.id}): pinned`);
+  }
+
   // Notability prune: needs a clue; keep ≤ diversity-scaled cap per terminal set.
   prunePlayable(tree, attrs, (members) =>
     adaptiveCap(members.map((n) => attrs[n.id]).filter((a): a is GenusAttribute => !!a), DEFAULT_CAP_DIALS),
+    pinned,
   );
 
   const genera = Object.values(tree.nodes).filter((n) => n.isGenus);
@@ -255,6 +276,8 @@ async function main() {
   console.log("genera (all):       ", genera.length);
   console.log("post-Mesozoic cut:  ", postMesozoic.size, `(dated younger than ${MESOZOIC_END_MA} Ma, + undated under Aves)`);
   console.log("playable (pruned):  ", playable.length, `(adaptive cap ${DEFAULT_CAP_DIALS.capMin}–${DEFAULT_CAP_DIALS.capMax})`);
+  console.log(`always-playable pins (${pinned.size}/${ALWAYS_PLAYABLE.length} applied):`);
+  for (const line of pinReport) console.log(line);
   console.log("clue attributes:    ", Object.keys(clueOut).length);
   console.log("genera w/o sitelink:", genera.filter((n) => n.sitelinks === 0).length);
   console.log("root count:         ", tree.nodes[DINOSAURIA].descendantGenusCount);
