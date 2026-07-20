@@ -5,6 +5,7 @@ import type { RawTaxon } from "../src/lib/tree/types";
 import { DINOSAURIA, NEORNITHES, RANK_SPECIES, RANK_GENUS } from "../src/lib/tree/types";
 import { enwikiTitleFromUrl } from "./enwiki-title";
 import { resolveCluster } from "./resolve-cluster";
+import { RANK_OVERRIDES } from "../src/lib/tree/rank-overrides";
 
 const PAGE = 10000;
 
@@ -18,10 +19,13 @@ async function fetchStructure(): Promise<RawTaxon[]> {
         OPTIONAL { ?taxon wdt:P105 ?rank }
       } ORDER BY ?taxon LIMIT ${PAGE} OFFSET ${offset}`);
     for (const r of rows) {
+      const id = qid(r.taxon!);
       raws.push({
-        id: qid(r.taxon!),
-        name: qid(r.taxon!), // filled in Phase 2
-        rankId: r.rank ? qid(r.rank) : null,
+        id,
+        name: id, // filled in Phase 2
+        // A curated rank override (#43) corrects genus items Wikidata mis-tags P105=species; it wins
+        // over the raw P105 so assembleTree keeps the lineage. Only rankId is affected.
+        rankId: RANK_OVERRIDES[id] ?? (r.rank ? qid(r.rank) : null),
         parentId: qid(r.parent!),
       });
     }
