@@ -45,7 +45,7 @@ describe("chipsFor", () => {
     const c = chips[0];
     expect(c.kind).toBe("leafHint");
     if (c.kind !== "leafHint") throw new Error("kind");
-    expect(c.label).toBe("Field clue");
+    expect(c.label).toBe("Paleo-data");
     expect((c as Record<string, unknown>).nodeId).toBeUndefined();
   });
 

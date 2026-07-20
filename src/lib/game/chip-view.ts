@@ -30,7 +30,7 @@ export function chipsFor(guesses: GuessResult[], store: TreeStore, opts: ChipOpt
   // newest-first
   for (const g of guesses.slice().reverse()) {
     if (g.kind === "leafHint") {
-      chips.push({ kind: "leafHint", label: "Field clue" });
+      chips.push({ kind: "leafHint", label: "Paleo-data" });
     } else if (g.kind === "branchHint") {
       const shared = store.getNode(g.sharedNodeId);
       chips.push({
