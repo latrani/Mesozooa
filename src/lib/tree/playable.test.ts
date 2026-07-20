@@ -67,6 +67,12 @@ describe("prunePlayable", () => {
     t.nodes["TB"].sitelinks = 3;
     t.nodes["TC"].sitelinks = 9;
     t.nodes["LO"].sitelinks = 4;
+    // Give every base-playable genus an image so existing tests exercise cap/clue/pin logic in
+    // isolation from the image gate (added #50). Image-gate behavior is tested separately below.
+    t.nodes["TR"].imageUrl = "tr.jpg";
+    t.nodes["TB"].imageUrl = "tb.jpg";
+    t.nodes["TC"].imageUrl = "tc.jpg";
+    t.nodes["LO"].imageUrl = "lo.jpg";
     return t;
   }
   const clue: GenusAttributes = {
@@ -113,12 +119,13 @@ describe("prunePlayable", () => {
     prunePlayable(t, clue, () => 1, new Set(["TR"]));
     expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TR"]);
   });
-  it("does NOT pin a genus with no clue (cap-only override)", () => {
+  it("pins a genus with no clue, evicting the non-pinned winner (pin bypasses all gates, #50)", () => {
     const t = freshTree();
-    // Clue map omits TB -> TB has no clue. Pinning it must NOT rescue it; TR wins cap 1 alone.
+    // Clue map omits TB -> TB has no clue. Under #50 a pin bypasses the clue gate, so pinned TB
+    // enters clade TF and, sorting to the top, survives cap 1 and evicts the non-pinned TR.
     const noTB: GenusAttributes = { TR: clue.TR, TC: clue.TC, LO: clue.LO };
     prunePlayable(t, noTB, () => 1, new Set(["TB"]));
-    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TR"]);
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB"]);
   });
   it("pinning both members of a clade keeps both even past cap", () => {
     const t = freshTree();
@@ -140,6 +147,37 @@ describe("prunePlayable", () => {
     const attrs: GenusAttributes = { ...clue, TX: { ageLabel: "Campanian", discoveryLocation: "USA" } };
     prunePlayable(t, attrs, () => 2, new Set(["TB"]));
     expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB", "TX"]);
+  });
+  it("excludes an imageless non-pinned genus", () => {
+    const t = freshTree();
+    delete t.nodes["TB"].imageUrl; // TB now imageless; TR(5) & TB(3) share clade TF, cap 7
+    prunePlayable(t, clue, () => 7);
+    // TB dropped for no image; TR kept. (TC & LO excluded by the branchDepth rule as before.)
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TR"]);
+  });
+  it("keeps an imageless genus when it is PINNED (pin overrides the image gate)", () => {
+    const t = freshTree();
+    delete t.nodes["TB"].imageUrl;
+    prunePlayable(t, clue, () => 7, new Set(["TB"]));
+    // TB imageless but pinned -> kept; TR kept.
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB", "TR"]);
+  });
+  it("pin overrides the clue gate too (no clue, still playable)", () => {
+    const t = freshTree();
+    const noTB = { TR: clue.TR, TC: clue.TC, LO: clue.LO }; // TB has no clue
+    prunePlayable(t, noTB, () => 7, new Set(["TB"]));
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TB", "TR"]);
+  });
+  it("image-having genera refill cap slots freed by an imageless drop", () => {
+    // TF clade: TR(5), TB(3), + inject TX(9) with an image. Make TB imageless, cap 2.
+    const t = freshTree();
+    t.nodes["TX"] = { ...t.nodes["TR"], id: "TX", name: "TXsaurus", sitelinks: 9, imageUrl: "tx.jpg" };
+    t.nodes["TF"].childrenIds = [...t.nodes["TF"].childrenIds, "TX"];
+    delete t.nodes["TB"].imageUrl;
+    const attrs = { ...clue, TX: { ageLabel: "Campanian", discoveryLocation: "USA" } };
+    prunePlayable(t, attrs, () => 2, new Set());
+    // Imageless TB dropped pre-cap; the 2 slots go to the image-having TX(9) and TR(5), not TB.
+    expect(playableGenera(t).map((n) => n.id).sort()).toEqual(["TR", "TX"]);
   });
 });
 

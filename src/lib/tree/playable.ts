@@ -63,9 +63,11 @@ export function playableGenera(tree: TreeData): TreeNode[] {
   return Object.values(tree.nodes).filter((n) => n.playable);
 }
 
-// Narrow the base-playable set: require a clue, then keep only the most-notable
-// (by sitelinks, ties by ascending id) genera within each terminal clade, up to a
-// per-clade cap computed by capFn from that clade's members.
+// Narrow the base-playable set: for NON-pinned genera require a clue, a non-degenerate
+// terminal clade, AND an image (#50); then keep only the most-notable (by sitelinks, ties by
+// ascending id) genera within each terminal clade, up to a per-clade cap computed by capFn.
+// A PINNED genus bypasses ALL of those gates (clue, degenerate-clade, image) — it needs only
+// base `n.playable` (the build guarantees that for pins) — and also survives the cap trim.
 export function prunePlayable(
   tree: TreeData,
   attrs: GenusAttributes,
@@ -74,18 +76,16 @@ export function prunePlayable(
 ): void {
   const byClade = new Map<string, TreeNode[]>();
   for (const n of Object.values(tree.nodes)) {
-    if (!n.playable) continue;
-    if (!hasClue(attrs[n.id])) {
-      n.playable = false;
-      continue;
-    }
+    if (!n.playable) continue; // base: genus + article (or a pin the build marked playable, Task 2)
     const a = terminalClade(tree, n.id);
-    // Degenerate targets: a terminal clade with <=1 narrowing step of runway makes two-phase
-    // warmth unitary/binary (spec 3.3). Exclude them; keeps the phase-1 denominator >= 2.
-    // NOTE: pins do NOT bypass this gate (nor the clue gate above) — cap-only override.
-    if (tree.nodes[a].branchDepth <= 1) {
-      n.playable = false;
-      continue;
+    // Pins bypass EVERY gate below (clue, degenerate-clade, image) — pin is last, pin wins (#50).
+    // A non-pinned genus must clear all three to be a candidate.
+    if (!pinned.has(n.id)) {
+      if (!hasClue(attrs[n.id])) { n.playable = false; continue; }
+      // Degenerate terminal clade (branchDepth <= 1) breaks two-phase warmth (spec 3.3).
+      if (tree.nodes[a].branchDepth <= 1) { n.playable = false; continue; }
+      // Image gate (#50): a playable dino must have a picture, else the card is a ??? placeholder.
+      if (!n.imageUrl) { n.playable = false; continue; }
     }
     const list = byClade.get(a);
     if (list) list.push(n);

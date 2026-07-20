@@ -13,7 +13,24 @@ rank-override work (#43) promotes **Eodromaeus** (sl=19) into that same bucket.
 We need a curated "always-playable" list: name a genus, and it's guaranteed into the playable pool
 past the cap — with the app degrading gracefully if a listed name is wrong.
 
-## Scope of the override: cap only
+## Scope of the override
+
+> **SUPERSEDED by #50 (`2026-07-20-image-gate-design.md`, 2026-07-20).** The "cap-only" scope below is
+> the ORIGINAL contract and is retained for history. The CURRENT contract is: **a pin overrides EVERY
+> gate — image, clue, degenerate-clade, AND the base article gate. Pin is last, pin wins; the only
+> thing that can't be pinned is a name that doesn't resolve to a genus.** A pin failing a gate is no
+> longer skipped — it's honored and the build report labels which gate(s) it overrode
+> (`pinned (overriding: no image, no paleo-data)`). Rationale (user): "Pins override gates. Period.
+> It's on me not to pin something stupid." The warmth math self-guards the degenerate case
+> (`warmth.ts` `denom = Math.max(1, …)`), so a degenerate-clade pin yields flat warmth, not a crash.
+> **This supersedes the cap-only contract THROUGHOUT THIS DOCUMENT**, not just this section. Later
+> sections (Mechanism, Graceful failure, Out of scope, Success criteria, Verification) still describe
+> the retired cap-only behavior in the active voice — read every "warned and skipped" / "NOT pinned" /
+> "cap-only" claim below as HISTORICAL. The live contract and its tests are in
+> `2026-07-20-image-gate-design.md` and `src/lib/tree/playable.test.ts`, which now assert the opposite
+> (e.g. "pins a genus with no clue").
+
+### Original (cap-only) scope — RETIRED
 
 `prunePlayable` excludes a genus for three reasons; the pin overrides **only the third**:
 
