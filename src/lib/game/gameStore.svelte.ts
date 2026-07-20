@@ -1,6 +1,6 @@
 import type { GameState } from "./types";
 import { treeStore } from "./treeData";
-import { createCountWarmth } from "./warmth";
+import { warmthForTarget, type WarmthProvider } from "./warmth";
 import {
   applyGuess,
   applyHint,
@@ -14,13 +14,15 @@ import {
   leafHintActive,
 } from "./engine-core";
 
-const warmth = createCountWarmth(treeStore.rootCount);
-
 export function createGame() {
   let state = $state<GameState>(newRoundState(treeStore));
+  const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore.data, state.target));
   return {
     get state(): GameState {
       return state;
+    },
+    get warmthProvider(): WarmthProvider {
+      return warmth;
     },
     get warmestId(): string | null {
       return warmestSharedNodeId(state, treeStore);
