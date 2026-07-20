@@ -11,7 +11,7 @@
   import { warmthRampColor } from "../lib/game/warmth-ramp";
   import { warmthForTarget } from "../lib/game/warmth";
   import HowToPlay from "../lib/components/HowToPlay.svelte";
-  import { buildShareText } from "../lib/game/share";
+  import { buildShareText, buildShareParts } from "../lib/game/share";
   import {
     fixtureStore,
     stateEmpty,
@@ -61,6 +61,7 @@
   ];
 
   const sampleShareText = buildShareText(stateSolvedWon, "2026-07-18");
+  const sampleShareParts = buildShareParts(stateSolvedWon, "2026-07-18");
 
   // Per-fixture-state provider for the standalone SpineTree panels below (GameBoard reads its
   // own store.warmthProvider; these panels drive SpineTree directly with a raw revealed/tipId).
@@ -221,7 +222,13 @@
     <div style="background: var(--placard); padding: var(--space-3); display: inline-block;">
       <HowToPlay />
     </div>
-    <p>Share text (recolored ramp), as shown in the Share modal:</p>
+    <p>Share preview (paragraph-spaced blocks, framed on the lighter page ground):</p>
+    <div style="display: flex; flex-direction: column; gap: var(--space-3); background: var(--bg-page); border: 1px solid var(--placard-edge); border-radius: var(--radius-card); padding: var(--space-4); line-height: 1.4; max-width: 20rem;">
+      <p style="margin: 0;">{sampleShareParts.headline}</p>
+      <p style="margin: 0;">{sampleShareParts.score}</p>
+      <pre style="margin: 0; white-space: pre;">{sampleShareParts.grid.join("\n")}</pre>
+    </div>
+    <p>Copied clipboard text (compact single line breaks):</p>
     <pre style="white-space: pre; line-height: 1.4;">{sampleShareText}</pre>
   </section>
 </div>

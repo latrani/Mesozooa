@@ -3,20 +3,19 @@
   import { nav } from "../../nav.svelte";
   import GameBoard from "./GameBoard.svelte";
   import Modal from "../../components/Modal.svelte";
-  import { buildShareText } from "../share";
+  import { buildShareText, buildShareParts } from "../share";
 
   let shareOpen = $state(false);
-  let copied = $state(false);
   let shareText = $derived(buildShareText(daily.state, daily.date));
+  let shareParts = $derived(buildShareParts(daily.state, daily.date));
 
-  async function copy() {
+  async function copyAndClose() {
     try {
       await navigator.clipboard.writeText(shareText);
-      copied = true;
-      setTimeout(() => (copied = false), 1500);
     } catch {
-      copied = false;
+      // Clipboard denied (e.g. insecure context) — still close; the preview stays visible next open.
     }
+    shareOpen = false;
   }
 </script>
 
@@ -30,8 +29,16 @@
 </main>
 
 <Modal bind:open={shareOpen} title="Share your result">
-  <pre class="share-preview">{shareText}</pre>
-  <button type="button" class="btn-secondary" onclick={copy}>{copied ? "Copied" : "Copy"}</button>
+  <!-- Preview shows the three blocks with paragraph spacing (display-only); the clipboard copy is
+       compact single line breaks (see buildShareText). -->
+  <div class="share-preview">
+    <p class="share-block">{shareParts.headline}</p>
+    <p class="share-block">{shareParts.score}</p>
+    <pre class="share-block share-grid">{shareParts.grid.join("\n")}</pre>
+  </div>
+  <div class="share-actions">
+    <button type="button" class="btn-primary" onclick={copyAndClose}>Copy and close</button>
+  </div>
 </Modal>
 
 <style>
@@ -39,11 +46,19 @@
   @media (min-width: 641px) {
     .daily { padding-top: 0; display: flex; flex-direction: column; min-height: 0; }
   }
-  /* pre keeps the emoji grid rows aligned; structural only */
+  /* Framed preview on a lighter sunk ground — the result reads as a lifted-out card, distinct
+     from the modal body. Blocks are spaced as paragraphs (display-only; copied text is compact). */
   .share-preview {
-    font-family: inherit;
-    white-space: pre;
-    margin: 0 0 var(--space-3);
+    display: flex; flex-direction: column; gap: var(--space-3);
+    background: var(--bg-page);
+    border: 1px solid var(--placard-edge);
+    border-radius: var(--radius-card);
+    padding: var(--space-4);
+    margin: 0 0 var(--space-4);
     line-height: 1.4;
   }
+  .share-block { margin: 0; }
+  /* pre keeps the emoji grid rows aligned */
+  .share-grid { font-family: inherit; white-space: pre; }
+  .share-actions { display: flex; justify-content: flex-end; }
 </style>
