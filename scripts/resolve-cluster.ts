@@ -32,9 +32,13 @@ export function resolveCluster(genus: RawTaxon, species: RawTaxon[]): ClusterRes
   articled.sort((a, b) => sl(b) - sl(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const rep = articled[0];
 
-  // Image: prefer the genus's own, else the representative's, else any species with one.
-  const imageUrl =
-    genus.imageUrl ?? rep?.imageUrl ?? species.find((s) => s.imageUrl)?.imageUrl;
+  // Image: prefer the genus's own, else the representative's, else any species with one — picking
+  // the lowest-id imaged species so the choice is deterministic across harvests (fetchClusterSpecies
+  // has no ORDER BY; matches the ascending-id tiebreak used for the representative).
+  const imagedSpecies = species
+    .filter((s) => s.imageUrl)
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
+  const imageUrl = genus.imageUrl ?? rep?.imageUrl ?? imagedSpecies?.imageUrl;
 
   if (!rep) {
     // No article anywhere — keep the genus's own identity untouched.

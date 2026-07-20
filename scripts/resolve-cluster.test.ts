@@ -108,6 +108,18 @@ describe("resolveCluster", () => {
     expect(r.imageUrl).toBe("commons://sp.jpg");
   });
 
+  it("picks the lowest-id species image deterministically (array order independent)", () => {
+    // No genus image, no articled rep image; two imaged species given out of id order.
+    const g = genus({ sitelinks: 0 });
+    const sp = [
+      species("Qs9", { imageUrl: "commons://nine.jpg" }),
+      species("Qs2", { imageUrl: "commons://two.jpg" }),
+    ];
+    expect(resolveCluster(g, sp).imageUrl).toBe("commons://two.jpg"); // Qs2 < Qs9
+    // Reversed input order → same result (determinism, not first-in-array).
+    expect(resolveCluster(g, [sp[1], sp[0]]).imageUrl).toBe("commons://two.jpg");
+  });
+
   it("handles a genus with no species (monotypic-less / leaf)", () => {
     const g = genus({ wikipediaUrl: "https://en.wikipedia.org/wiki/Genusname", enwikiTitle: "Genusname", sitelinks: 12, imageUrl: "commons://g.jpg" });
     const r = resolveCluster(g, []);
