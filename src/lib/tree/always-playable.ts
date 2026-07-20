@@ -4,4 +4,5 @@
 // docs/superpowers/specs/2026-07-20-always-playable-list-design.md.
 export const ALWAYS_PLAYABLE: string[] = [
   "Tawa", // Ghost Ranch coelophysoid; camp week. Bumped from Theropoda-direct cap by Eodromaeus (#43).
+  "Suskityrannus", // Zuni Basin (New Mexico) tyrannosauroid; camp week. Cap-bumped (#9/11 in Tyrannosauroidea).
 ];
