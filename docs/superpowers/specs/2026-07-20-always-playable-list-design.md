@@ -71,8 +71,12 @@ members.sort((x, y) => {
 });
 ```
 
-If a clade's pin count exceeds its cap (not a concern at current list size), pins fill the cap and the
-excess pins are still trimmed — acceptable and reported; revisit only if it ever happens.
+A pin is **never** trimmed: the trim loop skips pinned ids. So if a clade's pin count exceeds its cap
+(not a concern at current list size), all its pins survive and the clade simply exceeds cap by the
+overflow — a deliberate curation act, visible in the report. "A pinned genus is always playable" is a
+stronger, simpler guarantee than "pins survive unless there are too many," and matches the intent of
+an always-playable list; the cost (a clade over cap) only occurs if someone pins more than cap-many
+genera into one clade.
 
 ## Graceful failure + build report
 
