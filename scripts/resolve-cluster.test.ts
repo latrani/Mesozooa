@@ -11,17 +11,47 @@ const species = (id: string, over: Partial<RawTaxon> = {}): RawTaxon => ({
 
 describe("resolveCluster", () => {
   it("prefers a more-notable articled species over the genus (Cryolophosaurus case)", () => {
-    const g = genus({ id: "Q18511006", sitelinks: 0, imageUrl: "commons://cryo.jpg" });
+    // Species article titled with the bare genus name — enwikiTitle passes through (first token matches).
+    const g = genus({ id: "Q18511006", name: "Cryolophosaurus", sitelinks: 0, imageUrl: "commons://cryo.jpg" });
     const sp = [species("Q131166", {
+      name: "Cryolophosaurus ellioti",
       wikipediaUrl: "https://en.wikipedia.org/wiki/Cryolophosaurus",
       enwikiTitle: "Cryolophosaurus", sitelinks: 36,
     })];
     const r = resolveCluster(g, sp);
     expect(r.wikipediaUrl).toBe("https://en.wikipedia.org/wiki/Cryolophosaurus");
-    expect(r.enwikiTitle).toBe("Cryolophosaurus");
+    expect(r.enwikiTitle).toBe("Cryolophosaurus"); // first token == genus name → kept
     expect(r.sitelinks).toBe(36);
     expect(r.resolvedFrom).toBe("Q131166");
     expect(r.imageUrl).toBe("commons://cryo.jpg"); // genus's own image kept
+  });
+
+  it("drops a species' BINOMIAL enwikiTitle whose first token matches the genus (Afrovenator case)", () => {
+    // The link still resolves; the name-candidate is suppressed so the name gate sees no false conflict.
+    const g = genus({ id: "Q18511003", name: "Afrovenator", sitelinks: 0 });
+    const sp = [species("Qsp", {
+      name: "Afrovenator abakensis",
+      wikipediaUrl: "https://en.wikipedia.org/wiki/Afrovenator_abakensis",
+      enwikiTitle: "Afrovenator abakensis", sitelinks: 20,
+    })];
+    const r = resolveCluster(g, sp);
+    expect(r.wikipediaUrl).toBe("https://en.wikipedia.org/wiki/Afrovenator_abakensis"); // link kept
+    expect(r.enwikiTitle).toBeUndefined(); // binomial name-candidate dropped
+    expect(r.resolvedFrom).toBe("Qsp");
+  });
+
+  it("keeps a species enwikiTitle whose first token does NOT match the genus (quoted-dubious / gate case)", () => {
+    // e.g. '"Coelosaurus" antiquus' — first token '"Coelosaurus"' (with quotes) != 'Coelosaurus'.
+    const g = genus({ id: "Q1106617", name: "Coelosaurus", sitelinks: 0 });
+    const sp = [species("Qsp", {
+      name: '"Coelosaurus" antiquus',
+      wikipediaUrl: "https://en.wikipedia.org/wiki/%22Coelosaurus%22_antiquus",
+      enwikiTitle: '"Coelosaurus" antiquus', sitelinks: 5,
+    })];
+    const r = resolveCluster(g, sp);
+    expect(r.wikipediaUrl).toBe("https://en.wikipedia.org/wiki/%22Coelosaurus%22_antiquus");
+    expect(r.enwikiTitle).toBe('"Coelosaurus" antiquus'); // kept → name gate will flag it
+    expect(r.resolvedFrom).toBe("Qsp");
   });
 
   it("keeps the genus's own article when the genus is the most notable", () => {
