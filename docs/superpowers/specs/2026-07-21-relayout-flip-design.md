@@ -114,8 +114,49 @@ vestibular/motion-sensitive users the a11y work serves.
   it. No change to the phase machine (`ringId`-only) or the single-tween-writer discipline.
 - Rapid Enter-nav (fast Explore hopping) retargets the one shared glide, same clean interrupt
   behavior slice 1 established — no per-hop sequencing to stutter.
-- Scroll (`scrollToNode` centering the new tip) stays as-is; it's the third mover on the same
-  relayout and already smooth + reduced-motion-gated.
+- **Scroll re-center joins the shared clock** (revised — see below). It's the *third* mover on a
+  relayout, and it must ride the same envelope as the FLIP, or the two race.
+
+## Scroll must ride the shared clock (revised)
+
+**Why this section exists.** The first implementation left the tip re-center on the native
+smooth-scroll (`scrollToNode` → `scrollTo({behavior:"smooth"})`), computed from the node's
+*final* layout position. But the FLIP glides the node *to* that position over `GLIDE_MS`, while
+the browser's smooth-scroll finishes on its own (~300ms) curve. Measured live: on
+Eusaurischia→Saurischia, the viewport scrolls to the node's destination in ~300ms while the node
+is still gliding there over the full envelope, so the *selected* node drifts ~340px off-centre
+and back. That's the "two competing animations" the #52 comment warns against — I animated the
+nodes but not the scroll.
+
+**Fix:** the re-center scroll animates on the **same master progress + `GLIDE_MS`** as the node
+FLIP (same linear curve), not the native smooth-scroll. Node-glide and scroll-glide finish
+together, so the selected node stays put on screen while the rest of the tree reflows *around*
+it — the selected node is the stable anchor the whole transition pivots on. Concretely: on a
+relayout the effect snapshots the current `scrollTop`/`scrollLeft` and the target (final)
+scroll, and the scroll is driven from the master progress (lerp start→target) alongside the
+nodes — one clock, one curve. Reduced motion → instant (progress set to 1, duration 0), same as
+the FLIP. Non-relayout scroll (arrow-browse keep-visible `scrollFocusIntoView`, pinch/zoom) is
+unchanged — this only governs the tip-change re-center.
+
+**Scope note — only the re-center joins the clock, deliberately.** Scroll/zoom drivers split into
+two kinds: *transitions* (glide to a known target — tip re-center, zoom-button steps, keep-visible
+nudge) and *direct manipulation* (track a live input frame-by-frame — pinch-zoom, native
+one-finger scroll). Only the tip re-center actually races the FLIP, so only it moves onto the
+shared clock. A broader "unify all transition scrolls into one animated primitive" was considered
+and **declined as YAGNI**: the other transitions don't race anything, moving them buys no behavior
+change, and it would risk the load-bearing WebKit pinch-drift workaround next door. Revisit only
+if a *second* transition starts racing something (then there are two real call-sites to design a
+shared primitive against).
+
+## Coordinate frame — interpolate in pixels (revised)
+
+The FLIP must interpolate node positions in **pixel space** (with `px()`/`py()` applied at
+snapshot time), NOT raw layout grid coordinates. `py(y) = base + (y − layout.minY)·Y_GAP`, and
+`layout.minY` shifts when the tip changes (the spine re-anchors). Interpolating grid-`y` and
+re-applying the *new* `py()` each frame renders frame 0 as `py_new(oldY)` — a spurious uniform
+vertical teleport (~one screen), then a glide back. Snapshotting `from`/`to` in pixels keeps both
+endpoints in one consistent frame (the same coordinate-frame-unification fix slice 1 needed for
+the ring; the ring puck already lives in pixel space via `glyphCenter`).
 
 ## Testing
 
