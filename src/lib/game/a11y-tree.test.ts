@@ -27,8 +27,11 @@ describe("a11yTree", () => {
   });
 
   it("orders siblings by visual y ascending, name as tiebreak", () => {
-    const tf = (yf: (id: string) => number) =>
-      a11yTree(store, FULL, yf)[0].children[0].children.find((n) => n.id === "TF")!;
+    const tf = (yf: (id: string) => number) => {
+      const [root] = a11yTree(store, FULL, yf);
+      const t = root.children.find((n) => n.id === "T")!;
+      return t.children.find((n) => n.id === "TF")!;
+    };
     expect(ids(tf(yMap({ TR: 5, TB: 1 })).children)).toEqual(["TB", "TR"]);
     expect(ids(tf(yMap({ TR: 1, TB: 5 })).children)).toEqual(["TR", "TB"]);
     // equal y -> name tiebreak: Tarbosaurus before Tyrannosaurus
