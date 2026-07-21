@@ -159,7 +159,7 @@
   // natively (resolving var()/color-mix, no JS color math), and the transition-duration is fed the
   // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
   // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
-  const GLIDE_MS = 90; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  const GLIDE_MS = 900; // one speed for every move (playtest: snappy feels good on click too). Tunable.
   let glidePhase = $state<GlidePhase>("bloom");
   // Duration (ms) for BOTH the shape tween's next retarget and the CSS paint transition. The phase
   // machine sets it: 0 for instant placements (reduced-motion, first mount, relayout-follow), else
@@ -632,9 +632,11 @@
       {#if ringId}
         {@const rg = ringTween.current}
         {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
-        <!-- Shape (x/y/w/h/rx) comes from the JS tween. Paint (fill/stroke/fill-opacity) is left to
-             CSS transitions (see .label-ring): color glides node→node and fill fades out to a hollow
-             ring in transit, both over --glide-ms — so paint animates without JS color math. -->
+        <!-- Shape (x/y/w/h/rx) comes from the JS tween. Paint (fill, stroke, fill-opacity) is left to
+             CSS transitions (see .label-ring): color glides node→node and the fill goes from a SOLID
+             opaque disc in transit (like the glyph discs) to the translucent tint on bloom, both over
+             --glide-ms — so paint animates without JS color math. Fill is solid hiColor; fill-opacity
+             carries the tint (1 = opaque dot, 0.18 = the bloomed box's translucency). -->
         <rect
           class="label-ring"
           x={rg.x}
@@ -642,8 +644,8 @@
           width={rg.width}
           height={rg.height}
           rx={rg.radius}
-          fill-opacity={glidePhase === "bloom" ? 1 : 0}
-          style="fill: color-mix(in srgb, {hiColor} 18%, transparent); stroke: {hiColor}; --glide-ms: {glideMs}ms"
+          fill-opacity={glidePhase === "bloom" ? 0.18 : 1}
+          style="fill: {hiColor}; stroke: {hiColor}; --glide-ms: {glideMs}ms"
         />
       {/if}
     </svg>

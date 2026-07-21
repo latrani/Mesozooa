@@ -31,19 +31,24 @@ coordinates.
 Each ring move plays **collapse → skate → bloom**:
 
 1. **Collapse** — the label-ring shrinks toward the source node's glyph center, becoming a
-   **glyph-sized** ring (dot diameter = the node glyph size, 24px), and its **fill fades to
-   fully transparent** so in transit it's a hollow, stroke-only ring exactly bounding the
-   glyph disc — no muddy translucent overlap sitting on top of the glyph.
-2. **Skate** — the hollow glyph-sized ring translates in a straight line from the **source
+   **glyph-sized** disc (dot diameter = the node's own glyph size), and its **fill goes fully
+   opaque** so in transit it's a solid disc bounding the glyph — reading like a focus puck that
+   rhymes with the node glyph discs, not a translucent smear.
+2. **Skate** — the solid glyph-sized disc translates in a straight line from the **source
    glyph** to the **target glyph**. Glyphs (not labels) are the anchors: the puck lands on
    real tree structure at both ends, and its size matching the glyph makes it read as the
    focus "snapping onto" each disc.
-3. **Bloom** — at the target the ring re-expands into the full label-ring, hugging that
-   node's label, and its **fill fades back in** to the translucent tint.
+3. **Bloom** — at the target the disc re-expands into the full label-ring, hugging that
+   node's label, and its **fill fades back to the translucent tint** (so the label shows
+   through the settled box).
 
-Collapsing to a hollow glyph-sized ring mid-flight avoids a "ring around nothing" — a
-full-width filled ring sliding over whitespace and unrelated labels. The traveling marker is
-always a tight, unambiguous "here's your focus" that frames the node's own glyph.
+The traveling marker is always a tight, unambiguous "here's your focus" puck that frames the
+node's own glyph, rather than a full-width filled box sliding over whitespace and unrelated
+labels.
+
+Implementation note: the fill is always the solid highlight color; the dot↔bloom difference is
+carried by `fill-opacity` (1 opaque → 0.18 translucent), animated by a CSS transition alongside
+the stroke color. The bloomed 0.18 reproduces the earlier `color-mix(… 18%, transparent)` look.
 
 ## Retargeting + settle (fast-nav behavior)
 
