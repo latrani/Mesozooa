@@ -1,6 +1,6 @@
 # Ring-glide: animate the focus ring as a continuity aid
 
-**Status:** design approved, pending implementation plan
+**Status:** design approved; **revised 2026-07-21** after a first implementation exposed a relayout race (see *Motion architecture* below)
 **Issue:** [#52](https://github.com/latrani/Mesozooa/issues/52) (slice 1 of 2 — the focus-ring glide; the Explore relayout FLIP is slice 2, deferred)
 **Component:** `src/lib/game/components/SpineTree.svelte`
 
@@ -58,6 +58,43 @@ Net feel: holding an arrow is a dot skating along the tree that settles into a r
 land. Bloom becomes a meaningful "you've arrived" signal, firing once per nav streak rather
 than on every keystroke.
 
+## Motion architecture — separate "phase" from "position" (revised)
+
+**Why this section exists.** The first implementation drove one `$effect` off both the
+selection (`ringId`) *and* the node coordinates (`posOf`, a `$derived` of `layoutSpine`). Those
+are two semantically different events the effect could not tell apart: *the user moved focus*
+(should restart collapse→skate→bloom) vs. *the layout rebuilt under a stable selection* (should
+NOT). In Explore a single click mutates `highlightId`, `tipId`, AND `revealed`, so the layout
+re-derives 2–3 times in a cascade; each re-run reset the phase to `dot` and re-armed the settle
+timer, so the timer was repeatedly cleared before it could fire — **the ring collapsed to a dot
+and never bloomed** (confirmed live: a clicked node's ring sat at `DOT_R` for >1s while its
+label measured 105px wide). This is the same coupling as #52's second half: *relayout and
+refocus were one signal.* The fix is to make them two.
+
+The animation is split into two independent concerns:
+
+1. **Phase machine** — an effect keyed to **`ringId` only** (tracks the previous id; reacts
+   only to a genuine focus change). On a real move: set `phase="dot"`, arm the settle timer,
+   and on settle set `phase="bloom"`. It must read the node center **without** taking a
+   reactive dependency on the layout (Svelte `untrack`), so layout churn never trips it. This
+   is the sole owner of `phase` and the settle timer.
+
+2. **Position/geometry** — a **`$derived`** target: `ringGeom(phase, center(ringId), labelBox,
+   …)`. The tween target recomputes whenever `phase`, the ringed node's coordinates, OR
+   `labelBox` change. When a relayout moves the node, this updates the target and the ring
+   **follows at its current phase** — a bloomed ring stays bloomed and simply repositions; it
+   never resets to a dot.
+
+**Why this is the right seam for slice 2.** "Position follows relayout" *is* the hook the
+Explore relayout FLIP (slice 2) plugs into. Today the layout snaps, so the ring snaps to the
+node's new position (correct, and no worse than the pre-animation teleport). When slice 2 adds
+the FLIP over the node set, the ring rides the same transition for free — the "one coordinated
+transition" the #52 comment requires — with no further change to this component's ring logic.
+
+This replaces the earlier "small `$state` machine tracking phase + fromId + toId + timer" as a
+single effect. `fromId`/`toId` are unnecessary: the `Tween` already interpolates from its
+in-flight value, so "from" is implicit.
+
 ## Trigger-based speed
 
 **Every** ring move glides — keyboard hops, clicks, and guess-row selection alike (all are
@@ -86,26 +123,33 @@ done wrong hurts exactly the vestibular/motion-sensitive users the a11y work ser
 
 **New:**
 - A persistent ring/puck element rendered once at SVG top level (drawn last, over the nodes).
-- A small `$state` machine tracking the animation: current phase, `fromId`, `toId`, and the
-  settle timer. Position and size derive from `posOf` (existing per-node `{x, y, depth}`) plus
-  the existing `labelBox` measurement.
+- **Phase machine** — a `phase` (`"dot" | "bloom"`) `$state` plus the settle timer, owned by a
+  single effect keyed to `ringId` **only**. Reads the node center under `untrack` so layout
+  churn cannot re-trigger it. Handles the trigger (keyboard vs. commit) → duration selection,
+  and clears/re-arms the settle timer on a genuine focus change (and on teardown).
+- **Geometry `$derived`** — the tween target = `ringGeom(phase, center(ringId), labelBox, …)`,
+  recomputed on any of {`phase`, ringed-node coordinates, `labelBox`}. Driving the tween off
+  this derived value is what makes the ring follow a relayout at its current phase.
 
 **Removed:**
-- The per-node `{#if isHi && labelBox}` `<rect class="label-ring">` block (lines 524–535).
+- The per-node `{#if isHi && labelBox}` `<rect class="label-ring">` block (originally lines
+  524–535; the first implementation already removed it — this stays removed).
 
 **Reused / unchanged:**
-- `labelBox` + `measureLabel` (lines 178–185): bloom still needs the per-label bbox to size
-  the ring; that measurement logic stays, now feeding the persistent element instead of a
-  per-node rect.
+- `labelBox` + `measureLabel`: bloom still needs the per-label bbox to size the ring; that
+  measurement logic stays, feeding the geometry `$derived`.
 - `scrollFocusIntoView` / `scrollToNode`: **not touched.** The scroll policy is complementary
   to the motion smoothing (per the #52 comment); scroll-coordination bites in the Explore
   relayout FLIP (slice 2), not here.
 - `reduceMotion`.
 
 **Extracted as pure helpers (TDD'd):**
-- Duration selection from trigger kind (keyboard vs. commit).
-- Dot-travel endpoint computation from two node positions (source glyph center → target glyph
-  center in SVG coords).
+- Duration selection from trigger kind (keyboard vs. commit) — `glideDuration`. *(already built)*
+- Glyph-center endpoint from a node position — `glyphCenter`. *(already built)*
+- Phase→geometry resolution — `ringGeom` + `DOT_R`. *(already built)*
+
+The three pure helpers survive the redesign unchanged; only the component's effect/derived
+wiring changes.
 
 ## One visual detail to verify
 
