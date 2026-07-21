@@ -159,13 +159,13 @@
   // natively (resolving var()/color-mix, no JS color math), and the transition-duration is fed the
   // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
   // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
-  const GLIDE_MS = 2000; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
   // Puck look-and-feel knobs. PUCK_TRAVEL_OPACITY: overall opacity of the WHOLE puck (fill + border)
   // while traveling as a dot — set on element `opacity`, so the border fades with the fill (the dot's
   // fill is solid, tinted only by this). Bloom is always fully opaque with a 0.18 fill. PUCK_DOT_PAD:
   // px added to the dot's RADIUS beyond the glyph edge, so the dot can sit proud of the disc it frames.
   const PUCK_TRAVEL_OPACITY = 0.5;
-  const PUCK_DOT_PAD = 4;
+  const PUCK_DOT_PAD = 2;
   let glidePhase = $state<GlidePhase>("bloom");
   // Duration (ms) for BOTH the shape tween's next retarget and the CSS paint transition. The phase
   // machine sets it: 0 for instant placements (reduced-motion, first mount, relayout-follow), else
@@ -403,6 +403,18 @@
       e.preventDefault(); // stop arrow/Home/End from scrolling the page
       focusItem(next);
     }
+  }
+
+  // Move keyboard focus onto a node from OUTSIDE the tree (e.g. a "Recently viewed" chip in
+  // Explore selects a node — focus should land on it so the user can arrow on from there, matching
+  // a direct tree-node click). Sets treeFocused so the ring tracks it and, crucially, so the
+  // focus-restore effect fires after the jump's relayout even when the target wasn't in the old
+  // layout (its <li> doesn't exist yet, so the immediate focus() below is a no-op and the effect
+  // grabs the rebuilt <li> instead).
+  export function focusNode(id: string) {
+    treeFocused = true;
+    focusId = id;
+    liEls[id]?.focus({ preventScroll: true });
   }
 
   // Exposed for the trail scrubber (Plan 2).

@@ -29,6 +29,15 @@
     else explorer.focus(id);
   }
 
+  // The SpineTree instance, so a "Recently viewed" chip can move keyboard focus onto the node it
+  // jumps to — same as clicking the node in the tree. Selecting from the trail is just another way
+  // to select a node, so it should leave focus ready for arrow navigation.
+  let spine = $state<SpineTree>();
+  function jumpAndFocus(id: string) {
+    explorer.jumpTo(id);
+    spine?.focusNode(id);
+  }
+
   // Explore highlights the selected path only (issue #6): on-path (spine) nodes hot, everything
   // else cold. Pinned to the GAME ramp's two endpoints via warmthRampColor(1)/(0) — not hand-picked
   // tokens — so Explore and game can never drift to different warmth colors again.
@@ -43,7 +52,7 @@
       {#if recent.length}
         <ul class="recent" aria-label="Recently viewed">
           {#each recent as c (c.nodeId)}
-            <Chip chip={c} onselect={(id) => explorer.jumpTo(id)} />
+            <Chip chip={c} onselect={jumpAndFocus} />
           {/each}
         </ul>
       {/if}
@@ -57,6 +66,7 @@
 
     {#snippet tree(rightInset)}
       <SpineTree
+        bind:this={spine}
         revealed={explorer.revealed}
         tipId={explorer.highlightId}
         highlightId={explorer.highlightId}
