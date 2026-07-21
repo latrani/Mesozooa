@@ -6,6 +6,11 @@
   import { scrollFade } from "../../actions/scrollFade";
   import { warmthRampColor } from "../warmth-ramp";
   import {
+    glideDuration, glyphCenter, ringGeom, DOT_R,
+  } from "../ring-glide";
+  import type { GlideTrigger, GlidePhase, RingGeom, Point } from "../ring-glide";
+  import { Tween } from "svelte/motion";
+  import {
     ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, clampZoom, zoomStep, scrollForZoom,
   } from "../zoom";
   import { PinchGesture } from "@use-gesture/vanilla";
@@ -148,6 +153,67 @@
   // committed highlight prop.
   let ringId = $derived(treeFocused ? currentId : highlightId);
 
+  // --- Ring glide (issue #52 slice 1) ---------------------------------------------------------
+  // One persistent ring element, driven by a geometry tween. `.set()` retargets from the
+  // in-flight value, so rapid arrow-nav just redirects a skating dot (no per-hop bloom).
+  let glidePhase = $state<GlidePhase>("bloom");
+  // The move that caused the next ring change. Keyboard hops set this in focusItem; anything
+  // else (a highlightId commit / click) is a "commit". Read + reset when the ringId effect runs.
+  let nextTrigger: GlideTrigger = "commit";
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Geometry the ring renders at. Initialized to an offscreen dot; the effect below drives it.
+  const ringTween = new Tween<RingGeom>(
+    { cx: 0, cy: 0, width: DOT_R * 2, height: DOT_R * 2, radius: DOT_R },
+    { duration: 0 },
+  );
+
+  function ringCenter(id: string): Point | null {
+    const n = posOf.get(id);
+    return n ? glyphCenter(n, px, py) : null;
+  }
+
+  // Drive the tween whenever the ringed node changes. Collapse-to-dot + skate happen by
+  // retargeting the tween to the new glyph's dot geometry; bloom fires on settle.
+  $effect(() => {
+    const id = ringId;
+    if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+    if (!id) return;
+    const center = ringCenter(id);
+    if (!center) return;
+
+    if (reduceMotion) {
+      // Instant place at the bloom box — today's teleport, motion-sensitive safe.
+      glidePhase = "bloom";
+      ringTween.set(ringGeom("bloom", center, labelBox, RING_H, RING_PAD_X), { duration: 0 });
+      nextTrigger = "commit";
+      return;
+    }
+
+    const ms = glideDuration(nextTrigger);
+    nextTrigger = "commit"; // consume; keyboard hops re-arm it in focusItem
+    // Skate as a dot toward the new glyph (retargets any in-flight glide).
+    glidePhase = "dot";
+    ringTween.set(ringGeom("dot", center, labelBox, RING_H, RING_PAD_X), { duration: ms });
+    // Bloom on settle: if no new ringId arrives within one glide, expand to hug the label.
+    settleTimer = setTimeout(() => {
+      const c = ringCenter(id);
+      if (!c) return;
+      glidePhase = "bloom";
+      ringTween.set(ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X), { duration: ms });
+    }, ms);
+  });
+
+  // Re-hug the label if its measured box arrives/changes while already bloomed (labelBox is
+  // measured on a rAF, so it can land just after the settle).
+  $effect(() => {
+    void labelBox;
+    if (reduceMotion) return;
+    if (glidePhase !== "bloom" || !ringId) return;
+    const c = ringCenter(ringId);
+    if (c) ringTween.set(ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X), { duration: 0 });
+  });
+
   // A revealed clade whose children are NOT in the layout is "collapsed" — mark it so we can
   // draw a short right-fading stub ("more here"). Genera never get a stub.
   let hasLaidOutChildren = $derived(new Set(layout.edges.map((e) => e.parentId)));
@@ -274,6 +340,7 @@
   }
 
   function focusItem(id: string) {
+    nextTrigger = "keyboard"; // this move is an arrow hop; the ringId effect reads it
     focusId = id;
     // preventScroll: WE drive the visible scroll (scrollFocusIntoView); the browser's native
     // focus-scroll would fight it by targeting the clipped sr-only element.
@@ -521,18 +588,6 @@
           {#if isExpandable(n.id)}
             <line x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
           {/if}
-          {#if isHi && labelBox}
-            {@const hiColor = colorOf(n.id, n.onSpine, node?.isGenus ?? false) ?? "var(--turq)"}
-            <!-- selection box: bottom edge on the row line (y=0), hugging the centered label.
-                 Drawn UNDER the backing disc + glyph so its tucked corner hides behind them. -->
-            <rect
-              class="label-ring"
-              x={labelBox.x - RING_PAD_X} y={-RING_H}
-              width={labelBox.width + 2 * RING_PAD_X} height={RING_H}
-              rx="6"
-              style="fill: color-mix(in srgb, {hiColor} 18%, transparent); stroke: {hiColor}"
-            />
-          {/if}
           <!-- page-color backing disc: sits just under the glyph and over the label, so it fills
                the glyph's cutouts AND masks the tucked ring corner — neither peeks through. -->
           <circle class="glyph-bg" r={glyphSize / 2 + OUTLINE_PX} cy={glyphDY} />
@@ -550,6 +605,19 @@
           </text>
         </g>
       {/each}
+      {#if ringId}
+        {@const rg = ringTween.current}
+        {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
+        <rect
+          class="label-ring"
+          x={rg.cx - (glidePhase === "dot" ? rg.width / 2 : 0)}
+          y={rg.cy}
+          width={rg.width}
+          height={rg.height}
+          rx={rg.radius}
+          style="fill: color-mix(in srgb, {hiColor} 18%, transparent); stroke: {hiColor}"
+        />
+      {/if}
     </svg>
     <!-- fixed-px runway: reserves the specimen's covered width as scroll distance past the tree's
          right edge, unscaled by zoom (issue #32). flex:none so it never shrinks. -->
