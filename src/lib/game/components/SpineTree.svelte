@@ -520,7 +520,7 @@
          right edge, unscaled by zoom (issue #32). flex:none so it never shrinks. -->
     {#if runway}<div class="runway" style={`width:${runway}px`} aria-hidden="true"></div>{/if}
     {#if a11yRoots.length}
-      <ul class="sr-tree" role="tree" aria-label="Dinosaur cladogram">
+      <ul class="sr-tree" role="tree" aria-label="Dinosaur cladogram" onkeydown={onTreeKey}>
         {#each a11yRoots as n (n.id)}{@render treeitem(n)}{/each}
       </ul>
     {/if}
@@ -537,7 +537,6 @@
     bind:this={liEls[n.id]}
     onfocus={() => onItemFocus(n.id)}
     onblur={onItemBlur}
-    onkeydown={onTreeKey}
   >
     <span>{n.name}{#if !n.isGenus}, {n.descendantGenusCount} genera{/if}</span>
     {#if n.children.length}
