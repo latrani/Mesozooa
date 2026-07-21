@@ -1,7 +1,7 @@
 <script lang="ts">
   import { treeStore } from "../treeData";
   import { layoutSpine, centerOffsetFor } from "../spine-layout";
-  import { a11yTree } from "../a11y-tree";
+  import { a11yTree, buildNav, resolveKey } from "../a11y-tree";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
   import { warmthRampColor } from "../warmth-ramp";
@@ -137,6 +137,16 @@
   let currentId = $derived(
     focusId ?? highlightId ?? tipId ?? a11yRoots[0]?.id ?? null,
   );
+  let nav = $derived(buildNav(a11yRoots));
+  // Whether keyboard focus is currently inside the tree — gates the focus-follows ring so a
+  // mouse user's committed highlight isn't overridden by a stale keyboard cursor.
+  let treeFocused = $state(false);
+  // The li elements, so we can move DOM focus (roving tabindex) and restore it after an
+  // Explore re-center rebuilds the tree.
+  let liEls = $state<Record<string, HTMLLIElement>>({});
+  // The node the visible ring should mark: keyboard cursor while the tree is focused, else the
+  // committed highlight prop.
+  let ringId = $derived(treeFocused ? currentId : highlightId);
 
   // A revealed clade whose children are NOT in the layout is "collapsed" — mark it so we can
   // draw a short right-fading stub ("more here"). Genera never get a stub.
@@ -215,6 +225,41 @@
     scroller.scrollTo({ left, top, behavior: reduceMotion ? "auto" : "smooth" });
   }
 
+  // Focus entered a treeitem: lock the cursor to it and mirror it on the visible tree (ring +
+  // scroll into view). Cheap — touches neither tipId nor highlightId, so no relayout in either
+  // mode. This is the "focus-follows" behavior.
+  function onItemFocus(id: string) {
+    treeFocused = true;
+    focusId = id;
+    if (posOf.has(id)) scrollToNode(id);
+  }
+
+  function onItemBlur(e: FocusEvent) {
+    // Only drop the ring when focus leaves the tree entirely (not on within-tree hops).
+    const next = e.relatedTarget as Node | null;
+    if (!next || !(next as Element).closest?.("[role='tree']")) treeFocused = false;
+  }
+
+  function focusItem(id: string) {
+    focusId = id;
+    liEls[id]?.focus();
+  }
+
+  function onTreeKey(e: KeyboardEvent) {
+    const cur = currentId;
+    if (!cur) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onnodeselect?.(cur); // identical to a mouse click (undefined during game play = no-op)
+      return;
+    }
+    const next = resolveKey(nav, cur, e.key);
+    if (next) {
+      e.preventDefault(); // stop arrow/Home/End from scrolling the page
+      focusItem(next);
+    }
+  }
+
   // Exposed for the trail scrubber (Plan 2).
   export function panTo(id: string) {
     if (zoom !== ZOOM_DEFAULT) {
@@ -286,6 +331,16 @@
     }
     lastTipId = tipId;
     lastInset = rightInset;
+  });
+
+  // Activating a node in Explore re-centers (rebuilds revealed -> the tree). Keep DOM focus on
+  // the current cursor across that rebuild so keyboard position survives. Guarded by treeFocused
+  // so we never steal focus from elsewhere on the page.
+  $effect(() => {
+    void a11yRoots; // re-run when the tree structure changes
+    if (treeFocused && focusId && liEls[focusId] && document.activeElement !== liEls[focusId]) {
+      liEls[focusId].focus();
+    }
   });
 
   // Pinch-to-zoom, split by browser engine — both feed the single applyZoom entry point.
@@ -406,7 +461,7 @@
       {/each}
       {#each layout.nodes as n (n.id)}
         {@const node = treeStore.getNode(n.id)}
-        {@const isHi = n.id === highlightId}
+        {@const isHi = n.id === ringId}
         {@const isGenusNode = node?.isGenus ?? false}
         {@const glyphSize = isGenusNode ? GLYPH_GENUS : GLYPH_CLADE}
         {@const glyphDY = isGenusNode ? GLYPH_OFFSET_Y_GENUS : GLYPH_OFFSET_Y_CLADE}
@@ -479,6 +534,10 @@
     aria-selected={n.id === highlightId ? "true" : "false"}
     aria-expanded={n.isGenus ? undefined : n.children.length > 0 ? "true" : "false"}
     tabindex={n.id === currentId ? 0 : -1}
+    bind:this={liEls[n.id]}
+    onfocusin={() => onItemFocus(n.id)}
+    onblur={onItemBlur}
+    onkeydown={onTreeKey}
   >
     <span>{n.name}{#if !n.isGenus}, {n.descendantGenusCount} genera{/if}</span>
     {#if n.children.length}
