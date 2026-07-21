@@ -225,13 +225,46 @@
     scroller.scrollTo({ left, top, behavior: reduceMotion ? "auto" : "smooth" });
   }
 
+  // Keep-visible scroll for ARROW browsing: only pan (to the nearest edge) when the focused node
+  // strays near a viewport edge, instead of hard-centering every keystroke. Centering-on-every-
+  // press made the tree slide under a pinned ring; keep-visible lets the ring glide through a
+  // stable view and the viewport moves only at the boundaries. Commit paths (Enter / tip change)
+  // still center via scrollToNode — a deliberate "here's where you are" gesture. All coords are
+  // scaled by zoom so it's correct even when the user has pinch-zoomed.
+  const KEEP_VISIBLE_MARGIN_X = 140; // leave room past the node for its label
+  const KEEP_VISIBLE_MARGIN_Y = 60;
+  function scrollFocusIntoView(id: string) {
+    if (!scroller) return;
+    const n = posOf.get(id);
+    if (!n) return;
+    const nodeX = px(n.x) * zoom;
+    const nodeY = py(n.y) * zoom;
+    const viewW = scroller.clientWidth - rightInset; // the specimen overlay covers the right edge
+    const maxLeft = Math.max(0, contentWidth * zoom + runway - scroller.clientWidth);
+    const maxTop = Math.max(0, vbH * zoom - scroller.clientHeight);
+
+    let left = scroller.scrollLeft;
+    if (nodeX < left + KEEP_VISIBLE_MARGIN_X) left = nodeX - KEEP_VISIBLE_MARGIN_X;
+    else if (nodeX > left + viewW - KEEP_VISIBLE_MARGIN_X) left = nodeX - viewW + KEEP_VISIBLE_MARGIN_X;
+
+    let top = scroller.scrollTop;
+    if (nodeY < top + KEEP_VISIBLE_MARGIN_Y) top = nodeY - KEEP_VISIBLE_MARGIN_Y;
+    else if (nodeY > top + scroller.clientHeight - KEEP_VISIBLE_MARGIN_Y) top = nodeY - scroller.clientHeight + KEEP_VISIBLE_MARGIN_Y;
+
+    left = Math.min(Math.max(0, left), maxLeft);
+    top = Math.min(Math.max(0, top), maxTop);
+    if (left !== scroller.scrollLeft || top !== scroller.scrollTop) {
+      scroller.scrollTo({ left, top, behavior: reduceMotion ? "auto" : "smooth" });
+    }
+  }
+
   // Focus entered a treeitem: lock the cursor to it and mirror it on the visible tree (ring +
-  // scroll into view). Cheap — touches neither tipId nor highlightId, so no relayout in either
+  // keep-visible scroll). Cheap — touches neither tipId nor highlightId, so no relayout in either
   // mode. This is the "focus-follows" behavior.
   function onItemFocus(id: string) {
     treeFocused = true;
     focusId = id;
-    if (posOf.has(id)) scrollToNode(id);
+    if (posOf.has(id)) scrollFocusIntoView(id);
   }
 
   function onItemBlur(e: FocusEvent) {
