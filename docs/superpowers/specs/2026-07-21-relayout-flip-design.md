@@ -109,13 +109,47 @@ vestibular/motion-sensitive users the a11y work serves.
 
 ## Interaction with slice-1 machinery
 
-- The ring puck already reads `ringTarget` (a `$derived` off the layout) and tweens to final
-  positions — so it *already* participates in the one-clock model; this slice makes the nodes join
-  it. No change to the phase machine (`ringId`-only) or the single-tween-writer discipline.
 - Rapid Enter-nav (fast Explore hopping) retargets the one shared glide, same clean interrupt
   behavior slice 1 established — no per-hop sequencing to stutter.
 - **Scroll re-center joins the shared clock** (revised — see below). It's the *third* mover on a
   relayout, and it must ride the same envelope as the FLIP, or the two race.
+- **The ring position joins the shared clock too** (revised — see below). Slice 1 gave the ring
+  its own private `Tween`; that turned out to be the last mover NOT on the shared clock, and it
+  wheeled once scroll started animating.
+
+## The ring position must ride the shared clock (revised — "deep-unify")
+
+**Why this section exists.** Slice 1's ring puck had its OWN `Tween` (linear, full `GLIDE_MS`).
+Once the scroll re-center was put on the shared clock (`flipProgress(_, FLIP_FRACTION)`, complete
+at ~60%), the ring was the only mover left on a *different* time-warp. The ring is drawn INSIDE the
+scrolled SVG, so its on-screen position is `ringSVG(t) − scroll(t)`. With the ring on one curve and
+scroll on another, that difference traces a **curved on-screen path** — the ring visibly "wheels
+around" its node during a relayout (observed live). This is the same "one coordinated transition"
+requirement, now applied to the last hold-out.
+
+**The fix — ring POSITION on the shared clock; ring SIZE stays its own:**
+
+- **Position** (x/y of the ring) interpolates old-ringed-node-center → new-ringed-node-center in
+  **pixels**, on the **same** master progress + `flipProgress(_, FLIP_FRACTION)` curve the nodes
+  and scroll use. Because `lerp` is linear, `screen(t) = ringSVG(t) − scroll(t)` is then a straight,
+  monotonic path — the wheel is *provably* gone (both terms share the one curve). The ring's private
+  position `Tween` is retired.
+- **Size / phase** (the dot↔bloom morph: collapse to a glyph-sized dot, settle-timer, bloom to the
+  label box) stays on the ring's existing phase machine + `flipProgress`-of-its-own. Size doesn't
+  wheel — only x/y traces the curved screen path — so the morph is orthogonal and unchanged.
+- **Paint** (CSS opacity/color transitions) unchanged.
+
+**Trigger coordination.** The ring fires on `ringId` (focus) changes; the FLIP/scroll fire on
+`layout` (relayout) changes. On an Explore click BOTH change, and they must share ONE progress
+restart, not two racing ones. So the master progress tween is restarted by a single coordinated
+trigger covering "ringId and/or layout changed", and ring-from/to are snapshotted in the same place
+the node-from/to and scroll-from/to are. The phase machine stays `ringId`-keyed and `untrack`s
+layout, exactly as slice 1; only the ring's *position source* moves from its private tween to the
+shared progress.
+
+**Skate preserved.** On a pure focus change (game arrow-nav, no relayout): from = old node center,
+to = new node center, both stationary → the ring glides between them exactly as slice 1's skate did.
+Rapid-nav interrupt still retargets from the ring's current (mid-glide) position.
 
 ## Scroll must ride the shared clock (revised)
 
