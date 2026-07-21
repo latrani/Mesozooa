@@ -161,6 +161,9 @@
   // else (a highlightId commit / click) is a "commit". Read + reset when the ringId effect runs.
   let nextTrigger: GlideTrigger = "commit";
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  // First ring placement is instant (like reduced-motion): the tween starts at (0,0), so the
+  // very first skate would fly the dot in from the SVG's top-left corner. Cleared after placement.
+  let firstPlace = true;
 
   // Geometry the ring renders at. Initialized to an offscreen dot; the effect below drives it.
   const ringTween = new Tween<RingGeom>(
@@ -177,24 +180,30 @@
   // retargeting the tween to the new glyph's dot geometry; bloom fires on settle.
   $effect(() => {
     const id = ringId;
+    // Clear any pending settle up front, and again in the cleanup return so a component teardown
+    // (or a re-run) can never leave a timeout to fire ringTween.set on an orphaned tween.
     if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
-    if (!id) return;
+    if (!id) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
     const center = ringCenter(id);
-    if (!center) return;
+    if (!center) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
 
-    if (reduceMotion) {
-      // Instant place at the bloom box — today's teleport, motion-sensitive safe.
+    // Reduced-motion OR the first placement: put the ring at rest instantly (no dot/skate/timer),
+    // so the ring never flies in from (0,0) on mount.
+    if (reduceMotion || firstPlace) {
+      firstPlace = false;
       glidePhase = "bloom";
       ringTween.set(ringGeom("bloom", center, labelBox, RING_H, RING_PAD_X), { duration: 0 });
       nextTrigger = "commit";
-      return;
+      return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
     }
 
     const ms = glideDuration(nextTrigger);
     nextTrigger = "commit"; // consume; keyboard hops re-arm it in focusItem
-    // Skate as a dot toward the new glyph (retargets any in-flight glide).
+    // Skate as a dot toward the new glyph (retargets any in-flight glide). Pass null for labelBox:
+    // dot phase ignores it, and reading labelBox here would make this effect re-run on every label
+    // re-measurement, starving the re-hug effect below. The settle callback re-reads it for bloom.
     glidePhase = "dot";
-    ringTween.set(ringGeom("dot", center, labelBox, RING_H, RING_PAD_X), { duration: ms });
+    ringTween.set(ringGeom("dot", center, null, RING_H, RING_PAD_X), { duration: ms });
     // Bloom on settle: if no new ringId arrives within one glide, expand to hug the label.
     settleTimer = setTimeout(() => {
       const c = ringCenter(id);
@@ -202,6 +211,7 @@
       glidePhase = "bloom";
       ringTween.set(ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X), { duration: ms });
     }, ms);
+    return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
   });
 
   // Re-hug the label if its measured box arrives/changes while already bloomed (labelBox is
