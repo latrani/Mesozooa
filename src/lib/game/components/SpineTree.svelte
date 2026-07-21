@@ -148,6 +148,9 @@
   // What the node loop renders: {id, x, y, opacity}. Derived off the master progress so it
   // recomputes each animation frame. Under reduced motion (or a settled progress of 1) it's just
   // the layout at full opacity.
+  // NOTE: the node <g> loop renders from THIS (not layout.nodes directly), so nodes only appear
+  // once the relayout $effect below has populated flipDiff. Svelte flushes $effects pre-paint, so
+  // there's no empty-tree flash — but don't assume the node layer is independent of that effect.
   let displayed = $derived.by(() => {
     const p = flipProgressTween.current;
     const out: Array<{ id: string; x: number; y: number; opacity: number }> = [];
@@ -171,6 +174,9 @@
   $effect(() => {
     void layout; // the one tracked dependency
     const nextPos = untrack(() => layoutPos);
+    // Snapshot POSITION only (not opacity). So an enter/leave fade interrupted by a new relayout
+    // resets opacity (a node reclassified enter→persist snaps to opaque), while position stays
+    // continuous. Invisible at the shipped LEAVE_FRACTION=0 + transient; see #57 for the fade-continuity fix.
     const fromPos = untrack(() => new Map(displayed.map((d) => [d.id, { x: d.x, y: d.y }])));
     flipDiff = layoutDiff(fromPos, nextPos, parentOf);
     if (reduceMotion || fromPos.size === 0) {
