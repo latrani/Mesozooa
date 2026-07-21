@@ -161,8 +161,8 @@
   // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
   const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
   // Puck look-and-feel knobs. PUCK_TRAVEL_OPACITY: fill-opacity of the puck while traveling as a dot
-  // (bloom is always 0.18). PUCK_DOT_PAD: px added to the puck's width/height beyond the glyph size,
-  // so the traveling dot can sit a little proud of the disc it frames (0 = flush with the glyph).
+  // (bloom is always 0.18). PUCK_DOT_PAD: px added to the dot's RADIUS beyond the glyph edge, so the
+  // traveling dot can sit a little proud of the disc it frames (0 = flush with the glyph).
   const PUCK_TRAVEL_OPACITY = 1.0;
   const PUCK_DOT_PAD = 0;
   let glidePhase = $state<GlidePhase>("bloom");
@@ -188,9 +188,9 @@
 
   // The collapsed-ring radius for a node = half ITS glyph size (genus and clade glyphs are sized
   // independently), so the dot frames that node's own disc rather than assuming a shared size.
-  // PUCK_DOT_PAD grows the dot beyond the glyph by that many px of total diameter.
+  // PUCK_DOT_PAD grows the dot's RADIUS beyond the glyph edge by that many px (added after /2).
   function dotRadiusFor(id: string): number {
-    return ((treeStore.getNode(id)?.isGenus ? GLYPH_GENUS : GLYPH_CLADE) + PUCK_DOT_PAD) / 2;
+    return (treeStore.getNode(id)?.isGenus ? GLYPH_GENUS : GLYPH_CLADE) / 2 + PUCK_DOT_PAD;
   }
 
   // Geometry the ring should be at, DERIVED from phase + the ringed node's live coords + labelBox.
