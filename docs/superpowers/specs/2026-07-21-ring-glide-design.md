@@ -24,31 +24,38 @@ persistent-element refactor it shares.
 ## Motion model
 
 The visible ring stops being a per-node `<rect>`. It becomes **one persistent "puck"** — a
-single SVG element at the top level of the `<svg>` (a sibling of the `{#each layout.nodes}`
-block, drawn *last* so it paints over the nodes), positioned from the currently-ringed node's
-coordinates.
+single SVG `<rect>` positioned from the currently-ringed node's coordinates. It's rendered
+**between the branch-edges loop and the `{#each layout.nodes}` loop**, so (SVG paint order =
+document order) it sits *above* the branch lines but *behind* every node's page-color backplate
+and glyph — restoring the original per-node ring's tucked-behind stacking (it frames the glyph
+disc rather than covering it). See *Z-order* below.
 
 Each ring move plays **collapse → skate → bloom**:
 
 1. **Collapse** — the label-ring shrinks toward the source node's glyph center, becoming a
-   **glyph-sized** disc (dot diameter = the node's own glyph size), and its **fill goes fully
-   opaque** so in transit it's a solid disc bounding the glyph — reading like a focus puck that
-   rhymes with the node glyph discs, not a translucent smear.
-2. **Skate** — the solid glyph-sized disc translates in a straight line from the **source
-   glyph** to the **target glyph**. Glyphs (not labels) are the anchors: the puck lands on
-   real tree structure at both ends, and its size matching the glyph makes it read as the
-   focus "snapping onto" each disc.
-3. **Bloom** — at the target the disc re-expands into the full label-ring, hugging that
-   node's label, and its **fill fades back to the translucent tint** (so the label shows
-   through the settled box).
+   **glyph-sized** disc (dot diameter = the node's own glyph size), and the **whole puck fades to
+   `PUCK_TRAVEL_OPACITY`** (a tuning knob, currently 0.5) so in transit it's a semi-transparent
+   disc bounding the glyph — reading like a focus puck that rhymes with the node glyph discs.
+2. **Skate** — the glyph-sized disc translates in a straight line from the **source glyph** to
+   the **target glyph**. Glyphs (not labels) are the anchors: the puck lands on real tree
+   structure at both ends, and its size matching the glyph makes it read as the focus "snapping
+   onto" each disc.
+3. **Bloom** — at the target the disc re-expands into the full label-ring, hugging that node's
+   label, returns to full opacity, and its **fill drops to a translucent tint** (so the label
+   shows through the settled box).
 
 The traveling marker is always a tight, unambiguous "here's your focus" puck that frames the
 node's own glyph, rather than a full-width filled box sliding over whitespace and unrelated
 labels.
 
-Implementation note: the fill is always the solid highlight color; the dot↔bloom difference is
-carried by `fill-opacity` (1 opaque → 0.18 translucent), animated by a CSS transition alongside
-the stroke color. The bloomed 0.18 reproduces the earlier `color-mix(… 18%, transparent)` look.
+Implementation note — paint animates via **CSS transitions**, not the JS tween (which owns only
+the shape). Two independent opacity levers, both transitioned over `--glide-ms`:
+- **element `opacity`** carries the whole-puck travel fade: `PUCK_TRAVEL_OPACITY` (~0.5) while a
+  dot, `1` when bloomed. This fades fill *and* stroke together.
+- **`fill-opacity`** carries the fill tint: `1` (solid) while a dot, `0.18` when bloomed (the
+  `0.18` reproduces the earlier `color-mix(… 18%, transparent)` look; the label shows through).
+The fill/stroke *color* is the solid highlight color and also CSS-transitions (glides node→node);
+no JS color math. `PUCK_DOT_PAD` adds px to the dot's radius beyond the glyph edge (currently 0).
 
 ## Retargeting + settle (fast-nav behavior)
 
@@ -137,6 +144,15 @@ Scoped and safe by construction:
 
 Implemented as `onNodeClick(id)`: call `onnodeselect(id)`, then `focusItem(id)`.
 
+**Selecting from the "Recently viewed" trail does the same.** A history chip lives *outside* the
+tree (a different control, not a `treeitem`), so the ARIA-roving rationale above doesn't directly
+cover it — but selecting from the trail is just another way to select a node, and consistency
+with tree-click argues for matching behavior. Since focus moves on *activation* (not on focus),
+WCAG 3.2.1 still doesn't apply. SpineTree exposes `focusNode(id)` (like `panTo`); Explorer's chip
+handler calls `jumpTo(id)` then `spine.focusNode(id)`. `focusNode` sets `treeFocused` so the
+focus-restore `$effect` grabs the rebuilt `<li>` after the jump's relayout — necessary because a
+jump target often isn't in the pre-jump layout, so the immediate `focus()` is a no-op.
+
 ## Reduced motion
 
 `prefers-reduced-motion: reduce` → **no puck animation at all**. The ring places instantly at
@@ -147,7 +163,8 @@ done wrong hurts exactly the vestibular/motion-sensitive users the a11y work ser
 ## Structural changes
 
 **New:**
-- A persistent ring/puck element rendered once at SVG top level (drawn last, over the nodes).
+- A persistent ring/puck `<rect>` rendered once, **between the edges loop and the nodes loop**
+  (so it stacks behind glyphs, above branch lines — see *Z-order*).
 - **Phase machine** — a `phase` (`"dot" | "bloom"`) `$state` plus the settle timer, owned by a
   single effect keyed to `ringId` **only**. Reads the node center under `untrack` so layout
   churn cannot re-trigger it. Sets one `GLIDE_MS` duration (no trigger distinction), and
@@ -155,11 +172,14 @@ done wrong hurts exactly the vestibular/motion-sensitive users the a11y work ser
 - **Geometry `$derived`** — the tween target = `ringGeom(phase, center(ringId), labelBox, …)`,
   recomputed on any of {`phase`, ringed-node coordinates, `labelBox`}. Driving the tween off
   this derived value is what makes the ring follow a relayout at its current phase. The dot
-  branch sizes the ring to the **glyph diameter** (passed in, = `GLYPH_GENUS`) so the collapsed
-  ring frames the disc exactly.
-- **Fill-opacity tween** — a second tweened scalar, 1 while bloomed → 0 while dot, interpolated
-  alongside the geometry so the fill washes out on collapse and back in on bloom. Stroke opacity
-  is unchanged (the ring is always visible as an outline; only the tint fades).
+  branch sizes the ring to the ringed node's **own glyph** (`dotRadiusFor` picks `GLYPH_GENUS`
+  or `GLYPH_CLADE` — they're sized independently — plus `PUCK_DOT_PAD`) so the collapsed ring
+  frames that node's disc exactly.
+- **Paint via CSS, not the JS tween** — the tween carries only shape (`RingGeom`: x/y/w/h/radius).
+  Fill, stroke, element `opacity`, and `fill-opacity` are set as inline attrs and animated by CSS
+  transitions over `--glide-ms` (so color interpolates natively — no JS color math). Two opacity
+  levers: element `opacity` = `PUCK_TRAVEL_OPACITY` (dot) → `1` (bloom) fades the whole puck;
+  `fill-opacity` = `1` (dot) → `0.18` (bloom) carries the fill tint. See *Motion model*.
 
 **Removed:**
 - The per-node `{#if isHi && labelBox}` `<rect class="label-ring">` block (originally lines
@@ -183,20 +203,27 @@ done wrong hurts exactly the vestibular/motion-sensitive users the a11y work ser
 (one speed now — see *Speed*). The component's `nextTrigger` state and the `focusItem` trigger
 set go with it.
 
-## One visual detail to verify
+## Z-order
 
-Today's ring is drawn *under* the glyph + backing disc so its tucked corner hides behind them
-(line 527). A top-level persistent puck draws *over* everything. The bloomed ring must still
-read correctly on top rather than tucked — the fill is already translucent
-(`color-mix(in srgb, {hiColor} 18%, transparent)`), so the label should show through, but this
-is the one detail to confirm in the gallery once built.
+SVG has no `z-index`; paint order **is** document order. The original per-node ring was drawn
+first inside each node's `<g>`, so it tucked *behind* that node's page-color backplate + glyph
+(the label read on top). The persistent puck must reproduce that stacking, so it's emitted
+**after the branch-edges loop but before the `{#each layout.nodes}` loop** — above branch lines,
+behind every node's backplate/glyph/label. It frames the glyph disc rather than covering it.
+
+The collapsed-clade "more here" stubs (the right-fading `<line>` past an unexpanded clade) get
+the same treatment: they were originally drawn inside each node's `<g>` (which now renders
+*after* the puck), so they painted *in front of* the ring while an expanded clade's branch edge
+sat behind it — inconsistent. They're lifted into their own pass alongside the edges (before the
+puck), so both tree-line kinds stack behind the ring identically.
 
 ## Testing
 
 - Motion is DOM/visual: validated in `/gallery.html` with `prefers-reduced-motion` both on and
   off, plus build + running the app. Not unit-tested directly.
-- Pure extracted helpers (duration-from-trigger, travel-endpoints) are TDD'd per the working
-  agreement.
+- Pure extracted helpers (`glyphCenter`, `ringGeom`) are TDD'd per the working agreement.
+- Runtime reactivity/motion bugs (the relayout race, the coordinate-frame jump, focus-follows-
+  click) are verified live via Playwright — they don't surface in unit tests.
 - `npx tsc --noEmit` + `npx svelte-check` before commit (`verbatimModuleSyntax` is on; Vitest
   won't catch type-only-import violations).
 
