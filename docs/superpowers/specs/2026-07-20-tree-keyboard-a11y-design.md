@@ -74,8 +74,11 @@ same node objects, consistent with the established pattern.
 
 - The tree mirrors the **exact `revealed` set** the SVG draws, nested by real parent→child.
   Revealed is always a connected subtree from the root (`layoutSpine` requires
-  `revealed.has(rootId)`), so nesting is always well-formed; as a safety net the builder
-  attaches any node to its nearest revealed ancestor.
+  `revealed.has(rootId)`), so nesting is always well-formed. The builder mirrors that root
+  gate: if the true tree root is not revealed it returns nothing, exactly as the SVG renders
+  nothing. As a safety net for a would-be orphan (a revealed node whose parent is not
+  revealed, which shouldn't happen), the node surfaces as an additional top-level root rather
+  than vanishing.
 - `aria-expanded` is derived, no extra data needed, and honestly mirrors the SVG:
   - genus leaf → no `aria-expanded`;
   - clade with rendered children (`children.length > 0`) → `aria-expanded="true"`;
