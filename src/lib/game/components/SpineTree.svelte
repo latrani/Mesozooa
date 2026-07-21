@@ -139,7 +139,6 @@
   // clock with the ring puck. Master progress 0→1 over GLIDE_MS; per-class flipProgress staggers
   // completion. Node <g> loop renders from `displayed`; edges/stubs/ring keep reading layout/posOf.
   const flipProgressTween = new Tween(1, { duration: 0 }); // starts settled (no first-mount fly-in)
-  let flipFrom = $state<Map<string, Pos>>(new Map());       // positions snapshotted at last relayout
   let flipDiff = $state<LayoutDiff>({ persisting: [], entering: [], leaving: [] });
 
   const parentOf = (id: string) => treeStore.getNode(id)?.parentId ?? null;
@@ -173,7 +172,6 @@
     void layout; // the one tracked dependency
     const nextPos = untrack(() => layoutPos);
     const fromPos = untrack(() => new Map(displayed.map((d) => [d.id, { x: d.x, y: d.y }])));
-    flipFrom = fromPos;
     flipDiff = layoutDiff(fromPos, nextPos, parentOf);
     if (reduceMotion || fromPos.size === 0) {
       flipProgressTween.set(1, { duration: 0 }); // instant: reduced motion or first-ever layout
