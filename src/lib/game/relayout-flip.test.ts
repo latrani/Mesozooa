@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { layoutDiff } from "./relayout-flip";
+import { layoutDiff, lerp, lerpPos, flipProgress } from "./relayout-flip";
 import type { Pos } from "./relayout-flip";
 
 const P = (x: number, y: number): Pos => ({ x, y });
@@ -52,5 +52,32 @@ describe("layoutDiff", () => {
     expect(d.persisting).toEqual([]);
     expect(d.leaving).toEqual([]);
     expect(d.entering.map((e) => e.id).sort()).toEqual(["a", "b"]);
+  });
+});
+
+describe("lerp / lerpPos", () => {
+  it("lerp interpolates linearly", () => {
+    expect(lerp(10, 20, 0)).toBe(10);
+    expect(lerp(10, 20, 0.5)).toBe(15);
+    expect(lerp(10, 20, 1)).toBe(20);
+  });
+  it("lerpPos interpolates both axes", () => {
+    expect(lerpPos({ x: 0, y: 0 }, { x: 10, y: 20 }, 0.5)).toEqual({ x: 5, y: 10 });
+  });
+});
+
+describe("flipProgress", () => {
+  it("reaches local completion (1) at the class fraction", () => {
+    expect(flipProgress(0.6, 0.6)).toBe(1);   // FLIP done at 60% of the envelope
+    expect(flipProgress(0.3, 0.6)).toBe(0.5); // halfway through the FLIP window
+    expect(flipProgress(0, 0.6)).toBe(0);
+  });
+  it("clamps to 1 past the fraction", () => {
+    expect(flipProgress(0.9, 0.6)).toBe(1);
+    expect(flipProgress(1, 0.8)).toBe(1);
+  });
+  it("fraction <= 0 completes instantly (LEAVE_FRACTION = 0 => vanish now)", () => {
+    expect(flipProgress(0, 0)).toBe(1);
+    expect(flipProgress(0.5, 0)).toBe(1);
   });
 });

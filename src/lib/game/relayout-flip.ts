@@ -34,3 +34,20 @@ export function layoutDiff(
   }
   return { persisting, entering, leaving };
 }
+
+export function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+export function lerpPos(from: Pos, to: Pos, t: number): Pos {
+  return { x: lerp(from.x, to.x, t), y: lerp(from.y, to.y, t) };
+}
+
+// A class's local completion (0→1) on the shared master clock. `fraction` is the point in the
+// [0,1] envelope at which this class finishes; `fraction <= 0` means "already done" (instant),
+// which is how LEAVE_FRACTION = 0 renders leaving nodes as an immediate vanish.
+export function flipProgress(progress: number, fraction: number): number {
+  if (fraction <= 0) return 1;
+  const t = progress / fraction;
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+}
