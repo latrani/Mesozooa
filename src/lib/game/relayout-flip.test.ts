@@ -80,4 +80,7 @@ describe("flipProgress", () => {
     expect(flipProgress(0, 0)).toBe(1);
     expect(flipProgress(0.5, 0)).toBe(1);
   });
+  it("clamps a negative progress to 0 (transient mid-interrupt input)", () => {
+    expect(flipProgress(-0.2, 0.6)).toBe(0);
+  });
 });
