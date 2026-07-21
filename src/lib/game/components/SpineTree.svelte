@@ -159,12 +159,13 @@
   // natively (resolving var()/color-mix, no JS color math), and the transition-duration is fed the
   // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
   // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
-  const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
-  // Puck look-and-feel knobs. PUCK_TRAVEL_OPACITY: fill-opacity of the puck while traveling as a dot
-  // (bloom is always 0.18). PUCK_DOT_PAD: px added to the dot's RADIUS beyond the glyph edge, so the
-  // traveling dot can sit a little proud of the disc it frames (0 = flush with the glyph).
-  const PUCK_TRAVEL_OPACITY = 1.0;
-  const PUCK_DOT_PAD = 0;
+  const GLIDE_MS = 2000; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  // Puck look-and-feel knobs. PUCK_TRAVEL_OPACITY: overall opacity of the WHOLE puck (fill + border)
+  // while traveling as a dot — set on element `opacity`, so the border fades with the fill (the dot's
+  // fill is solid, tinted only by this). Bloom is always fully opaque with a 0.18 fill. PUCK_DOT_PAD:
+  // px added to the dot's RADIUS beyond the glyph edge, so the dot can sit proud of the disc it frames.
+  const PUCK_TRAVEL_OPACITY = 0.5;
+  const PUCK_DOT_PAD = 4;
   let glidePhase = $state<GlidePhase>("bloom");
   // Duration (ms) for BOTH the shape tween's next retarget and the CSS paint transition. The phase
   // machine sets it: 0 for instant placements (reduced-motion, first mount, relayout-follow), else
@@ -622,7 +623,8 @@
           width={rg.width}
           height={rg.height}
           rx={rg.radius}
-          fill-opacity={glidePhase === "bloom" ? 0.18 : PUCK_TRAVEL_OPACITY}
+          fill-opacity={glidePhase === "bloom" ? 0.18 : 1}
+          opacity={glidePhase === "bloom" ? 1 : PUCK_TRAVEL_OPACITY}
           style="fill: {hiColor}; stroke: {hiColor}; --glide-ms: {glideMs}ms"
         />
       {/if}
@@ -773,7 +775,8 @@
        JS tween. --glide-ms is set inline per-move (0 for instant/reduced-motion placements). */
     transition: fill var(--glide-ms, 0ms) linear,
                 stroke var(--glide-ms, 0ms) linear,
-                fill-opacity var(--glide-ms, 0ms) linear;
+                fill-opacity var(--glide-ms, 0ms) linear,
+                opacity var(--glide-ms, 0ms) linear;
   }
   .node.highlight .lbl { font-weight: var(--fw-black); }
   .zoom-controls {
