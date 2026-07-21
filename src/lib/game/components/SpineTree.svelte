@@ -5,10 +5,8 @@
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
   import { warmthRampColor } from "../warmth-ramp";
-  import {
-    glideDuration, glyphCenter, ringGeom, DOT_R,
-  } from "../ring-glide";
-  import type { GlideTrigger, GlidePhase, RingGeom, Point } from "../ring-glide";
+  import { glyphCenter, ringGeom } from "../ring-glide";
+  import type { GlidePhase, RingGeom, Point } from "../ring-glide";
   import { Tween } from "svelte/motion";
   import { untrack } from "svelte";
   import {
@@ -155,29 +153,38 @@
   let ringId = $derived(treeFocused ? currentId : highlightId);
 
   // --- Ring glide (issue #52 slice 1) ---------------------------------------------------------
-  // One persistent ring element, driven by a geometry tween. `.set()` retargets from the
-  // in-flight value, so rapid arrow-nav just redirects a skating dot (no per-hop bloom).
+  // One persistent ring element. Its SHAPE (x/y/width/height/radius) is driven by a JS Tween that
+  // retargets from the in-flight value, so rapid arrow-nav just redirects a skating ring. Its PAINT
+  // (fill, stroke, fill-opacity) is animated by CSS transitions instead: CSS interpolates colors
+  // natively (resolving var()/color-mix, no JS color math), and the transition-duration is fed the
+  // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
+  // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
+  const GLIDE_MS = 90; // one speed for every move (playtest: snappy feels good on click too). Tunable.
   let glidePhase = $state<GlidePhase>("bloom");
-  // Duration (ms) the tween driver uses for the NEXT retarget. The phase machine sets it: 0 for
-  // instant placements (reduced-motion, first mount, and relayout-follow), else the trigger's
-  // glide duration. A $state so the driver effect re-runs when it changes.
+  // Duration (ms) for BOTH the shape tween's next retarget and the CSS paint transition. The phase
+  // machine sets it: 0 for instant placements (reduced-motion, first mount, relayout-follow), else
+  // GLIDE_MS. A $state so the driver effect + the --glide-ms style binding re-run when it changes.
   let glideMs = $state(0);
-  // The move that caused the next FOCUS change. Keyboard hops set this in focusItem; anything
-  // else (a highlightId commit / click) is a "commit". Read + reset by the phase machine.
-  let nextTrigger: GlideTrigger = "commit";
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
   // First ring placement is instant: the tween starts at (0,0), so the first skate would fly the
-  // dot in from the SVG's top-left corner. Cleared after the first real placement.
+  // ring in from the SVG's top-left corner. Cleared after the first real placement.
   let firstPlace = true;
 
+  // Seed is an offscreen placeholder overwritten on first real placement; radius here is arbitrary.
   const ringTween = new Tween<RingGeom>(
-    { x: 0, y: 0, width: DOT_R * 2, height: DOT_R * 2, radius: DOT_R },
+    { x: 0, y: 0, width: 0, height: 0, radius: 0 },
     { duration: 0 },
   );
 
   function ringCenter(id: string): Point | null {
     const n = posOf.get(id);
     return n ? glyphCenter(n, px, py) : null;
+  }
+
+  // The collapsed-ring radius for a node = half ITS glyph size (genus and clade glyphs are sized
+  // independently), so the dot frames that node's own disc rather than assuming a shared size.
+  function dotRadiusFor(id: string): number {
+    return (treeStore.getNode(id)?.isGenus ? GLYPH_GENUS : GLYPH_CLADE) / 2;
   }
 
   // Geometry the ring should be at, DERIVED from phase + the ringed node's live coords + labelBox.
@@ -187,7 +194,7 @@
   let ringTarget = $derived.by<RingGeom | null>(() => {
     if (!ringId) return null;
     const c = ringCenter(ringId);
-    return c ? ringGeom(glidePhase, c, labelBox, RING_H, RING_PAD_X) : null;
+    return c ? ringGeom(glidePhase, c, labelBox, RING_H, RING_PAD_X, dotRadiusFor(ringId)) : null;
   });
 
   // PHASE MACHINE — reacts to a genuine FOCUS change only (keyed to ringId). Reads coords under
@@ -202,9 +209,6 @@
     const hasCenter = untrack(() => ringCenter(id) !== null);
     if (!hasCenter) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
 
-    const trigger = nextTrigger;
-    nextTrigger = "commit"; // consume; keyboard hops re-arm it in focusItem
-
     // Instant placement: reduced-motion or the very first mount → bloom at rest, no skate/settle.
     if (reduceMotion || firstPlace) {
       firstPlace = false;
@@ -215,13 +219,12 @@
 
     // Normal move: collapse to a dot and skate (the driver tweens the position derived), then
     // bloom on settle if no new focus change arrives within one glide.
-    const ms = glideDuration(trigger);
-    glideMs = ms;
+    glideMs = GLIDE_MS;
     glidePhase = "dot";
     settleTimer = setTimeout(() => {
-      glideMs = ms;
+      glideMs = GLIDE_MS;
       glidePhase = "bloom";
-    }, ms);
+    }, GLIDE_MS);
     return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
   });
 
@@ -362,7 +365,6 @@
   }
 
   function focusItem(id: string) {
-    nextTrigger = "keyboard"; // this move is an arrow hop; the ringId effect reads it
     focusId = id;
     // preventScroll: WE drive the visible scroll (scrollFocusIntoView); the browser's native
     // focus-scroll would fight it by targeting the clipped sr-only element.
@@ -630,6 +632,9 @@
       {#if ringId}
         {@const rg = ringTween.current}
         {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
+        <!-- Shape (x/y/w/h/rx) comes from the JS tween. Paint (fill/stroke/fill-opacity) is left to
+             CSS transitions (see .label-ring): color glides node→node and fill fades out to a hollow
+             ring in transit, both over --glide-ms — so paint animates without JS color math. -->
         <rect
           class="label-ring"
           x={rg.x}
@@ -637,7 +642,8 @@
           width={rg.width}
           height={rg.height}
           rx={rg.radius}
-          style="fill: color-mix(in srgb, {hiColor} 18%, transparent); stroke: {hiColor}"
+          fill-opacity={glidePhase === "bloom" ? 1 : 0}
+          style="fill: color-mix(in srgb, {hiColor} 18%, transparent); stroke: {hiColor}; --glide-ms: {glideMs}ms"
         />
       {/if}
     </svg>
@@ -737,7 +743,14 @@
   .node.link:hover .lbl { text-decoration-color: var(--turq); fill: var(--turq-dp); }
   /* clicked guess row -> ring the label of the shared/guessed node (fill+stroke set inline,
      colored by warmth). No dot ring — the label outline alone marks the selection. */
-  .label-ring { stroke-width: 2; }
+  .label-ring {
+    stroke-width: 2;
+    /* Paint animates via CSS (color interpolation is native here — no JS color math); shape is the
+       JS tween. --glide-ms is set inline per-move (0 for instant/reduced-motion placements). */
+    transition: fill var(--glide-ms, 0ms) linear,
+                stroke var(--glide-ms, 0ms) linear,
+                fill-opacity var(--glide-ms, 0ms) linear;
+  }
   .node.highlight .lbl { font-weight: var(--fw-black); }
   .zoom-controls {
     position: absolute; z-index: 5; right: var(--space-4); bottom: var(--space-4);

@@ -1,18 +1,6 @@
 // Pure math for the focus-ring glide (see docs/superpowers/specs/2026-07-21-ring-glide-design.md).
 // No DOM / no Svelte — the component owns the tween and rendering; this owns the numbers.
 
-// Provisional durations (ms). Two distinct, trigger-selected speeds; exact values are a
-// look-and-feel knob (#52). Keyboard hops get the full skate; commits (click / guess-row) a
-// compressed glide so a deliberate "put it there" doesn't dawdle.
-export const GLIDE_MS_KEYBOARD = 180;
-export const GLIDE_MS_COMMIT = 90;
-
-export type GlideTrigger = "keyboard" | "commit";
-
-export function glideDuration(trigger: GlideTrigger): number {
-  return trigger === "commit" ? GLIDE_MS_COMMIT : GLIDE_MS_KEYBOARD;
-}
-
 export interface Point { x: number; y: number }
 
 // The glyph disc's center in SVG space — the puck's skate anchor at both ends. The node's
@@ -27,32 +15,31 @@ export function glyphCenter(
 
 export type GlidePhase = "dot" | "bloom";
 
-// Collapsed-dot radius (provisional; look-and-feel knob). Sized to rhyme with the node glyph
-// discs without covering them.
-export const DOT_R = 5;
-
 // x/y are the rect's TOP-LEFT corner — one consistent coordinate frame across both phases, so
 // the tween interpolates a single frame and there's no discontinuity at a phase boundary.
 export interface RingGeom { x: number; y: number; width: number; height: number; radius: number }
 
-// The rendered ring's geometry for a phase. One element morphs between these: a DOT_R circle
-// on the glyph center (dot / in-transit) and the full label-hugging box (bloom / settled).
-// A null labelBox (not yet measured) always yields a dot — there's nothing to hug.
+// The rendered ring's geometry for a phase. One element morphs between these: a glyph-sized
+// ring centered on the glyph (dot / in-transit) and the full label-hugging box (bloom /
+// settled). `dotR` is the collapsed radius — the caller passes GLYPH_GENUS / 2 so the dot
+// frames the glyph disc exactly. A null labelBox (not yet measured) always yields a dot —
+// there's nothing to hug.
 export function ringGeom(
   phase: GlidePhase,
   center: Point,
   labelBox: { x: number; y: number; width: number; height: number } | null,
   ringH: number,
   ringPadX: number,
+  dotR: number,
 ): RingGeom {
   if (phase === "dot" || !labelBox) {
-    // DOT_R circle centered on the glyph → top-left is center minus the radius on both axes.
+    // dotR circle centered on the glyph → top-left is center minus the radius on both axes.
     return {
-      x: center.x - DOT_R,
-      y: center.y - DOT_R,
-      width: DOT_R * 2,
-      height: DOT_R * 2,
-      radius: DOT_R,
+      x: center.x - dotR,
+      y: center.y - dotR,
+      width: dotR * 2,
+      height: dotR * 2,
+      radius: dotR,
     };
   }
   return {

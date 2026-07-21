@@ -31,17 +31,19 @@ coordinates.
 Each ring move plays **collapse → skate → bloom**:
 
 1. **Collapse** — the label-ring shrinks toward the source node's glyph center, becoming a
-   small dot. The dot visually rhymes with the node glyph discs (footprint / tracks), so
-   focus-in-transit reads as a little puck hopping between nodes.
-2. **Skate** — the dot translates in a straight line from the **source glyph** to the
-   **target glyph**. Glyphs (not labels) are the anchors: the puck lands on real tree
-   structure at both ends, and a straight glyph-to-glyph line rhymes with the discs.
-3. **Bloom** — at the target the dot re-expands into the full label-ring, hugging that
-   node's label.
+   **glyph-sized** ring (dot diameter = the node glyph size, 24px), and its **fill fades to
+   fully transparent** so in transit it's a hollow, stroke-only ring exactly bounding the
+   glyph disc — no muddy translucent overlap sitting on top of the glyph.
+2. **Skate** — the hollow glyph-sized ring translates in a straight line from the **source
+   glyph** to the **target glyph**. Glyphs (not labels) are the anchors: the puck lands on
+   real tree structure at both ends, and its size matching the glyph makes it read as the
+   focus "snapping onto" each disc.
+3. **Bloom** — at the target the ring re-expands into the full label-ring, hugging that
+   node's label, and its **fill fades back in** to the translucent tint.
 
-Collapsing to a dot mid-flight avoids a "ring around nothing" — a full-width ring sliding
-over whitespace and unrelated labels. The traveling marker is always a tight, unambiguous
-"here's your focus" dot.
+Collapsing to a hollow glyph-sized ring mid-flight avoids a "ring around nothing" — a
+full-width filled ring sliding over whitespace and unrelated labels. The traveling marker is
+always a tight, unambiguous "here's your focus" that frames the node's own glyph.
 
 ## Retargeting + settle (fast-nav behavior)
 
@@ -95,22 +97,22 @@ This replaces the earlier "small `$state` machine tracking phase + fromId + toId
 single effect. `fromId`/`toId` are unnecessary: the `Tween` already interpolates from its
 in-flight value, so "from" is implicit.
 
-## Trigger-based speed
+## Speed — one duration for all moves (revised)
 
 **Every** ring move glides — keyboard hops, clicks, and guess-row selection alike (all are
 either a `focusId`/keyboard-cursor change or a committed `highlightId` change; the ring
 follows `ringId`, which is derived from both). Consistency means the ring is always one
 coherent object, never teleporting in one interaction and gliding in another.
 
-Two speeds, chosen by **what caused the move** (not by travel distance):
+**One speed for everything.** The earlier design had two trigger-selected durations (a snappy
+click glide, a slower keyboard skate). Playtest verdict: the snappy timing feels good enough
+that *every* move should use it — this is a game, and the quick glide gives good feel on click
+navigation too. So the trigger distinction (and its `GlideTrigger`/`glideDuration`/`nextTrigger`
+plumbing) is **removed** in favor of a single `GLIDE_MS` constant. Re-splitting later is cheap
+if a slower commit is ever wanted; carrying dead two-speed machinery is not worth it.
 
-- **Keyboard hop** — the full skate.
-- **Click / guess-row commit** (any `highlightId` change) — a quick glide, same three phases
-  compressed. A deliberate "put it there" shouldn't dawdle, but still reads as a glide.
-
-Both durations are **named constants** at the top of the component, explicitly tunable. Exact
-values are deliberately left for the look-and-feel pass (fine-tune later); the structural
-requirement is only that two distinct, trigger-selected durations exist.
+`GLIDE_MS` is a named constant at the top of the component, still tunable in the look-and-feel
+pass.
 
 ## Reduced motion
 
@@ -125,11 +127,16 @@ done wrong hurts exactly the vestibular/motion-sensitive users the a11y work ser
 - A persistent ring/puck element rendered once at SVG top level (drawn last, over the nodes).
 - **Phase machine** — a `phase` (`"dot" | "bloom"`) `$state` plus the settle timer, owned by a
   single effect keyed to `ringId` **only**. Reads the node center under `untrack` so layout
-  churn cannot re-trigger it. Handles the trigger (keyboard vs. commit) → duration selection,
-  and clears/re-arms the settle timer on a genuine focus change (and on teardown).
+  churn cannot re-trigger it. Sets one `GLIDE_MS` duration (no trigger distinction), and
+  clears/re-arms the settle timer on a genuine focus change (and on teardown).
 - **Geometry `$derived`** — the tween target = `ringGeom(phase, center(ringId), labelBox, …)`,
   recomputed on any of {`phase`, ringed-node coordinates, `labelBox`}. Driving the tween off
-  this derived value is what makes the ring follow a relayout at its current phase.
+  this derived value is what makes the ring follow a relayout at its current phase. The dot
+  branch sizes the ring to the **glyph diameter** (passed in, = `GLYPH_GENUS`) so the collapsed
+  ring frames the disc exactly.
+- **Fill-opacity tween** — a second tweened scalar, 1 while bloomed → 0 while dot, interpolated
+  alongside the geometry so the fill washes out on collapse and back in on bloom. Stroke opacity
+  is unchanged (the ring is always visible as an outline; only the tint fades).
 
 **Removed:**
 - The per-node `{#if isHi && labelBox}` `<rect class="label-ring">` block (originally lines
@@ -144,12 +151,14 @@ done wrong hurts exactly the vestibular/motion-sensitive users the a11y work ser
 - `reduceMotion`.
 
 **Extracted as pure helpers (TDD'd):**
-- Duration selection from trigger kind (keyboard vs. commit) — `glideDuration`. *(already built)*
-- Glyph-center endpoint from a node position — `glyphCenter`. *(already built)*
-- Phase→geometry resolution — `ringGeom` + `DOT_R`. *(already built)*
+- Glyph-center endpoint from a node position — `glyphCenter`. *(already built, unchanged)*
+- Phase→geometry resolution — `ringGeom`. The dot radius is a **parameter** (the caller passes
+  `GLYPH_GENUS / 2`), so "dot = glyph size" holds by construction rather than via a magic
+  number that could desync. Replaces the old fixed `DOT_R` const.
 
-The three pure helpers survive the redesign unchanged; only the component's effect/derived
-wiring changes.
+**Removed helper:** `glideDuration` + `GlideTrigger` + `GLIDE_MS_KEYBOARD`/`GLIDE_MS_COMMIT`
+(one speed now — see *Speed*). The component's `nextTrigger` state and the `focusItem` trigger
+set go with it.
 
 ## One visual detail to verify
 
