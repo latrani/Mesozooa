@@ -6,7 +6,7 @@
   import { scrollFade } from "../../actions/scrollFade";
   import { warmthRampColor } from "../warmth-ramp";
   import { glyphCenter, ringGeom, lerpRingGeom } from "../ring-glide";
-  import type { RingGeom, Point } from "../ring-glide";
+  import type { Point } from "../ring-glide";
   import { layoutDiff, flipProgress, lerpPos, lerp } from "../relayout-flip";
   import type { Pos, LayoutDiff } from "../relayout-flip";
   import { Tween } from "svelte/motion";
@@ -247,12 +247,10 @@
   let ringId = $derived(treeFocused ? currentId : highlightId);
 
   // --- Ring glide (issue #52 slice 1) ---------------------------------------------------------
-  // One persistent ring element. Its SHAPE (x/y/width/height/radius) is driven by a JS Tween that
-  // retargets from the in-flight value, so rapid arrow-nav just redirects a skating ring. Its PAINT
-  // (fill, stroke, fill-opacity) is animated by CSS transitions instead: CSS interpolates colors
-  // natively (resolving var()/color-mix, no JS color math), and the transition-duration is fed the
-  // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
-  // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
+  // One persistent ring element, unified onto the shared motion clock (see below). Its POSITION
+  // rides `ringProgress` (same 0→1/GLIDE_MS as the node FLIP + scroll → no wheel); its SIZE rides
+  // `morphTween` (dot↔bloom); only its fill/stroke COLOR animates via a CSS transition (native
+  // color interp, no JS color math). The opacities are computed inline from `morphTween`.
   const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
   // Relayout FLIP completion fractions of the GLIDE_MS envelope (shared clock, shared start).
   // Staggered COMPLETION gives cause→effect: structure settles, branches appear, focus arrives.
@@ -338,6 +336,9 @@
 
     // Normal move: restart the position glide (same 0→1/GLIDE_MS as the node+scroll clock → lockstep,
     // no wheel), morph to a dot as it travels, then bloom on settle if no new move interrupts.
+    // INVARIANT (no-wheel): ringProgress and flipProgressTween MUST be restarted with identical
+    // (0→1, GLIDE_MS) params within one effect flush, so they share a frame-start on Svelte's raf
+    // clock. A refactor that splits their triggers or changes one duration reintroduces the wheel.
     ringCenterFrom = glideFrom;
     morphTween.set(0, { duration: GLIDE_MS });     // collapse to dot as it travels
     ringProgress.set(0, { duration: 0 });
@@ -619,6 +620,9 @@
         // If the FLIP's scroll driver is handling this re-center (shared-clock animation, set in the
         // relayout effect above), don't ALSO fire the native scroll — that's the race we removed.
         // Still reset zoom to default; just skip the competing scrollToNode.
+        // INVARIANT: `scrollTargetPx` is refreshed by the FLIP effect (declared earlier) on EVERY
+        // layout change before this reads it — and a tipId change always forces a layout change — so
+        // it's never stale here. Don't reorder these effects or read scrollTargetPx without that.
         if (scrollTargetPx) zoom = ZOOM_DEFAULT;
         else resetZoom(); // zoomed / non-animated path: native re-center as before
       } else if (rightInset !== lastInset) {
@@ -767,12 +771,13 @@
       <!-- The persistent focus ring is drawn HERE — after the branch edges but BEFORE the node
            glyphs/backplates/labels — so it sits behind every node's page-color backplate and glyph
            (SVG paint order = document order; no z-index). This restores the original per-node ring's
-           stacking: on top of branch lines, tucked behind the glyph disc it frames. Shape (x/y/w/h/rx)
-           comes from the JS tween; paint (fill/stroke color + the two opacity levers) is left to CSS
-           transitions (see .label-ring), so color glides node→node with no JS color math. Two levers,
-           both over --glide-ms: element `opacity` fades the WHOLE puck (PUCK_TRAVEL_OPACITY while a
-           dot → 1 bloomed), and `fill-opacity` carries the fill tint (1 solid dot → 0.18 translucent
-           bloom, the label showing through). Fill/stroke are the solid highlight color. -->
+           stacking: on top of branch lines, tucked behind the glyph disc it frames.
+           SHAPE = lerpRingGeom(dot, bloom, morph) at the live `ringCenterNow` (position on the shared
+           clock, size on morphTween). The two opacity levers are computed inline as attrs from `morph`
+           (NOT CSS): element `opacity` fades the WHOLE puck (PUCK_TRAVEL_OPACITY as a dot → 1 bloomed),
+           `fill-opacity` carries the fill tint (1 solid dot → 0.18 translucent bloom, label showing
+           through). Only fill/stroke COLOR animates via CSS (see .label-ring) so hue glides node→node
+           with no JS color math. -->
       {#if ringId && ringCenterNow}
         {@const c = ringCenterNow}
         {@const m = morphTween.current}
