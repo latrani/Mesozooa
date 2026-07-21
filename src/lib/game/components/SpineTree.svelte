@@ -5,6 +5,10 @@
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
   import { warmthRampColor } from "../warmth-ramp";
+  import { glyphCenter, ringGeom } from "../ring-glide";
+  import type { GlidePhase, RingGeom, Point } from "../ring-glide";
+  import { Tween } from "svelte/motion";
+  import { untrack } from "svelte";
   import {
     ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, clampZoom, zoomStep, scrollForZoom,
   } from "../zoom";
@@ -148,6 +152,100 @@
   // committed highlight prop.
   let ringId = $derived(treeFocused ? currentId : highlightId);
 
+  // --- Ring glide (issue #52 slice 1) ---------------------------------------------------------
+  // One persistent ring element. Its SHAPE (x/y/width/height/radius) is driven by a JS Tween that
+  // retargets from the in-flight value, so rapid arrow-nav just redirects a skating ring. Its PAINT
+  // (fill, stroke, fill-opacity) is animated by CSS transitions instead: CSS interpolates colors
+  // natively (resolving var()/color-mix, no JS color math), and the transition-duration is fed the
+  // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
+  // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
+  const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  // Puck look-and-feel knobs. PUCK_TRAVEL_OPACITY: overall opacity of the WHOLE puck (fill + border)
+  // while traveling as a dot — set on element `opacity`, so the border fades with the fill (the dot's
+  // fill is solid, tinted only by this). Bloom is always fully opaque with a 0.18 fill. PUCK_DOT_PAD:
+  // px added to the dot's RADIUS beyond the glyph edge, so the dot can sit proud of the disc it frames.
+  const PUCK_TRAVEL_OPACITY = 0.5;
+  const PUCK_DOT_PAD = 2;
+  let glidePhase = $state<GlidePhase>("bloom");
+  // Duration (ms) for BOTH the shape tween's next retarget and the CSS paint transition. The phase
+  // machine sets it: 0 for instant placements (reduced-motion, first mount, relayout-follow), else
+  // GLIDE_MS. A $state so the driver effect + the --glide-ms style binding re-run when it changes.
+  let glideMs = $state(0);
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  // First ring placement is instant: the tween starts at (0,0), so the first skate would fly the
+  // ring in from the SVG's top-left corner. Cleared after the first real placement.
+  let firstPlace = true;
+
+  // Seed is an offscreen placeholder overwritten on first real placement; radius here is arbitrary.
+  const ringTween = new Tween<RingGeom>(
+    { x: 0, y: 0, width: 0, height: 0, radius: 0 },
+    { duration: 0 },
+  );
+
+  function ringCenter(id: string): Point | null {
+    const n = posOf.get(id);
+    return n ? glyphCenter(n, px, py) : null;
+  }
+
+  // The collapsed-ring radius for a node = half ITS glyph size (genus and clade glyphs are sized
+  // independently), so the dot frames that node's own disc rather than assuming a shared size.
+  // PUCK_DOT_PAD grows the dot's RADIUS beyond the glyph edge by that many px (added after /2).
+  function dotRadiusFor(id: string): number {
+    return (treeStore.getNode(id)?.isGenus ? GLYPH_GENUS : GLYPH_CLADE) / 2 + PUCK_DOT_PAD;
+  }
+
+  // Geometry the ring should be at, DERIVED from phase + the ringed node's live coords + labelBox.
+  // Because it reads posOf (via ringCenter), it recomputes when a relayout moves the node — so the
+  // tween driver below repositions the ring at its CURRENT phase, without the phase machine (which
+  // ignores layout) re-running. This is the split that fixes the relayout race and is slice 2's hook.
+  let ringTarget = $derived.by<RingGeom | null>(() => {
+    if (!ringId) return null;
+    const c = ringCenter(ringId);
+    return c ? ringGeom(glidePhase, c, labelBox, RING_H, RING_PAD_X, dotRadiusFor(ringId)) : null;
+  });
+
+  // PHASE MACHINE — reacts to a genuine FOCUS change only (keyed to ringId). Reads coords under
+  // untrack so a relayout (posOf change) never re-triggers it. Sole owner of glidePhase, glideMs,
+  // settleTimer, firstPlace.
+  $effect(() => {
+    const id = ringId; // the ONLY tracked dependency
+    if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+    if (!id) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+
+    // Read the center without subscribing to layout — layout changes are the position derived's job.
+    const hasCenter = untrack(() => ringCenter(id) !== null);
+    if (!hasCenter) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+
+    // Instant placement: reduced-motion or the very first mount → bloom at rest, no skate/settle.
+    if (reduceMotion || firstPlace) {
+      firstPlace = false;
+      glideMs = 0;
+      glidePhase = "bloom";
+      return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+    }
+
+    // Normal move: collapse to a dot and skate (the driver tweens the position derived), then
+    // bloom on settle if no new focus change arrives within one glide.
+    glideMs = GLIDE_MS;
+    glidePhase = "dot";
+    settleTimer = setTimeout(() => {
+      glideMs = GLIDE_MS;
+      glidePhase = "bloom";
+    }, GLIDE_MS);
+    return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+  });
+
+  // TWEEN DRIVER — the ONLY caller of ringTween.set. Retargets whenever the position derived or the
+  // duration changes. A relayout moves ringTarget → the ring follows at its current phase. glideMs is
+  // set to 0 by the phase machine's instant paths and for relayout-follow (a phase-less target change
+  // keeps the last glideMs, which is fine — a settled ring's glideMs is the bloom duration, a short
+  // reposition; if that ever feels wrong it's a look-and-feel knob, not a correctness issue).
+  $effect(() => {
+    const target = ringTarget;
+    if (!target) return;
+    ringTween.set(target, { duration: glideMs });
+  });
+
   // A revealed clade whose children are NOT in the layout is "collapsed" — mark it so we can
   // draw a short right-fading stub ("more here"). Genera never get a stub.
   let hasLaidOutChildren = $derived(new Set(layout.edges.map((e) => e.parentId)));
@@ -170,17 +268,22 @@
   const px = (x: number) => STEM + PAD + x * X_GAP;
   const py = (y: number) => PAD + LABEL_PAD + (y - layout.minY) * Y_GAP;
 
-  // bbox of the highlighted label, in the node's local coords — backs the ring rect. Measured on a
-  // rAF, NOT synchronously: the count <tspan> is appended after the name, and a synchronous getBBox()
-  // at highlight-time can run before that tspan is laid out — yielding a box that fits only the name,
-  // so the ring falls short of the count (intermittently, by layout-race). Deferring to the next
-  // frame guarantees the full text (name + count) is measured.
+  // bbox of the highlighted label, in the node's local coords — backs the ring rect.
   let labelBox = $state<{ x: number; y: number; width: number; height: number } | null>(null);
-  function measureLabel(el: SVGTextElement, active: boolean) {
-    const measure = (on: boolean) => {
-      if (on) requestAnimationFrame(() => { labelBox = el.getBBox(); });
+  // Re-measures the highlighted label's bbox on a rAF (see below). The action's parameter is a KEY:
+  // non-null => this is the ringed node and should be measured; the key's VALUE encodes everything
+  // that changes the label's rendered width (name, on-spine font-size, count) so Svelte fires
+  // `update` — and we re-measure — whenever the width could change while a node stays highlighted.
+  // (Passing just `isHi` missed the expand case: the node stays highlighted, but going on-spine
+  // bumps the font-size up, widening the text without re-triggering a measure — the ring fell short.)
+  function measureLabel(el: SVGTextElement, key: string | null) {
+    const measure = (k: string | null) => {
+      // rAF, NOT synchronous: the count <tspan> is appended after the name, and a same-tick getBBox()
+      // can run before that tspan (or a just-changed font-size) is laid out — yielding a short box.
+      // Deferring a frame guarantees the full, final text metrics.
+      if (k !== null) requestAnimationFrame(() => { labelBox = el.getBBox(); });
     };
-    measure(active);
+    measure(key);
     return { update: measure };
   }
 
@@ -280,6 +383,18 @@
     liEls[id]?.focus({ preventScroll: true });
   }
 
+  // A pointer click on a node: select it, then move keyboard focus INTO the tree so the user can
+  // keep navigating with arrows (the ARIA tree pattern — a clicked treeitem takes focus). Guarded
+  // on onnodeselect so it's a no-op in the game (where SVG clicks do nothing); only Explore, where
+  // clicking IS navigation, grabs focus. The click may relayout (Explore re-center) and rebuild the
+  // <li>s; focusItem sets focusId + treeFocused (via onItemFocus), and the focus-restore effect
+  // re-focuses the rebuilt item, so keyboard position survives the rebuild.
+  function onNodeClick(id: string) {
+    if (!onnodeselect) return;
+    onnodeselect(id);
+    focusItem(id);
+  }
+
   function onTreeKey(e: KeyboardEvent) {
     const cur = currentId;
     if (!cur) return;
@@ -293,6 +408,18 @@
       e.preventDefault(); // stop arrow/Home/End from scrolling the page
       focusItem(next);
     }
+  }
+
+  // Move keyboard focus onto a node from OUTSIDE the tree (e.g. a "Recently viewed" chip in
+  // Explore selects a node — focus should land on it so the user can arrow on from there, matching
+  // a direct tree-node click). Sets treeFocused so the ring tracks it and, crucially, so the
+  // focus-restore effect fires after the jump's relayout even when the target wasn't in the old
+  // layout (its <li> doesn't exist yet, so the immediate focus() below is a no-op and the effect
+  // grabs the rebuilt <li> instead).
+  export function focusNode(id: string) {
+    treeFocused = true;
+    focusId = id;
+    liEls[id]?.focus({ preventScroll: true });
   }
 
   // Exposed for the trail scrubber (Plan 2).
@@ -494,6 +621,39 @@
         <path class="edge" class:spine={e.onSpine} d={edgePath(e.parentId, e.childId)} fill="none"
           style={e.onSpine ? `stroke: url(#${gradId(e.parentId, e.childId)})` : ""} />
       {/each}
+      <!-- "more here" stubs for collapsed clades. Drawn WITH the branch edges (before the ring), not
+           inside each node's <g> (which renders after the ring) — so this tree-line stacks behind the
+           selection ring exactly like a real branch edge does, rather than in front of it. -->
+      {#each layout.nodes as n (n.id)}
+        {#if isExpandable(n.id)}
+          <line transform={`translate(${px(n.x)} ${py(n.y)})`}
+            x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
+        {/if}
+      {/each}
+      <!-- The persistent focus ring is drawn HERE — after the branch edges but BEFORE the node
+           glyphs/backplates/labels — so it sits behind every node's page-color backplate and glyph
+           (SVG paint order = document order; no z-index). This restores the original per-node ring's
+           stacking: on top of branch lines, tucked behind the glyph disc it frames. Shape (x/y/w/h/rx)
+           comes from the JS tween; paint (fill/stroke color + the two opacity levers) is left to CSS
+           transitions (see .label-ring), so color glides node→node with no JS color math. Two levers,
+           both over --glide-ms: element `opacity` fades the WHOLE puck (PUCK_TRAVEL_OPACITY while a
+           dot → 1 bloomed), and `fill-opacity` carries the fill tint (1 solid dot → 0.18 translucent
+           bloom, the label showing through). Fill/stroke are the solid highlight color. -->
+      {#if ringId}
+        {@const rg = ringTween.current}
+        {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
+        <rect
+          class="label-ring"
+          x={rg.x}
+          y={rg.y}
+          width={rg.width}
+          height={rg.height}
+          rx={rg.radius}
+          fill-opacity={glidePhase === "bloom" ? 0.18 : 1}
+          opacity={glidePhase === "bloom" ? 1 : PUCK_TRAVEL_OPACITY}
+          style="fill: {hiColor}; stroke: {hiColor}; --glide-ms: {glideMs}ms"
+        />
+      {/if}
       {#each layout.nodes as n (n.id)}
         {@const node = treeStore.getNode(n.id)}
         {@const isHi = n.id === ringId}
@@ -516,23 +676,8 @@
           class:clickable={!!onnodeselect}
           class:link={linkLabels && !!onnodeselect}
           transform={`translate(${px(n.x)} ${py(n.y)})`}
-          onclick={() => onnodeselect?.(n.id)}
+          onclick={() => onNodeClick(n.id)}
         >
-          {#if isExpandable(n.id)}
-            <line x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
-          {/if}
-          {#if isHi && labelBox}
-            {@const hiColor = colorOf(n.id, n.onSpine, node?.isGenus ?? false) ?? "var(--turq)"}
-            <!-- selection box: bottom edge on the row line (y=0), hugging the centered label.
-                 Drawn UNDER the backing disc + glyph so its tucked corner hides behind them. -->
-            <rect
-              class="label-ring"
-              x={labelBox.x - RING_PAD_X} y={-RING_H}
-              width={labelBox.width + 2 * RING_PAD_X} height={RING_H}
-              rx="6"
-              style="fill: color-mix(in srgb, {hiColor} 18%, transparent); stroke: {hiColor}"
-            />
-          {/if}
           <!-- page-color backing disc: sits just under the glyph and over the label, so it fills
                the glyph's cutouts AND masks the tucked ring corner — neither peeks through. -->
           <circle class="glyph-bg" r={glyphSize / 2 + OUTLINE_PX} cy={glyphDY} />
@@ -545,7 +690,11 @@
             height={glyphSize}
             style={glyphFill ? `fill: ${glyphFill}` : ""}
           />
-          <text class="lbl" x={LABEL_OFFSET + RING_PAD_X} y={LABEL_BASELINE_DY} use:measureLabel={isHi}>
+          <!-- measure key: non-null only for the ringed node; value encodes what changes the label's
+               width (name, on-spine font-size, count) so the ring re-measures when e.g. expanding a
+               highlighted clade bumps it on-spine (bigger font → wider text). -->
+          <text class="lbl" x={LABEL_OFFSET + RING_PAD_X} y={LABEL_BASELINE_DY}
+            use:measureLabel={isHi ? `${node?.name}|${n.onSpine}|${showCounts && !node?.isGenus ? node?.descendantGenusCount : ""}` : null}>
             {displayName(node?.name)}{#if showCounts && !node?.isGenus}<tspan class="count" dx="4">{node?.descendantGenusCount}</tspan>{/if}
           </text>
         </g>
@@ -647,7 +796,15 @@
   .node.link:hover .lbl { text-decoration-color: var(--turq); fill: var(--turq-dp); }
   /* clicked guess row -> ring the label of the shared/guessed node (fill+stroke set inline,
      colored by warmth). No dot ring — the label outline alone marks the selection. */
-  .label-ring { stroke-width: 2; }
+  .label-ring {
+    stroke-width: 2;
+    /* Paint animates via CSS (color interpolation is native here — no JS color math); shape is the
+       JS tween. --glide-ms is set inline per-move (0 for instant/reduced-motion placements). */
+    transition: fill var(--glide-ms, 0ms) linear,
+                stroke var(--glide-ms, 0ms) linear,
+                fill-opacity var(--glide-ms, 0ms) linear,
+                opacity var(--glide-ms, 0ms) linear;
+  }
   .node.highlight .lbl { font-weight: var(--fw-black); }
   .zoom-controls {
     position: absolute; z-index: 5; right: var(--space-4); bottom: var(--space-4);
