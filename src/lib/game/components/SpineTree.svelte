@@ -10,6 +10,7 @@
   } from "../ring-glide";
   import type { GlideTrigger, GlidePhase, RingGeom, Point } from "../ring-glide";
   import { Tween } from "svelte/motion";
+  import { untrack } from "svelte";
   import {
     ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, clampZoom, zoomStep, scrollForZoom,
   } from "../zoom";
@@ -157,15 +158,18 @@
   // One persistent ring element, driven by a geometry tween. `.set()` retargets from the
   // in-flight value, so rapid arrow-nav just redirects a skating dot (no per-hop bloom).
   let glidePhase = $state<GlidePhase>("bloom");
-  // The move that caused the next ring change. Keyboard hops set this in focusItem; anything
-  // else (a highlightId commit / click) is a "commit". Read + reset when the ringId effect runs.
+  // Duration (ms) the tween driver uses for the NEXT retarget. The phase machine sets it: 0 for
+  // instant placements (reduced-motion, first mount, and relayout-follow), else the trigger's
+  // glide duration. A $state so the driver effect re-runs when it changes.
+  let glideMs = $state(0);
+  // The move that caused the next FOCUS change. Keyboard hops set this in focusItem; anything
+  // else (a highlightId commit / click) is a "commit". Read + reset by the phase machine.
   let nextTrigger: GlideTrigger = "commit";
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
-  // First ring placement is instant (like reduced-motion): the tween starts at (0,0), so the
-  // very first skate would fly the dot in from the SVG's top-left corner. Cleared after placement.
+  // First ring placement is instant: the tween starts at (0,0), so the first skate would fly the
+  // dot in from the SVG's top-left corner. Cleared after the first real placement.
   let firstPlace = true;
 
-  // Geometry the ring renders at. Initialized to an offscreen dot; the effect below drives it.
   const ringTween = new Tween<RingGeom>(
     { cx: 0, cy: 0, width: DOT_R * 2, height: DOT_R * 2, radius: DOT_R },
     { duration: 0 },
@@ -176,52 +180,60 @@
     return n ? glyphCenter(n, px, py) : null;
   }
 
-  // Drive the tween whenever the ringed node changes. Collapse-to-dot + skate happen by
-  // retargeting the tween to the new glyph's dot geometry; bloom fires on settle.
+  // Geometry the ring should be at, DERIVED from phase + the ringed node's live coords + labelBox.
+  // Because it reads posOf (via ringCenter), it recomputes when a relayout moves the node — so the
+  // tween driver below repositions the ring at its CURRENT phase, without the phase machine (which
+  // ignores layout) re-running. This is the split that fixes the relayout race and is slice 2's hook.
+  let ringTarget = $derived.by<RingGeom | null>(() => {
+    if (!ringId) return null;
+    const c = ringCenter(ringId);
+    return c ? ringGeom(glidePhase, c, labelBox, RING_H, RING_PAD_X) : null;
+  });
+
+  // PHASE MACHINE — reacts to a genuine FOCUS change only (keyed to ringId). Reads coords under
+  // untrack so a relayout (posOf change) never re-triggers it. Sole owner of glidePhase, glideMs,
+  // settleTimer, firstPlace.
   $effect(() => {
-    const id = ringId;
-    // Clear any pending settle up front, and again in the cleanup return so a component teardown
-    // (or a re-run) can never leave a timeout to fire ringTween.set on an orphaned tween.
+    const id = ringId; // the ONLY tracked dependency
     if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
     if (!id) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
-    const center = ringCenter(id);
-    if (!center) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
 
-    // Reduced-motion OR the first placement: put the ring at rest instantly (no dot/skate/timer),
-    // so the ring never flies in from (0,0) on mount.
+    // Read the center without subscribing to layout — layout changes are the position derived's job.
+    const hasCenter = untrack(() => ringCenter(id) !== null);
+    if (!hasCenter) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+
+    const trigger = nextTrigger;
+    nextTrigger = "commit"; // consume; keyboard hops re-arm it in focusItem
+
+    // Instant placement: reduced-motion or the very first mount → bloom at rest, no skate/settle.
     if (reduceMotion || firstPlace) {
       firstPlace = false;
+      glideMs = 0;
       glidePhase = "bloom";
-      ringTween.set(ringGeom("bloom", center, labelBox, RING_H, RING_PAD_X), { duration: 0 });
-      nextTrigger = "commit";
       return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
     }
 
-    const ms = glideDuration(nextTrigger);
-    nextTrigger = "commit"; // consume; keyboard hops re-arm it in focusItem
-    // Skate as a dot toward the new glyph (retargets any in-flight glide). Pass null for labelBox:
-    // dot phase ignores it, and reading labelBox here would make this effect re-run on every label
-    // re-measurement, starving the re-hug effect below. The settle callback re-reads it for bloom.
+    // Normal move: collapse to a dot and skate (the driver tweens the position derived), then
+    // bloom on settle if no new focus change arrives within one glide.
+    const ms = glideDuration(trigger);
+    glideMs = ms;
     glidePhase = "dot";
-    ringTween.set(ringGeom("dot", center, null, RING_H, RING_PAD_X), { duration: ms });
-    // Bloom on settle: if no new ringId arrives within one glide, expand to hug the label.
     settleTimer = setTimeout(() => {
-      const c = ringCenter(id);
-      if (!c) return;
+      glideMs = ms;
       glidePhase = "bloom";
-      ringTween.set(ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X), { duration: ms });
     }, ms);
     return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
   });
 
-  // Re-hug the label if its measured box arrives/changes while already bloomed (labelBox is
-  // measured on a rAF, so it can land just after the settle).
+  // TWEEN DRIVER — the ONLY caller of ringTween.set. Retargets whenever the position derived or the
+  // duration changes. A relayout moves ringTarget → the ring follows at its current phase. glideMs is
+  // set to 0 by the phase machine's instant paths and for relayout-follow (a phase-less target change
+  // keeps the last glideMs, which is fine — a settled ring's glideMs is the bloom duration, a short
+  // reposition; if that ever feels wrong it's a look-and-feel knob, not a correctness issue).
   $effect(() => {
-    void labelBox;
-    if (reduceMotion) return;
-    if (glidePhase !== "bloom" || !ringId) return;
-    const c = ringCenter(ringId);
-    if (c) ringTween.set(ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X), { duration: 0 });
+    const target = ringTarget;
+    if (!target) return;
+    ringTween.set(target, { duration: glideMs });
   });
 
   // A revealed clade whose children are NOT in the layout is "collapsed" — mark it so we can
