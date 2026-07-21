@@ -604,6 +604,15 @@
         <path class="edge" class:spine={e.onSpine} d={edgePath(e.parentId, e.childId)} fill="none"
           style={e.onSpine ? `stroke: url(#${gradId(e.parentId, e.childId)})` : ""} />
       {/each}
+      <!-- "more here" stubs for collapsed clades. Drawn WITH the branch edges (before the ring), not
+           inside each node's <g> (which renders after the ring) — so this tree-line stacks behind the
+           selection ring exactly like a real branch edge does, rather than in front of it. -->
+      {#each layout.nodes as n (n.id)}
+        {#if isExpandable(n.id)}
+          <line transform={`translate(${px(n.x)} ${py(n.y)})`}
+            x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
+        {/if}
+      {/each}
       <!-- The persistent focus ring is drawn HERE — after the branch edges but BEFORE the node
            glyphs/backplates/labels — so it sits behind every node's page-color backplate and glyph
            (SVG paint order = document order; no z-index). This restores the original per-node ring's
@@ -652,9 +661,6 @@
           transform={`translate(${px(n.x)} ${py(n.y)})`}
           onclick={() => onNodeClick(n.id)}
         >
-          {#if isExpandable(n.id)}
-            <line x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
-          {/if}
           <!-- page-color backing disc: sits just under the glyph and over the label, so it fills
                the glyph's cutouts AND masks the tucked ring corner — neither peeks through. -->
           <circle class="glyph-bg" r={glyphSize / 2 + OUTLINE_PX} cy={glyphDY} />
