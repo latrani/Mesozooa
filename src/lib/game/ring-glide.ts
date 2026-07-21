@@ -24,3 +24,33 @@ export function glyphCenter(
 ): Point {
   return { x: px(node.x), y: py(node.y) };
 }
+
+export type GlidePhase = "dot" | "bloom";
+
+// Collapsed-dot radius (provisional; look-and-feel knob). Sized to rhyme with the node glyph
+// discs without covering them.
+export const DOT_R = 5;
+
+export interface RingGeom { cx: number; cy: number; width: number; height: number; radius: number }
+
+// The rendered ring's geometry for a phase. One element morphs between these: a DOT_R circle
+// on the glyph center (dot / in-transit) and the full label-hugging box (bloom / settled).
+// A null labelBox (not yet measured) always yields a dot — there's nothing to hug.
+export function ringGeom(
+  phase: GlidePhase,
+  center: Point,
+  labelBox: { x: number; y: number; width: number; height: number } | null,
+  ringH: number,
+  ringPadX: number,
+): RingGeom {
+  if (phase === "dot" || !labelBox) {
+    return { cx: center.x, cy: center.y, width: DOT_R * 2, height: DOT_R * 2, radius: DOT_R };
+  }
+  return {
+    cx: center.x + labelBox.x - ringPadX,
+    cy: center.y - ringH,
+    width: labelBox.width + 2 * ringPadX,
+    height: ringH,
+    radius: 6,
+  };
+}
