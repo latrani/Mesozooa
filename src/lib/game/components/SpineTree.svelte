@@ -268,17 +268,22 @@
   const px = (x: number) => STEM + PAD + x * X_GAP;
   const py = (y: number) => PAD + LABEL_PAD + (y - layout.minY) * Y_GAP;
 
-  // bbox of the highlighted label, in the node's local coords — backs the ring rect. Measured on a
-  // rAF, NOT synchronously: the count <tspan> is appended after the name, and a synchronous getBBox()
-  // at highlight-time can run before that tspan is laid out — yielding a box that fits only the name,
-  // so the ring falls short of the count (intermittently, by layout-race). Deferring to the next
-  // frame guarantees the full text (name + count) is measured.
+  // bbox of the highlighted label, in the node's local coords — backs the ring rect.
   let labelBox = $state<{ x: number; y: number; width: number; height: number } | null>(null);
-  function measureLabel(el: SVGTextElement, active: boolean) {
-    const measure = (on: boolean) => {
-      if (on) requestAnimationFrame(() => { labelBox = el.getBBox(); });
+  // Re-measures the highlighted label's bbox on a rAF (see below). The action's parameter is a KEY:
+  // non-null => this is the ringed node and should be measured; the key's VALUE encodes everything
+  // that changes the label's rendered width (name, on-spine font-size, count) so Svelte fires
+  // `update` — and we re-measure — whenever the width could change while a node stays highlighted.
+  // (Passing just `isHi` missed the expand case: the node stays highlighted, but going on-spine
+  // bumps the font-size up, widening the text without re-triggering a measure — the ring fell short.)
+  function measureLabel(el: SVGTextElement, key: string | null) {
+    const measure = (k: string | null) => {
+      // rAF, NOT synchronous: the count <tspan> is appended after the name, and a same-tick getBBox()
+      // can run before that tspan (or a just-changed font-size) is laid out — yielding a short box.
+      // Deferring a frame guarantees the full, final text metrics.
+      if (k !== null) requestAnimationFrame(() => { labelBox = el.getBBox(); });
     };
-    measure(active);
+    measure(key);
     return { update: measure };
   }
 
@@ -685,7 +690,11 @@
             height={glyphSize}
             style={glyphFill ? `fill: ${glyphFill}` : ""}
           />
-          <text class="lbl" x={LABEL_OFFSET + RING_PAD_X} y={LABEL_BASELINE_DY} use:measureLabel={isHi}>
+          <!-- measure key: non-null only for the ringed node; value encodes what changes the label's
+               width (name, on-spine font-size, count) so the ring re-measures when e.g. expanding a
+               highlighted clade bumps it on-spine (bigger font → wider text). -->
+          <text class="lbl" x={LABEL_OFFSET + RING_PAD_X} y={LABEL_BASELINE_DY}
+            use:measureLabel={isHi ? `${node?.name}|${n.onSpine}|${showCounts && !node?.isGenus ? node?.descendantGenusCount : ""}` : null}>
             {displayName(node?.name)}{#if showCounts && !node?.isGenus}<tspan class="count" dx="4">{node?.descendantGenusCount}</tspan>{/if}
           </text>
         </g>
