@@ -1,6 +1,7 @@
 <script lang="ts">
   import { treeStore } from "../treeData";
   import { layoutSpine, centerOffsetFor } from "../spine-layout";
+  import { a11yTree } from "../a11y-tree";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
   import { warmthRampColor } from "../warmth-ramp";
@@ -126,6 +127,16 @@
 
   let layout = $derived(layoutSpine(treeStore, revealed, tipId));
   let posOf = $derived(new Map(layout.nodes.map((n) => [n.id, n])));
+
+  // Per-node visual y for sibling ordering in the a11y tree (mirrors the SVG's layout).
+  let yOf = $derived((id: string) => posOf.get(id)?.y ?? Infinity);
+  let a11yRoots = $derived(a11yTree(treeStore, revealed, yOf));
+  // The single roving-tabindex target: keyboard cursor if set, else the committed highlight,
+  // else the tip, else the first item. Task 4 turns `focusId` into live keyboard state.
+  let focusId = $state<string | null>(null);
+  let currentId = $derived(
+    focusId ?? highlightId ?? tipId ?? a11yRoots[0]?.id ?? null,
+  );
 
   // A revealed clade whose children are NOT in the layout is "collapsed" — mark it so we can
   // draw a short right-fading stub ("more here"). Genera never get a stub.
@@ -348,8 +359,7 @@
       width={contentWidth * zoom}
       height={vbH * zoom}
       viewBox={`0 0 ${contentWidth} ${vbH}`}
-      role="img"
-      aria-label="Cladogram"
+      aria-hidden="true"
     >
       <!-- per-spine-segment gradients: blend from the parent dot color to the child dot color
            (userSpaceOnUse so x1/x2 sit at the two endpoint columns) -->
@@ -401,8 +411,11 @@
         {@const glyphSize = isGenusNode ? GLYPH_GENUS : GLYPH_CLADE}
         {@const glyphDY = isGenusNode ? GLYPH_OFFSET_Y_GENUS : GLYPH_OFFSET_Y_CLADE}
         {@const glyphFill = colorOf(n.id, n.onSpine, isGenusNode)}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- The SVG is aria-hidden (decorative visual layer); the keyboard/AT path lives in
+             the sibling <ul role="tree"> below. onclick here is a pure pointer convenience, so
+             the missing key handler is intentional, not a gap. -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <g
           class="node"
           class:spine={n.onSpine}
@@ -451,10 +464,30 @@
     <!-- fixed-px runway: reserves the specimen's covered width as scroll distance past the tree's
          right edge, unscaled by zoom (issue #32). flex:none so it never shrinks. -->
     {#if runway}<div class="runway" style={`width:${runway}px`} aria-hidden="true"></div>{/if}
+    {#if a11yRoots.length}
+      <ul class="sr-tree" role="tree" aria-label="Dinosaur cladogram">
+        {#each a11yRoots as n (n.id)}{@render treeitem(n)}{/each}
+      </ul>
+    {/if}
   </div>
 {:else}
   <p class="tree-empty">{emptyLabel}</p>
 {/if}
+{#snippet treeitem(n: import("../a11y-tree").A11yNode)}
+  <li
+    role="treeitem"
+    aria-selected={n.id === highlightId ? "true" : "false"}
+    aria-expanded={n.isGenus ? undefined : n.children.length > 0 ? "true" : "false"}
+    tabindex={n.id === currentId ? 0 : -1}
+  >
+    <span>{n.name}{#if !n.isGenus}, {n.descendantGenusCount} genera{/if}</span>
+    {#if n.children.length}
+      <ul role="group">
+        {#each n.children as c (c.id)}{@render treeitem(c)}{/each}
+      </ul>
+    {/if}
+  </li>
+{/snippet}
 {#if layout.nodes.length}
   <div class="zoom-controls btn-secondary" role="group" aria-label="Zoom">
     <button type="button" aria-label="Zoom out" onclick={() => zoomButton(-1)} disabled={zoom <= ZOOM_MIN}>&minus;</button>
@@ -541,5 +574,12 @@
     color: var(--ink-soft); font-size: var(--type-body); padding: var(--space-6);
     flex: 1 1 auto; width: 100%; min-height: 200px;
     display: flex; align-items: center;
+  }
+  /* Visually hidden but focusable + AT-reachable: the parallel semantic tree. It stays hidden
+     even on focus — the SVG's focus ring (Task 4) is the visible feedback, so this never needs
+     to appear. */
+  .sr-tree {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
 </style>
