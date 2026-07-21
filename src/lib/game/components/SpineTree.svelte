@@ -159,7 +159,7 @@
   // natively (resolving var()/color-mix, no JS color math), and the transition-duration is fed the
   // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
   // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
-  const GLIDE_MS = 400; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
   let glidePhase = $state<GlidePhase>("bloom");
   // Duration (ms) for BOTH the shape tween's next retarget and the CSS paint transition. The phase
   // machine sets it: 0 for instant placements (reduced-motion, first mount, relayout-follow), else
@@ -597,6 +597,29 @@
         <path class="edge" class:spine={e.onSpine} d={edgePath(e.parentId, e.childId)} fill="none"
           style={e.onSpine ? `stroke: url(#${gradId(e.parentId, e.childId)})` : ""} />
       {/each}
+      <!-- The persistent focus ring is drawn HERE — after the branch edges but BEFORE the node
+           glyphs/backplates/labels — so it sits behind every node's page-color backplate and glyph
+           (SVG paint order = document order; no z-index). This restores the original per-node ring's
+           stacking: on top of branch lines, tucked behind the glyph disc it frames. Shape (x/y/w/h/rx)
+           comes from the JS tween; paint (fill, stroke, fill-opacity) is left to CSS transitions (see
+           .label-ring): color glides node→node and the fill goes from a SOLID opaque disc in transit
+           (like the glyph discs) to the translucent tint on bloom, over --glide-ms — so paint animates
+           without JS color math. Fill is solid hiColor; fill-opacity carries the tint (1 = opaque dot,
+           0.18 = the bloomed box's translucency). -->
+      {#if ringId}
+        {@const rg = ringTween.current}
+        {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
+        <rect
+          class="label-ring"
+          x={rg.x}
+          y={rg.y}
+          width={rg.width}
+          height={rg.height}
+          rx={rg.radius}
+          fill-opacity={glidePhase === "bloom" ? 0.18 : 1}
+          style="fill: {hiColor}; stroke: {hiColor}; --glide-ms: {glideMs}ms"
+        />
+      {/if}
       {#each layout.nodes as n (n.id)}
         {@const node = treeStore.getNode(n.id)}
         {@const isHi = n.id === ringId}
@@ -641,25 +664,6 @@
           </text>
         </g>
       {/each}
-      {#if ringId}
-        {@const rg = ringTween.current}
-        {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
-        <!-- Shape (x/y/w/h/rx) comes from the JS tween. Paint (fill, stroke, fill-opacity) is left to
-             CSS transitions (see .label-ring): color glides node→node and the fill goes from a SOLID
-             opaque disc in transit (like the glyph discs) to the translucent tint on bloom, both over
-             --glide-ms — so paint animates without JS color math. Fill is solid hiColor; fill-opacity
-             carries the tint (1 = opaque dot, 0.18 = the bloomed box's translucency). -->
-        <rect
-          class="label-ring"
-          x={rg.x}
-          y={rg.y}
-          width={rg.width}
-          height={rg.height}
-          rx={rg.radius}
-          fill-opacity={glidePhase === "bloom" ? 0.18 : 1}
-          style="fill: {hiColor}; stroke: {hiColor}; --glide-ms: {glideMs}ms"
-        />
-      {/if}
     </svg>
     <!-- fixed-px runway: reserves the specimen's covered width as scroll distance past the tree's
          right edge, unscaled by zoom (issue #32). flex:none so it never shrinks. -->
