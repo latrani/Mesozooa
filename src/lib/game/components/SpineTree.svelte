@@ -7,6 +7,8 @@
   import { warmthRampColor } from "../warmth-ramp";
   import { glyphCenter, ringGeom } from "../ring-glide";
   import type { GlidePhase, RingGeom, Point } from "../ring-glide";
+  import { layoutDiff, flipProgress, lerpPos } from "../relayout-flip";
+  import type { Pos, LayoutDiff } from "../relayout-flip";
   import { Tween } from "svelte/motion";
   import { untrack } from "svelte";
   import {
@@ -132,6 +134,55 @@
   let layout = $derived(layoutSpine(treeStore, revealed, tipId));
   let posOf = $derived(new Map(layout.nodes.map((n) => [n.id, n])));
 
+  // --- Relayout FLIP (issue #52 slice 2) ------------------------------------------------------
+  // `layout` is the TARGET; `displayed` is what actually renders, animating toward it on a shared
+  // clock with the ring puck. Master progress 0→1 over GLIDE_MS; per-class flipProgress staggers
+  // completion. Node <g> loop renders from `displayed`; edges/stubs/ring keep reading layout/posOf.
+  const flipProgressTween = new Tween(1, { duration: 0 }); // starts settled (no first-mount fly-in)
+  let flipFrom = $state<Map<string, Pos>>(new Map());       // positions snapshotted at last relayout
+  let flipDiff = $state<LayoutDiff>({ persisting: [], entering: [], leaving: [] });
+
+  const parentOf = (id: string) => treeStore.getNode(id)?.parentId ?? null;
+  // The layout's node id -> position map (the animation target).
+  let layoutPos = $derived(new Map<string, Pos>(layout.nodes.map((n) => [n.id, { x: n.x, y: n.y }])));
+
+  // What the node loop renders: {id, x, y, opacity}. Derived off the master progress so it
+  // recomputes each animation frame. Under reduced motion (or a settled progress of 1) it's just
+  // the layout at full opacity.
+  let displayed = $derived.by(() => {
+    const p = flipProgressTween.current;
+    const out: Array<{ id: string; x: number; y: number; opacity: number }> = [];
+    for (const n of flipDiff.persisting) {
+      const q = lerpPos(n.from, n.to, flipProgress(p, FLIP_FRACTION));
+      out.push({ id: n.id, x: q.x, y: q.y, opacity: 1 });
+    }
+    for (const n of flipDiff.entering) {
+      out.push({ id: n.id, x: n.to.x, y: n.to.y, opacity: flipProgress(p, ENTER_FRACTION) });
+    }
+    for (const n of flipDiff.leaving) {
+      const o = 1 - flipProgress(p, LEAVE_FRACTION);
+      if (o > 0) out.push({ id: n.id, x: n.lastPos.x, y: n.lastPos.y, opacity: o });
+    }
+    return out;
+  });
+
+  // On a relayout: snapshot current displayed positions as the FLIP's `from` (so an interrupted
+  // glide restarts from where nodes visually are), diff against the new layout, restart progress.
+  // Depends on `layout` ONLY; reads displayed/progress under untrack so it never self-triggers.
+  $effect(() => {
+    void layout; // the one tracked dependency
+    const nextPos = untrack(() => layoutPos);
+    const fromPos = untrack(() => new Map(displayed.map((d) => [d.id, { x: d.x, y: d.y }])));
+    flipFrom = fromPos;
+    flipDiff = layoutDiff(fromPos, nextPos, parentOf);
+    if (reduceMotion || fromPos.size === 0) {
+      flipProgressTween.set(1, { duration: 0 }); // instant: reduced motion or first-ever layout
+    } else {
+      flipProgressTween.set(0, { duration: 0 });
+      flipProgressTween.set(1, { duration: GLIDE_MS });
+    }
+  });
+
   // Per-node visual y for sibling ordering in the a11y tree (mirrors the SVG's layout).
   let yOf = $derived((id: string) => posOf.get(id)?.y ?? Infinity);
   let a11yRoots = $derived(a11yTree(treeStore, revealed, yOf));
@@ -160,6 +211,12 @@
   // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
   // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
   const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  // Relayout FLIP completion fractions of the GLIDE_MS envelope (shared clock, shared start).
+  // Staggered COMPLETION gives cause→effect: structure settles, branches appear, focus arrives.
+  // Values provisional (look-and-feel pass); the order LEAVE < FLIP < ENTER < puck(1.0) is fixed.
+  const FLIP_FRACTION = 0.6;   // persisting nodes finish sliding
+  const ENTER_FRACTION = 0.8;  // entering nodes finish fading in
+  const LEAVE_FRACTION = 0;    // leaving nodes finish disappearing (0 = instant; honest knob)
   // Puck look-and-feel knobs. PUCK_TRAVEL_OPACITY: overall opacity of the WHOLE puck (fill + border)
   // while traveling as a dot — set on element `opacity`, so the border fades with the fill (the dot's
   // fill is solid, tinted only by this). Bloom is always fully opaque with a 0.18 fill. PUCK_DOT_PAD:
@@ -654,13 +711,14 @@
           style="fill: {hiColor}; stroke: {hiColor}; --glide-ms: {glideMs}ms"
         />
       {/if}
-      {#each layout.nodes as n (n.id)}
-        {@const node = treeStore.getNode(n.id)}
-        {@const isHi = n.id === ringId}
+      {#each displayed as d (d.id)}
+        {@const n = posOf.get(d.id)}
+        {@const node = treeStore.getNode(d.id)}
+        {@const isHi = d.id === ringId}
         {@const isGenusNode = node?.isGenus ?? false}
         {@const glyphSize = isGenusNode ? GLYPH_GENUS : GLYPH_CLADE}
         {@const glyphDY = isGenusNode ? GLYPH_OFFSET_Y_GENUS : GLYPH_OFFSET_Y_CLADE}
-        {@const glyphFill = colorOf(n.id, n.onSpine, isGenusNode)}
+        {@const glyphFill = colorOf(d.id, n?.onSpine ?? false, isGenusNode)}
         <!-- The SVG is aria-hidden (decorative visual layer); the keyboard/AT path lives in
              the sibling <ul role="tree"> below. onclick here is a pure pointer convenience, so
              the missing key handler is intentional, not a gap. -->
@@ -668,15 +726,16 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <g
           class="node"
-          class:spine={n.onSpine}
+          class:spine={n?.onSpine}
           class:highlight={isHi}
           class:genus={node?.isGenus}
           class:playable={gradeByPlayable && node?.isGenus && node.playable}
           class:nonplayable={gradeByPlayable && node?.isGenus && !node.playable}
           class:clickable={!!onnodeselect}
           class:link={linkLabels && !!onnodeselect}
-          transform={`translate(${px(n.x)} ${py(n.y)})`}
-          onclick={() => onNodeClick(n.id)}
+          transform={`translate(${px(d.x)} ${py(d.y)})`}
+          opacity={d.opacity}
+          onclick={() => onNodeClick(d.id)}
         >
           <!-- page-color backing disc: sits just under the glyph and over the label, so it fills
                the glyph's cutouts AND masks the tucked ring corner — neither peeks through. -->
@@ -694,7 +753,7 @@
                width (name, on-spine font-size, count) so the ring re-measures when e.g. expanding a
                highlighted clade bumps it on-spine (bigger font → wider text). -->
           <text class="lbl" x={LABEL_OFFSET + RING_PAD_X} y={LABEL_BASELINE_DY}
-            use:measureLabel={isHi ? `${node?.name}|${n.onSpine}|${showCounts && !node?.isGenus ? node?.descendantGenusCount : ""}` : null}>
+            use:measureLabel={isHi ? `${node?.name}|${n?.onSpine}|${showCounts && !node?.isGenus ? node?.descendantGenusCount : ""}` : null}>
             {displayName(node?.name)}{#if showCounts && !node?.isGenus}<tspan class="count" dx="4">{node?.descendantGenusCount}</tspan>{/if}
           </text>
         </g>
