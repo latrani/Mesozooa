@@ -33,27 +33,23 @@ export function a11yTree(
     return path.length > 1 ? path[1] : null;
   };
 
+  // Siblings order by visual y ascending; equal y (or both missing from the layout) fall back
+  // to name. Comparing with < avoids the NaN that Infinity - Infinity would produce.
+  const cmp = (a: string, b: string): number => {
+    const ya = yOf(a);
+    const yb = yOf(b);
+    if (ya !== yb) return ya < yb ? -1 : 1;
+    return (store.getNode(a)?.name ?? "").localeCompare(store.getNode(b)?.name ?? "");
+  };
+
   const build = (id: string): A11yNode => {
     const node = store.getNode(id)!;
-    // Collect children with their store order index
-    const childrenWithIndex: Array<{ id: string; storeIdx: number }> = [];
-    store.children(id).forEach((child, idx) => {
-      if (revealed.has(child.id)) {
-        childrenWithIndex.push({ id: child.id, storeIdx: idx });
-      }
-    });
-    // Sort by y position. When y values are equal:
-    // - If both are Infinity (no layout info), preserve store order
-    // - Otherwise, use name as deterministic tiebreak
-    const cmp = (a: { id: string; storeIdx: number }, b: { id: string; storeIdx: number }): number => {
-      const yA = yOf(a.id);
-      const yB = yOf(b.id);
-      if (yA !== yB) return yA - yB;
-      // Both have equal y; tiebreak depends on whether they're missing from layout
-      if (yA === Infinity) return a.storeIdx - b.storeIdx; // preserve store order
-      return (store.getNode(a.id)?.name ?? "").localeCompare(store.getNode(b.id)?.name ?? ""); // alphabetical
-    };
-    const kids = childrenWithIndex.sort(cmp).map((c) => build(c.id));
+    const kids = store
+      .children(id)
+      .filter((c) => revealed.has(c.id))
+      .map((c) => c.id)
+      .sort(cmp)
+      .map(build);
     return {
       id,
       name: displayName(node.name),
@@ -73,12 +69,7 @@ export function a11yTree(
       return par === null || !revealed.has(par);
     });
 
-  // Sort roots by y position, with name as deterministic tiebreak
-  const cmpRoots = (a: string, b: string): number =>
-    (yOf(a) - yOf(b)) ||
-    (store.getNode(a)?.name ?? "").localeCompare(store.getNode(b)?.name ?? "");
-
-  return roots.sort(cmpRoots).map(build);
+  return roots.sort(cmp).map(build);
 }
 
 export function flattenVisible(roots: A11yNode[]): A11yNode[] {

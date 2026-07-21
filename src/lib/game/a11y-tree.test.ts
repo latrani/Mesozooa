@@ -23,7 +23,7 @@ describe("a11yTree", () => {
     expect(root.id).toBe("Q430");
     expect(ids(root.children)).toEqual(["T", "O"]); // T y=0 above O y=1
     const t = root.children[0];
-    expect(ids(t.children)).toEqual(["TF", "LO"]); // both genera/clades under Theropoda
+    expect(ids(t.children)).toEqual(["LO", "TF"]); // both missing from y-map -> name tiebreak
   });
 
   it("orders siblings by visual y ascending, name as tiebreak", () => {
@@ -58,6 +58,11 @@ describe("a11yTree", () => {
   it("returns empty when the root is not revealed", () => {
     expect(a11yTree(store, new Set(["TR"]), yMap({}))).toEqual([]);
     expect(a11yTree(store, new Set(), yMap({}))).toEqual([]);
+  });
+
+  it("returns empty for a rootless revealed fragment (mirrors layoutSpine's root gate)", () => {
+    // TF, TR revealed but the tree root (Q430) is not -> nothing renders, like the SVG.
+    expect(a11yTree(store, new Set(["TF", "TR"]), yMap({}))).toEqual([]);
   });
 });
 
