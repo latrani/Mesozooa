@@ -275,7 +275,9 @@
 
   function focusItem(id: string) {
     focusId = id;
-    liEls[id]?.focus();
+    // preventScroll: WE drive the visible scroll (scrollFocusIntoView); the browser's native
+    // focus-scroll would fight it by targeting the clipped sr-only element.
+    liEls[id]?.focus({ preventScroll: true });
   }
 
   function onTreeKey(e: KeyboardEvent) {
@@ -372,7 +374,7 @@
   $effect(() => {
     void a11yRoots; // re-run when the tree structure changes
     if (treeFocused && focusId && liEls[focusId] && document.activeElement !== liEls[focusId]) {
-      liEls[focusId].focus();
+      liEls[focusId].focus({ preventScroll: true });
     }
   });
 
@@ -552,12 +554,17 @@
     <!-- fixed-px runway: reserves the specimen's covered width as scroll distance past the tree's
          right edge, unscaled by zoom (issue #32). flex:none so it never shrinks. -->
     {#if runway}<div class="runway" style={`width:${runway}px`} aria-hidden="true"></div>{/if}
-    {#if a11yRoots.length}
-      <ul class="sr-tree" role="tree" aria-label="Dinosaur cladogram" onkeydown={onTreeKey}>
-        {#each a11yRoots as n (n.id)}{@render treeitem(n)}{/each}
-      </ul>
-    {/if}
   </div>
+  <!-- The accessibility tree lives OUTSIDE the scroller on purpose: focusing a treeitem must not
+       trigger the browser's native "scroll focused element into view", which would yank
+       .tree-scroll toward this clipped sr-only element (top-left) on every keystroke. Kept out of
+       the scroll container, all visible scrolling is driven solely by our scrollFocusIntoView /
+       scrollToNode. -->
+  {#if a11yRoots.length}
+    <ul class="sr-tree" role="tree" aria-label="Dinosaur cladogram" onkeydown={onTreeKey}>
+      {#each a11yRoots as n (n.id)}{@render treeitem(n)}{/each}
+    </ul>
+  {/if}
 {:else}
   <p class="tree-empty">{emptyLabel}</p>
 {/if}
