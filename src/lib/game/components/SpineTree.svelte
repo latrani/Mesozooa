@@ -142,8 +142,14 @@
   let flipDiff = $state<LayoutDiff>({ persisting: [], entering: [], leaving: [] });
 
   const parentOf = (id: string) => treeStore.getNode(id)?.parentId ?? null;
-  // The layout's node id -> position map (the animation target).
-  let layoutPos = $derived(new Map<string, Pos>(layout.nodes.map((n) => [n.id, { x: n.x, y: n.y }])));
+  // The layout's node id -> position map (the animation target), in PIXEL space (px/py applied).
+  // Pixels, not grid coords, because py() subtracts layout.minY — which SHIFTS when the tip changes
+  // (the spine re-anchors). Interpolating grid-y and re-applying the NEW py() each frame would render
+  // frame 0 as py_new(oldY): a spurious uniform vertical teleport (old y, new minY, no cancellation),
+  // then a glide back — the "jump up then back down". Folding px/py in at snapshot time keeps from/to
+  // in ONE consistent pixel frame (same fix as slice-1's coordinate-frame unification; the ring puck
+  // already lives in pixel space for the same reason).
+  let layoutPos = $derived(new Map<string, Pos>(layout.nodes.map((n) => [n.id, { x: px(n.x), y: py(n.y) }])));
 
   // What the node loop renders: {id, x, y, opacity}. Derived off the master progress so it
   // recomputes each animation frame. Under reduced motion (or a settled progress of 1) it's just
@@ -737,7 +743,7 @@
           class:nonplayable={gradeByPlayable && node?.isGenus && !node.playable}
           class:clickable={!!onnodeselect}
           class:link={linkLabels && !!onnodeselect}
-          transform={`translate(${px(d.x)} ${py(d.y)})`}
+          transform={`translate(${d.x} ${d.y})`}
           opacity={d.opacity}
           onclick={() => onNodeClick(d.id)}
         >
