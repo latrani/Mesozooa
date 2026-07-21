@@ -634,11 +634,11 @@
            glyphs/backplates/labels — so it sits behind every node's page-color backplate and glyph
            (SVG paint order = document order; no z-index). This restores the original per-node ring's
            stacking: on top of branch lines, tucked behind the glyph disc it frames. Shape (x/y/w/h/rx)
-           comes from the JS tween; paint (fill, stroke, fill-opacity) is left to CSS transitions (see
-           .label-ring): color glides node→node and the fill goes from a SOLID opaque disc in transit
-           (like the glyph discs) to the translucent tint on bloom, over --glide-ms — so paint animates
-           without JS color math. Fill is solid hiColor; fill-opacity carries the tint (1 = opaque dot,
-           0.18 = the bloomed box's translucency). -->
+           comes from the JS tween; paint (fill/stroke color + the two opacity levers) is left to CSS
+           transitions (see .label-ring), so color glides node→node with no JS color math. Two levers,
+           both over --glide-ms: element `opacity` fades the WHOLE puck (PUCK_TRAVEL_OPACITY while a
+           dot → 1 bloomed), and `fill-opacity` carries the fill tint (1 solid dot → 0.18 translucent
+           bloom, the label showing through). Fill/stroke are the solid highlight color. -->
       {#if ringId}
         {@const rg = ringTween.current}
         {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
