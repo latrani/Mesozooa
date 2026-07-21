@@ -535,7 +535,7 @@
     aria-expanded={n.isGenus ? undefined : n.children.length > 0 ? "true" : "false"}
     tabindex={n.id === currentId ? 0 : -1}
     bind:this={liEls[n.id]}
-    onfocusin={() => onItemFocus(n.id)}
+    onfocus={() => onItemFocus(n.id)}
     onblur={onItemBlur}
     onkeydown={onTreeKey}
   >
