@@ -77,3 +77,37 @@ describe("flattenVisible", () => {
     );
   });
 });
+
+import { buildNav, resolveKey } from "./a11y-tree";
+
+describe("buildNav + resolveKey", () => {
+  // Tree: Q430 -> [T -> [TF -> [TR, TB], LO], O -> [CF -> [TC]]]
+  const roots = a11yTree(
+    store,
+    FULL,
+    yMap({ T: 0, O: 1, TF: 0, LO: 1, TR: 0, TB: 1 }),
+  );
+  const nav = buildNav(roots);
+  const key = (cur: string, k: string) => resolveKey(nav, cur, k);
+
+  it("ArrowDown/Up walk the flattened order and stop at the ends", () => {
+    expect(nav.order).toEqual(["Q430", "T", "TF", "TR", "TB", "LO", "O", "CF", "TC"]);
+    expect(key("TF", "ArrowDown")).toBe("TR");
+    expect(key("TF", "ArrowUp")).toBe("T");
+    expect(key("Q430", "ArrowUp")).toBeNull(); // first item
+    expect(key("TC", "ArrowDown")).toBeNull(); // last item
+  });
+
+  it("ArrowRight goes to first child; ArrowLeft goes to parent", () => {
+    expect(key("T", "ArrowRight")).toBe("TF");
+    expect(key("TR", "ArrowRight")).toBeNull(); // genus leaf, no child
+    expect(key("TF", "ArrowLeft")).toBe("T");
+    expect(key("Q430", "ArrowLeft")).toBeNull(); // root, no parent
+  });
+
+  it("Home/End jump to the first/last visible item; unknown keys do nothing", () => {
+    expect(key("TC", "Home")).toBe("Q430");
+    expect(key("Q430", "End")).toBe("TC");
+    expect(key("T", "a")).toBeNull();
+  });
+});

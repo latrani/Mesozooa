@@ -81,3 +81,45 @@ export function flattenVisible(roots: A11yNode[]): A11yNode[] {
   roots.forEach(walk);
   return out;
 }
+
+export interface TreeNav {
+  order: string[];
+  parent: Record<string, string>;
+  firstChild: Record<string, string>;
+}
+
+export function buildNav(roots: A11yNode[]): TreeNav {
+  const order = flattenVisible(roots).map((n) => n.id);
+  const parent: Record<string, string> = {};
+  const firstChild: Record<string, string> = {};
+  const walk = (n: A11yNode) => {
+    if (n.children.length > 0) firstChild[n.id] = n.children[0].id;
+    for (const c of n.children) {
+      parent[c.id] = n.id;
+      walk(c);
+    }
+  };
+  roots.forEach(walk);
+  return { order, parent, firstChild };
+}
+
+export function resolveKey(nav: TreeNav, currentId: string, key: string): string | null {
+  const i = nav.order.indexOf(currentId);
+  if (i === -1) return null;
+  switch (key) {
+    case "ArrowDown":
+      return i + 1 < nav.order.length ? nav.order[i + 1] : null;
+    case "ArrowUp":
+      return i > 0 ? nav.order[i - 1] : null;
+    case "ArrowRight":
+      return nav.firstChild[currentId] ?? null;
+    case "ArrowLeft":
+      return nav.parent[currentId] ?? null;
+    case "Home":
+      return nav.order[0] ?? null;
+    case "End":
+      return nav.order[nav.order.length - 1] ?? null;
+    default:
+      return null;
+  }
+}
