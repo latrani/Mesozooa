@@ -1,6 +1,7 @@
 <script lang="ts">
   import { treeStore } from "../treeData";
   import { layoutSpine, centerOffsetFor } from "../spine-layout";
+  import { a11yTree, buildNav, resolveKey } from "../a11y-tree";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
   import { warmthRampColor } from "../warmth-ramp";
@@ -127,6 +128,26 @@
   let layout = $derived(layoutSpine(treeStore, revealed, tipId));
   let posOf = $derived(new Map(layout.nodes.map((n) => [n.id, n])));
 
+  // Per-node visual y for sibling ordering in the a11y tree (mirrors the SVG's layout).
+  let yOf = $derived((id: string) => posOf.get(id)?.y ?? Infinity);
+  let a11yRoots = $derived(a11yTree(treeStore, revealed, yOf));
+  // The single roving-tabindex target: keyboard cursor if set, else the committed highlight,
+  // else the tip, else the first item. Task 4 turns `focusId` into live keyboard state.
+  let focusId = $state<string | null>(null);
+  let currentId = $derived(
+    focusId ?? highlightId ?? tipId ?? a11yRoots[0]?.id ?? null,
+  );
+  let nav = $derived(buildNav(a11yRoots));
+  // Whether keyboard focus is currently inside the tree — gates the focus-follows ring so a
+  // mouse user's committed highlight isn't overridden by a stale keyboard cursor.
+  let treeFocused = $state(false);
+  // The li elements, so we can move DOM focus (roving tabindex) and restore it after an
+  // Explore re-center rebuilds the tree.
+  let liEls = $state<Record<string, HTMLLIElement>>({});
+  // The node the visible ring should mark: keyboard cursor while the tree is focused, else the
+  // committed highlight prop.
+  let ringId = $derived(treeFocused ? currentId : highlightId);
+
   // A revealed clade whose children are NOT in the layout is "collapsed" — mark it so we can
   // draw a short right-fading stub ("more here"). Genera never get a stub.
   let hasLaidOutChildren = $derived(new Set(layout.edges.map((e) => e.parentId)));
@@ -204,6 +225,76 @@
     scroller.scrollTo({ left, top, behavior: reduceMotion ? "auto" : "smooth" });
   }
 
+  // Keep-visible scroll for ARROW browsing: only pan (to the nearest edge) when the focused node
+  // strays near a viewport edge, instead of hard-centering every keystroke. Centering-on-every-
+  // press made the tree slide under a pinned ring; keep-visible lets the ring glide through a
+  // stable view and the viewport moves only at the boundaries. Commit paths (Enter / tip change)
+  // still center via scrollToNode — a deliberate "here's where you are" gesture. All coords are
+  // scaled by zoom so it's correct even when the user has pinch-zoomed.
+  const KEEP_VISIBLE_MARGIN_X = 140; // leave room past the node for its label
+  const KEEP_VISIBLE_MARGIN_Y = 60;
+  function scrollFocusIntoView(id: string) {
+    if (!scroller) return;
+    const n = posOf.get(id);
+    if (!n) return;
+    const nodeX = px(n.x) * zoom;
+    const nodeY = py(n.y) * zoom;
+    const viewW = scroller.clientWidth - rightInset; // the specimen overlay covers the right edge
+    const maxLeft = Math.max(0, contentWidth * zoom + runway - scroller.clientWidth);
+    const maxTop = Math.max(0, vbH * zoom - scroller.clientHeight);
+
+    let left = scroller.scrollLeft;
+    if (nodeX < left + KEEP_VISIBLE_MARGIN_X) left = nodeX - KEEP_VISIBLE_MARGIN_X;
+    else if (nodeX > left + viewW - KEEP_VISIBLE_MARGIN_X) left = nodeX - viewW + KEEP_VISIBLE_MARGIN_X;
+
+    let top = scroller.scrollTop;
+    if (nodeY < top + KEEP_VISIBLE_MARGIN_Y) top = nodeY - KEEP_VISIBLE_MARGIN_Y;
+    else if (nodeY > top + scroller.clientHeight - KEEP_VISIBLE_MARGIN_Y) top = nodeY - scroller.clientHeight + KEEP_VISIBLE_MARGIN_Y;
+
+    left = Math.min(Math.max(0, left), maxLeft);
+    top = Math.min(Math.max(0, top), maxTop);
+    if (left !== scroller.scrollLeft || top !== scroller.scrollTop) {
+      scroller.scrollTo({ left, top, behavior: reduceMotion ? "auto" : "smooth" });
+    }
+  }
+
+  // Focus entered a treeitem: lock the cursor to it and mirror it on the visible tree (ring +
+  // keep-visible scroll). Cheap — touches neither tipId nor highlightId, so no relayout in either
+  // mode. This is the "focus-follows" behavior.
+  function onItemFocus(id: string) {
+    treeFocused = true;
+    focusId = id;
+    if (posOf.has(id)) scrollFocusIntoView(id);
+  }
+
+  function onItemBlur(e: FocusEvent) {
+    // Only drop the ring when focus leaves the tree entirely (not on within-tree hops).
+    const next = e.relatedTarget as Node | null;
+    if (!next || !(next as Element).closest?.("[role='tree']")) treeFocused = false;
+  }
+
+  function focusItem(id: string) {
+    focusId = id;
+    // preventScroll: WE drive the visible scroll (scrollFocusIntoView); the browser's native
+    // focus-scroll would fight it by targeting the clipped sr-only element.
+    liEls[id]?.focus({ preventScroll: true });
+  }
+
+  function onTreeKey(e: KeyboardEvent) {
+    const cur = currentId;
+    if (!cur) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onnodeselect?.(cur); // identical to a mouse click (undefined during game play = no-op)
+      return;
+    }
+    const next = resolveKey(nav, cur, e.key);
+    if (next) {
+      e.preventDefault(); // stop arrow/Home/End from scrolling the page
+      focusItem(next);
+    }
+  }
+
   // Exposed for the trail scrubber (Plan 2).
   export function panTo(id: string) {
     if (zoom !== ZOOM_DEFAULT) {
@@ -277,6 +368,16 @@
     lastInset = rightInset;
   });
 
+  // Activating a node in Explore re-centers (rebuilds revealed -> the tree). Keep DOM focus on
+  // the current cursor across that rebuild so keyboard position survives. Guarded by treeFocused
+  // so we never steal focus from elsewhere on the page.
+  $effect(() => {
+    void a11yRoots; // re-run when the tree structure changes
+    if (treeFocused && focusId && liEls[focusId] && document.activeElement !== liEls[focusId]) {
+      liEls[focusId].focus({ preventScroll: true });
+    }
+  });
+
   // Pinch-to-zoom, split by browser engine — both feed the single applyZoom entry point.
   //
   // WebKit (Safari, Orion, iOS/iPadOS): hand-handle the native WebKit GestureEvents. They fire
@@ -348,8 +449,7 @@
       width={contentWidth * zoom}
       height={vbH * zoom}
       viewBox={`0 0 ${contentWidth} ${vbH}`}
-      role="img"
-      aria-label="Cladogram"
+      aria-hidden="true"
     >
       <!-- per-spine-segment gradients: blend from the parent dot color to the child dot color
            (userSpaceOnUse so x1/x2 sit at the two endpoint columns) -->
@@ -396,13 +496,16 @@
       {/each}
       {#each layout.nodes as n (n.id)}
         {@const node = treeStore.getNode(n.id)}
-        {@const isHi = n.id === highlightId}
+        {@const isHi = n.id === ringId}
         {@const isGenusNode = node?.isGenus ?? false}
         {@const glyphSize = isGenusNode ? GLYPH_GENUS : GLYPH_CLADE}
         {@const glyphDY = isGenusNode ? GLYPH_OFFSET_Y_GENUS : GLYPH_OFFSET_Y_CLADE}
         {@const glyphFill = colorOf(n.id, n.onSpine, isGenusNode)}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- The SVG is aria-hidden (decorative visual layer); the keyboard/AT path lives in
+             the sibling <ul role="tree"> below. onclick here is a pure pointer convenience, so
+             the missing key handler is intentional, not a gap. -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <g
           class="node"
           class:spine={n.onSpine}
@@ -452,9 +555,37 @@
          right edge, unscaled by zoom (issue #32). flex:none so it never shrinks. -->
     {#if runway}<div class="runway" style={`width:${runway}px`} aria-hidden="true"></div>{/if}
   </div>
+  <!-- The accessibility tree lives OUTSIDE the scroller on purpose: focusing a treeitem must not
+       trigger the browser's native "scroll focused element into view", which would yank
+       .tree-scroll toward this clipped sr-only element (top-left) on every keystroke. Kept out of
+       the scroll container, all visible scrolling is driven solely by our scrollFocusIntoView /
+       scrollToNode. -->
+  {#if a11yRoots.length}
+    <ul class="sr-tree" role="tree" aria-label="Dinosaur cladogram" onkeydown={onTreeKey}>
+      {#each a11yRoots as n (n.id)}{@render treeitem(n)}{/each}
+    </ul>
+  {/if}
 {:else}
   <p class="tree-empty">{emptyLabel}</p>
 {/if}
+{#snippet treeitem(n: import("../a11y-tree").A11yNode)}
+  <li
+    role="treeitem"
+    aria-selected={n.id === highlightId ? "true" : "false"}
+    aria-expanded={n.isGenus ? undefined : n.children.length > 0 ? "true" : "false"}
+    tabindex={n.id === currentId ? 0 : -1}
+    bind:this={liEls[n.id]}
+    onfocus={() => onItemFocus(n.id)}
+    onblur={onItemBlur}
+  >
+    <span>{n.name}{#if !n.isGenus}, {n.descendantGenusCount} {n.descendantGenusCount === 1 ? "genus" : "genera"}{/if}</span>
+    {#if n.children.length}
+      <ul role="group">
+        {#each n.children as c (c.id)}{@render treeitem(c)}{/each}
+      </ul>
+    {/if}
+  </li>
+{/snippet}
 {#if layout.nodes.length}
   <div class="zoom-controls btn-secondary" role="group" aria-label="Zoom">
     <button type="button" aria-label="Zoom out" onclick={() => zoomButton(-1)} disabled={zoom <= ZOOM_MIN}>&minus;</button>
@@ -541,5 +672,12 @@
     color: var(--ink-soft); font-size: var(--type-body); padding: var(--space-6);
     flex: 1 1 auto; width: 100%; min-height: 200px;
     display: flex; align-items: center;
+  }
+  /* Visually hidden but focusable + AT-reachable: the parallel semantic tree. It stays hidden
+     even on focus — the SVG's focus ring (Task 4) is the visible feedback, so this never needs
+     to appear. */
+  .sr-tree {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
 </style>
