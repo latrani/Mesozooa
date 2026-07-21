@@ -538,7 +538,7 @@
     onfocus={() => onItemFocus(n.id)}
     onblur={onItemBlur}
   >
-    <span>{n.name}{#if !n.isGenus}, {n.descendantGenusCount} genera{/if}</span>
+    <span>{n.name}{#if !n.isGenus}, {n.descendantGenusCount} {n.descendantGenusCount === 1 ? "genus" : "genera"}{/if}</span>
     {#if n.children.length}
       <ul role="group">
         {#each n.children as c (c.id)}{@render treeitem(c)}{/each}
