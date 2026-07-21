@@ -33,23 +33,29 @@ describe("ringGeom", () => {
   const labelBox = { x: 14, y: -20, width: 80, height: 16 };
   const RING_H = 28, RING_PAD_X = 14;
 
-  it("dot phase is a DOT_R circle centered on the glyph", () => {
+  it("dot phase is a DOT_R circle centered on the glyph (top-left = center - DOT_R)", () => {
     const g = ringGeom("dot", center, labelBox, RING_H, RING_PAD_X);
-    expect(g).toEqual({ cx: 100, cy: 200, width: DOT_R * 2, height: DOT_R * 2, radius: DOT_R });
+    expect(g).toEqual({
+      x: 100 - DOT_R,
+      y: 200 - DOT_R,
+      width: DOT_R * 2,
+      height: DOT_R * 2,
+      radius: DOT_R,
+    });
   });
 
   it("dot phase ignores a null labelBox (still a valid dot)", () => {
     const g = ringGeom("dot", center, null, RING_H, RING_PAD_X);
     expect(g.width).toBe(DOT_R * 2);
-    expect(g.cx).toBe(100);
+    expect(g.x).toBe(100 - DOT_R);
   });
 
   it("bloom phase expands to the label-ring box in SVG space", () => {
     const g = ringGeom("bloom", center, labelBox, RING_H, RING_PAD_X);
     // x = center.x + labelBox.x - padX; y = center.y - RING_H
     expect(g).toEqual({
-      cx: 100 + 14 - 14,     // 100
-      cy: 200 - 28,          // 172
+      x: 100 + 14 - 14,      // 100
+      y: 200 - 28,           // 172
       width: 80 + 2 * 14,    // 108
       height: 28,
       radius: 6,
@@ -59,5 +65,6 @@ describe("ringGeom", () => {
   it("bloom with a null labelBox falls back to a dot (nothing to hug yet)", () => {
     const g = ringGeom("bloom", center, null, RING_H, RING_PAD_X);
     expect(g.width).toBe(DOT_R * 2);
+    expect(g.x).toBe(100 - DOT_R);
   });
 });

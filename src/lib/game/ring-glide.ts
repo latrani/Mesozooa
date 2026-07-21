@@ -31,7 +31,9 @@ export type GlidePhase = "dot" | "bloom";
 // discs without covering them.
 export const DOT_R = 5;
 
-export interface RingGeom { cx: number; cy: number; width: number; height: number; radius: number }
+// x/y are the rect's TOP-LEFT corner — one consistent coordinate frame across both phases, so
+// the tween interpolates a single frame and there's no discontinuity at a phase boundary.
+export interface RingGeom { x: number; y: number; width: number; height: number; radius: number }
 
 // The rendered ring's geometry for a phase. One element morphs between these: a DOT_R circle
 // on the glyph center (dot / in-transit) and the full label-hugging box (bloom / settled).
@@ -44,11 +46,18 @@ export function ringGeom(
   ringPadX: number,
 ): RingGeom {
   if (phase === "dot" || !labelBox) {
-    return { cx: center.x, cy: center.y, width: DOT_R * 2, height: DOT_R * 2, radius: DOT_R };
+    // DOT_R circle centered on the glyph → top-left is center minus the radius on both axes.
+    return {
+      x: center.x - DOT_R,
+      y: center.y - DOT_R,
+      width: DOT_R * 2,
+      height: DOT_R * 2,
+      radius: DOT_R,
+    };
   }
   return {
-    cx: center.x + labelBox.x - ringPadX,
-    cy: center.y - ringH,
+    x: center.x + labelBox.x - ringPadX,
+    y: center.y - ringH,
     width: labelBox.width + 2 * ringPadX,
     height: ringH,
     radius: 6,

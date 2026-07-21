@@ -171,7 +171,7 @@
   let firstPlace = true;
 
   const ringTween = new Tween<RingGeom>(
-    { cx: 0, cy: 0, width: DOT_R * 2, height: DOT_R * 2, radius: DOT_R },
+    { x: 0, y: 0, width: DOT_R * 2, height: DOT_R * 2, radius: DOT_R },
     { duration: 0 },
   );
 
@@ -632,8 +632,8 @@
         {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
         <rect
           class="label-ring"
-          x={rg.cx - (glidePhase === "dot" ? rg.width / 2 : 0)}
-          y={rg.cy}
+          x={rg.x}
+          y={rg.y}
           width={rg.width}
           height={rg.height}
           rx={rg.radius}
