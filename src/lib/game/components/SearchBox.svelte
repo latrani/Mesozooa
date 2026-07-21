@@ -7,7 +7,13 @@
     entries,
     onpick,
     placeholder = "Search…",
-  }: { entries: SearchEntry[]; onpick: (id: string) => void; placeholder?: string } = $props();
+    ariaLabel = "Search dinosaurs",
+  }: {
+    entries: SearchEntry[];
+    onpick: (id: string) => void;
+    placeholder?: string;
+    ariaLabel?: string;
+  } = $props();
 
   let search = $derived(createSearch(entries));
   let query = $state("");
@@ -20,7 +26,7 @@
 </script>
 
 <div class="searchbox">
-  <input {placeholder} bind:value={query} autocomplete="off" />
+  <input {placeholder} aria-label={ariaLabel} bind:value={query} autocomplete="off" />
   {#if results.length}
     <div class="menu">
       <ul use:scrollFade={results}>
