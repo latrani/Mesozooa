@@ -7,7 +7,7 @@
   import { warmthRampColor } from "../warmth-ramp";
   import { glyphCenter, ringGeom } from "../ring-glide";
   import type { GlidePhase, RingGeom, Point } from "../ring-glide";
-  import { layoutDiff, flipProgress, lerpPos } from "../relayout-flip";
+  import { layoutDiff, flipProgress, lerpPos, lerp } from "../relayout-flip";
   import type { Pos, LayoutDiff } from "../relayout-flip";
   import { Tween } from "svelte/motion";
   import { untrack } from "svelte";
@@ -140,6 +140,13 @@
   // completion. Node <g> loop renders from `displayed`; edges/stubs/ring keep reading layout/posOf.
   const flipProgressTween = new Tween(1, { duration: 0 }); // starts settled (no first-mount fly-in)
   let flipDiff = $state<LayoutDiff>({ persisting: [], entering: [], leaving: [] });
+  // Re-center scroll, animated on the SAME master clock as the FLIP (spec: "Scroll must ride the
+  // shared clock"). Snapshotted on relayout; the driver below lerps scrollLeft/Top start→target by
+  // the same flipProgress(_, FLIP_FRACTION) curve the persisting nodes use — so the tip node (which
+  // IS a persisting node) stays visually put while the tree reflows around it. null = don't animate
+  // scroll (zoomed, or the target couldn't be computed) → the tip-change effect handles it natively.
+  let scrollFrom: { left: number; top: number } | null = null;
+  let scrollTargetPx: { left: number; top: number } | null = null;
 
   const parentOf = (id: string) => treeStore.getNode(id)?.parentId ?? null;
   // The layout's node id -> position map (the animation target), in PIXEL space (px/py applied).
@@ -185,12 +192,38 @@
     // continuous. Invisible at the shipped LEAVE_FRACTION=0 + transient; see #57 for the fade-continuity fix.
     const fromPos = untrack(() => new Map(displayed.map((d) => [d.id, { x: d.x, y: d.y }])));
     flipDiff = layoutDiff(fromPos, nextPos, parentOf);
+
+    // Snapshot the re-center scroll so it can animate on this same clock. Only when at default zoom
+    // (the common case) and not first-mount: zoomed re-centers still go through resetZoom's native
+    // path (untouched), and first paint shouldn't fly-scroll. tipId is read untracked — its change
+    // is what triggered this layout, so it's already fresh.
+    const tip = untrack(() => tipId);
+    const atDefaultZoom = untrack(() => zoom) === ZOOM_DEFAULT;
+    if (!reduceMotion && fromPos.size > 0 && atDefaultZoom && scroller && tip) {
+      scrollFrom = { left: scroller.scrollLeft, top: scroller.scrollTop };
+      scrollTargetPx = untrack(() => scrollTargetFor(tip));
+    } else {
+      scrollFrom = null;
+      scrollTargetPx = null; // let the tip-change effect scroll natively (or instant)
+    }
+
     if (reduceMotion || fromPos.size === 0) {
       flipProgressTween.set(1, { duration: 0 }); // instant: reduced motion or first-ever layout
     } else {
       flipProgressTween.set(0, { duration: 0 });
       flipProgressTween.set(1, { duration: GLIDE_MS });
     }
+  });
+
+  // Scroll driver: while a shared-clock re-center is active, lerp the scroll offset start→target
+  // by the persisting-node curve, so scroll and the tip node move as one. Reads the tween (per
+  // frame) + the snapshot; writes only the scroller — no reactive state, so no loop.
+  $effect(() => {
+    const p = flipProgressTween.current;
+    if (!scroller || !scrollFrom || !scrollTargetPx) return;
+    const t = flipProgress(p, FLIP_FRACTION);
+    scroller.scrollLeft = lerp(scrollFrom.left, scrollTargetPx.left, t);
+    scroller.scrollTop = lerp(scrollFrom.top, scrollTargetPx.top, t);
   });
 
   // Per-node visual y for sibling ordering in the a11y tree (mirrors the SVG's layout).
@@ -376,10 +409,12 @@
   const reduceMotion =
     typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  function scrollToNode(id: string) {
-    if (!scroller) return;
+  // The scroll offset that centers node `id` (at zoom = default). Extracted so the relayout
+  // re-center can animate to it on the shared FLIP clock instead of a competing native scroll.
+  function scrollTargetFor(id: string): { left: number; top: number } | null {
+    if (!scroller) return null;
     const n = posOf.get(id);
-    if (!n) return;
+    if (!n) return null;
     const left = centerOffsetFor(n.depth, {
       xGap: X_GAP,
       pad: STEM + PAD, // node x-origin includes the left stem offset
@@ -392,7 +427,13 @@
     const rawTop = py(n.y) - scroller.clientHeight / 2;
     const maxTop = Math.max(0, vbH - scroller.clientHeight);
     const top = Math.min(Math.max(0, rawTop), maxTop);
-    scroller.scrollTo({ left, top, behavior: reduceMotion ? "auto" : "smooth" });
+    return { left, top };
+  }
+
+  function scrollToNode(id: string) {
+    const t = scrollTargetFor(id);
+    if (!t || !scroller) return;
+    scroller.scrollTo({ left: t.left, top: t.top, behavior: reduceMotion ? "auto" : "smooth" });
   }
 
   // Keep-visible scroll for ARROW browsing: only pan (to the nearest edge) when the focused node
@@ -553,7 +594,11 @@
     void scrollWidth; // re-run when the scrollable width changes too
     if (scroller && tipId && d >= 0) {
       if (tipId !== lastTipId) {
-        resetZoom(); // navigation -> back to the default view, which re-centers on the new tip
+        // If the FLIP's scroll driver is handling this re-center (shared-clock animation, set in the
+        // relayout effect above), don't ALSO fire the native scroll — that's the race we removed.
+        // Still reset zoom to default; just skip the competing scrollToNode.
+        if (scrollTargetPx) zoom = ZOOM_DEFAULT;
+        else resetZoom(); // zoomed / non-animated path: native re-center as before
       } else if (rightInset !== lastInset) {
         scrollToNode(tipId);
       }
