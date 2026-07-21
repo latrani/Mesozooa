@@ -119,6 +119,24 @@ if a slower commit is ever wanted; carrying dead two-speed machinery is not wort
 `GLIDE_MS` is a named constant at the top of the component, still tunable in the look-and-feel
 pass.
 
+## Click moves focus into the tree
+
+A pointer click on a node **selects it and moves keyboard focus onto that treeitem**, so the
+user can immediately continue with arrow keys — no separate Tab-into-the-tree step. This is the
+canonical ARIA tree-view behavior (a clicked `treeitem` takes focus under roving tabindex), not
+a focus-steal: focus lands on exactly the element the user clicked, so WCAG 3.2.1 (On Focus)
+doesn't apply.
+
+Scoped and safe by construction:
+- Guarded on `onnodeselect` — a no-op in the game (SVG node clicks do nothing there); only
+  Explore, where clicking *is* navigation, grabs focus.
+- Mouse-only users see no change: the visible ring already tracks the focused node
+  (`treeFocused ? currentId : highlightId`), and post-click both point at the clicked node.
+- The Explore re-center rebuilds the sr-tree `<li>`s; the existing focus-restore `$effect`
+  (added for keyboard-nav-triggers-relayout) re-focuses the rebuilt item, so focus survives.
+
+Implemented as `onNodeClick(id)`: call `onnodeselect(id)`, then `focusItem(id)`.
+
 ## Reduced motion
 
 `prefers-reduced-motion: reduce` → **no puck animation at all**. The ring places instantly at

@@ -159,7 +159,7 @@
   // natively (resolving var()/color-mix, no JS color math), and the transition-duration is fed the
   // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
   // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
-  const GLIDE_MS = 900; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  const GLIDE_MS = 400; // one speed for every move (playtest: snappy feels good on click too). Tunable.
   let glidePhase = $state<GlidePhase>("bloom");
   // Duration (ms) for BOTH the shape tween's next retarget and the CSS paint transition. The phase
   // machine sets it: 0 for instant placements (reduced-motion, first mount, relayout-follow), else
@@ -369,6 +369,18 @@
     // preventScroll: WE drive the visible scroll (scrollFocusIntoView); the browser's native
     // focus-scroll would fight it by targeting the clipped sr-only element.
     liEls[id]?.focus({ preventScroll: true });
+  }
+
+  // A pointer click on a node: select it, then move keyboard focus INTO the tree so the user can
+  // keep navigating with arrows (the ARIA tree pattern — a clicked treeitem takes focus). Guarded
+  // on onnodeselect so it's a no-op in the game (where SVG clicks do nothing); only Explore, where
+  // clicking IS navigation, grabs focus. The click may relayout (Explore re-center) and rebuild the
+  // <li>s; focusItem sets focusId + treeFocused (via onItemFocus), and the focus-restore effect
+  // re-focuses the rebuilt item, so keyboard position survives the rebuild.
+  function onNodeClick(id: string) {
+    if (!onnodeselect) return;
+    onnodeselect(id);
+    focusItem(id);
   }
 
   function onTreeKey(e: KeyboardEvent) {
@@ -607,7 +619,7 @@
           class:clickable={!!onnodeselect}
           class:link={linkLabels && !!onnodeselect}
           transform={`translate(${px(n.x)} ${py(n.y)})`}
-          onclick={() => onnodeselect?.(n.id)}
+          onclick={() => onNodeClick(n.id)}
         >
           {#if isExpandable(n.id)}
             <line x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
