@@ -468,3 +468,181 @@ git commit -m "fix: ring-glide visual adjustments from gallery pass (#52)"
 **Type consistency:** `RingGeom`/`GlidePhase`/`GlideTrigger`/`Point` defined in Tasks 1–2, consumed with matching names in Task 3. `glideDuration`/`glyphCenter`/`ringGeom`/`DOT_R` signatures match between definition and use. ✓
 
 **Not closing #52** — slice 1 of 2; messages reference `#52` but don't close it. ✓
+
+---
+
+## Task 5: Rework — split phase from position (fixes the relayout race)
+
+**Added 2026-07-21 after Task 4 verification.** Live testing found the ring collapses to a dot
+and never blooms after any interaction that relayouts the tree (every Explore click; confirmed
+via Playwright: ring stuck at `DOT_R` >1s while its label measured 105px). Root cause: the
+drive `$effect` depends on both `ringId` AND `posOf` (a `$derived` of `layoutSpine`), so a
+relayout — which fires 2–3× per Explore click as `highlightId`/`tipId`/`revealed` all change —
+re-runs the effect, resets `glidePhase="dot"`, and clears the settle timer before it fires. See
+the revised spec's *Motion architecture* section.
+
+This task rewrites ONLY the effect/derived wiring added in Task 3. The three pure helpers
+(Tasks 1–2) and the persistent `<rect>` render block are unchanged except as noted.
+
+**Files:**
+- Modify: `src/lib/game/components/SpineTree.svelte`
+
+**Interfaces:** unchanged — still consumes `glideDuration`, `glyphCenter`, `ringGeom`, `DOT_R`,
+`GlideTrigger`, `GlidePhase`, `RingGeom`, `Point`. Adds `untrack` from `svelte`.
+
+**Architecture:**
+- **Phase machine** — one effect keyed to `ringId` ONLY. Reads the node center under `untrack`
+  so layout churn can't re-trigger it. Owns `glidePhase` + `settleTimer` + `firstPlace`.
+- **Geometry `$derived`** — `ringTarget = ringGeom(glidePhase, center(ringId), labelBox, …)`,
+  recomputed on `glidePhase` / ringed-node coords / `labelBox`.
+- **Tween driver** — a tiny effect that pushes `ringTarget` into the tween. Duration comes from
+  a `$state` `glideMs` the phase machine sets (0 for instant placements, else the trigger's
+  duration). This effect is the ONLY caller of `ringTween.set`, so there's a single writer.
+
+Splitting the writer this way is what lets the ring follow a relayout at its current phase: when
+`posOf` changes, `ringTarget` recomputes and the driver retargets the tween WITHOUT the phase
+machine running, so a bloomed ring stays bloomed and repositions.
+
+- [ ] **Step 1: Add the `untrack` import**
+
+In the `import ... from "svelte"` area near the top of `<script>` (there isn't one yet for
+`svelte` core — add it beside the `svelte/motion` import from Task 3):
+
+```ts
+  import { untrack } from "svelte";
+```
+
+- [ ] **Step 2: Replace the tween-state block (the `let glidePhase … ringCenter` region, currently ~lines 159–177)**
+
+Replace from `let glidePhase = $state<GlidePhase>("bloom");` through the end of the `ringCenter`
+function with:
+
+```ts
+  let glidePhase = $state<GlidePhase>("bloom");
+  // Duration (ms) the tween driver uses for the NEXT retarget. The phase machine sets it: 0 for
+  // instant placements (reduced-motion, first mount, and relayout-follow), else the trigger's
+  // glide duration. A $state so the driver effect re-runs when it changes.
+  let glideMs = $state(0);
+  // The move that caused the next FOCUS change. Keyboard hops set this in focusItem; anything
+  // else (a highlightId commit / click) is a "commit". Read + reset by the phase machine.
+  let nextTrigger: GlideTrigger = "commit";
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  // First ring placement is instant: the tween starts at (0,0), so the first skate would fly the
+  // dot in from the SVG's top-left corner. Cleared after the first real placement.
+  let firstPlace = true;
+
+  const ringTween = new Tween<RingGeom>(
+    { cx: 0, cy: 0, width: DOT_R * 2, height: DOT_R * 2, radius: DOT_R },
+    { duration: 0 },
+  );
+
+  function ringCenter(id: string): Point | null {
+    const n = posOf.get(id);
+    return n ? glyphCenter(n, px, py) : null;
+  }
+
+  // Geometry the ring should be at, DERIVED from phase + the ringed node's live coords + labelBox.
+  // Because it reads posOf (via ringCenter), it recomputes when a relayout moves the node — so the
+  // tween driver below repositions the ring at its CURRENT phase, without the phase machine (which
+  // ignores layout) re-running. This is the split that fixes the relayout race and is slice 2's hook.
+  let ringTarget = $derived.by<RingGeom | null>(() => {
+    if (!ringId) return null;
+    const c = ringCenter(ringId);
+    return c ? ringGeom(glidePhase, c, labelBox, RING_H, RING_PAD_X) : null;
+  });
+```
+
+- [ ] **Step 3: Replace BOTH `$effect` blocks (the drive effect + the re-hug effect, currently ~lines 179–225) with the phase machine + tween driver**
+
+```ts
+  // PHASE MACHINE — reacts to a genuine FOCUS change only (keyed to ringId). Reads coords under
+  // untrack so a relayout (posOf change) never re-triggers it. Sole owner of glidePhase, glideMs,
+  // settleTimer, firstPlace.
+  $effect(() => {
+    const id = ringId; // the ONLY tracked dependency
+    if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+    if (!id) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+
+    // Read the center without subscribing to layout — layout changes are the position derived's job.
+    const hasCenter = untrack(() => ringCenter(id) !== null);
+    if (!hasCenter) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+
+    const trigger = nextTrigger;
+    nextTrigger = "commit"; // consume; keyboard hops re-arm it in focusItem
+
+    // Instant placement: reduced-motion or the very first mount → bloom at rest, no skate/settle.
+    if (reduceMotion || firstPlace) {
+      firstPlace = false;
+      glideMs = 0;
+      glidePhase = "bloom";
+      return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+    }
+
+    // Normal move: collapse to a dot and skate (the driver tweens the position derived), then
+    // bloom on settle if no new focus change arrives within one glide.
+    const ms = glideDuration(trigger);
+    glideMs = ms;
+    glidePhase = "dot";
+    settleTimer = setTimeout(() => {
+      glideMs = ms;
+      glidePhase = "bloom";
+    }, ms);
+    return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+  });
+
+  // TWEEN DRIVER — the ONLY caller of ringTween.set. Retargets whenever the position derived or the
+  // duration changes. A relayout moves ringTarget → the ring follows at its current phase. glideMs is
+  // set to 0 by the phase machine's instant paths and for relayout-follow (a phase-less target change
+  // keeps the last glideMs, which is fine — a settled ring's glideMs is the bloom duration, a short
+  // reposition; if that ever feels wrong it's a look-and-feel knob, not a correctness issue).
+  $effect(() => {
+    const target = ringTarget;
+    if (!target) return;
+    ringTween.set(target, { duration: glideMs });
+  });
+```
+
+Note the deleted re-hug effect: `ringTarget` already depends on `labelBox`, so a late label
+measurement recomputes the target and the driver retargets — the separate re-hug effect is
+subsumed.
+
+- [ ] **Step 4: Confirm the render binding still reads the tween (no change expected)**
+
+The persistent `<rect>` from Task 3 Step 5 reads `ringTween.current` and `glidePhase` — both
+still exist. Verify it's unchanged and still present after the `{#each layout.nodes}` block.
+
+- [ ] **Step 5: Run the full gate**
+
+Run:
+```bash
+npx vitest run
+npx tsc --noEmit
+npx svelte-check --threshold error
+```
+Expected: all green (318 tests; 0 type/svelte errors).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/lib/game/components/SpineTree.svelte
+git commit -m "fix(ring-glide): split phase from position so the ring follows relayout (#52)"
+```
+
+- [ ] **Step 7: Re-verify live (the original failing repro)**
+
+With `npm run dev` running, in Explore: click a node that re-centers the tree (e.g. Ornithischia
+from the Dinosauria root). Confirm the ring ends **bloomed** (hugging the label), not stuck as a
+dot. Then arrow-navigate and confirm collapse→skate→bloom still works, and holding an arrow
+still skates-without-blooming until you stop. Reduced-motion still instant.
+
+### Task 5 Self-Review
+
+- Root cause (dual dependency on ringId + posOf) → fixed by keying the phase machine to `ringId`
+  only + `untrack` on the center read (Step 3). ✓
+- Ring follows relayout at current phase → geometry `$derived` + single tween driver (Steps 2–3). ✓
+- Single writer to the tween (no multi-writer race) → only the driver effect calls `.set` (Step 3). ✓
+- Settle-only bloom, trigger speeds, reduced-motion, first-mount instant → all preserved in the
+  phase machine (Step 3). ✓
+- Timer teardown cleanup retained on every exit path → Step 3. ✓
+- No placeholder; full code shown. ✓
+- `untrack` imported from `svelte` (Step 1); types unchanged. ✓
