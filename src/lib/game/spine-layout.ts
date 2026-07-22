@@ -192,6 +192,28 @@ export function layoutSpine(
   return { nodes, edges, width, minY, maxY };
 }
 
+// The square-cladogram elbow path from parent pixel-point `p` to child pixel-point `c`: a vertical
+// riser at the parent's x, a rounded quadratic corner, then a horizontal arm to the child. A
+// same-row child (dy===0) has no riser, so it draws the straight arm. Ported verbatim from the
+// inline `edgePath` in SpineTree.svelte, taking resolved pixel points instead of ids+px/py.
+export function edgePathBetween(
+  p: { x: number; y: number },
+  c: { x: number; y: number },
+  cornerRadius: number,
+): string {
+  const x0 = p.x, y0 = p.y;
+  const cx = p.x, cy = c.y; // the elbow corner
+  const x1 = c.x;
+  const dy = cy - y0; // riser direction: +down / -up (0 when child shares the parent's row)
+  // A same-row child has no riser, so no corner to round — draw the straight arm.
+  if (dy === 0) return `M ${x0} ${y0} H ${x1}`;
+  // Round the elbow with a quadratic whose control point is the sharp corner; clamp the radius
+  // to half of each leg so short segments don't over-round or overshoot.
+  const dirY = Math.sign(dy);
+  const r = Math.min(cornerRadius, Math.abs(dy) / 2, (x1 - cx) / 2);
+  return `M ${x0} ${y0} V ${cy - r * dirY} Q ${cx} ${cy} ${cx + r} ${cy} H ${x1}`;
+}
+
 export interface ViewMetrics {
   xGap: number;
   pad: number;

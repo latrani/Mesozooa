@@ -1,6 +1,6 @@
 <script lang="ts">
   import { treeStore } from "../treeData";
-  import { layoutSpine, centerOffsetFor } from "../spine-layout";
+  import { layoutSpine, centerOffsetFor, edgePathBetween } from "../spine-layout";
   import { a11yTree, buildNav, resolveKey } from "../a11y-tree";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
@@ -181,6 +181,12 @@
     return out;
   });
 
+  // id -> the ANIMATED render position ({x,y,opacity} in PIXEL space) for this frame. Edges,
+  // spine gradients, the root stem, and collapsed-clade stubs read this instead of the final
+  // layout (posOf + px/py) so they track gliding nodes during a relayout rather than snapping.
+  // CAUTION: these values are ALREADY pixels — use d.x/d.y directly, never wrap in px()/py().
+  let displayedPos = $derived(new Map(displayed.map((d) => [d.id, d])));
+
   // On a relayout: snapshot current displayed positions as the FLIP's `from` (so an interrupted
   // glide restarts from where nodes visually are), diff against the new layout, restart progress.
   // Depends on `layout` ONLY; reads displayed/progress under untrack so it never self-triggers.
@@ -264,7 +270,16 @@
   // px added to the dot's RADIUS beyond the glyph edge, so the dot can sit proud of the disc it frames.
   const PUCK_TRAVEL_OPACITY = 0.5;
   const PUCK_DOT_PAD = 2;
+  // Ring transition style. true = the "puck": box collapses to a glyph-sized dot, skates, re-blooms.
+  // false = the ring stays a label box and simply glides label→label, tweening position + size
+  // (old label's box → new label's box) + color, no dot phase. Position rides the shared clock in
+  // BOTH modes, so neither wheels during a relayout. Kept as a toggle: the FLIP is now tight enough
+  // that the puck flourish is optional, but it's still nice and may be useful elsewhere.
+  const PUCK_TRANSITION = false;
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  // In no-puck mode, the box interpolates from the PREVIOUS label's measured box to the new one, so
+  // we snapshot the old box at each transition (labelBox re-measures to the new label ~1 frame later).
+  let labelBoxFrom = $state<{ x: number; y: number; width: number; height: number } | null>(null);
   // First ring placement is instant: the tween starts at (0,0), so the first skate would fly the
   // ring in from the SVG's top-left corner. Cleared after the first real placement.
   let firstPlace = true;
@@ -323,6 +338,9 @@
     // `to`, so ringCenterNow still reflects the old target (interrupt-safe). Then point `to` at the
     // newly-focused node.
     const glideFrom = untrack(() => ringCenterNow);
+    // Snapshot the outgoing label's box so no-puck mode can tween old-box → new-box (labelBox itself
+    // re-measures to the incoming label a frame later).
+    labelBoxFrom = untrack(() => labelBox);
     ringCenterTo = newCenter;
 
     // Instant placement: reduced-motion or the very first mount → bloomed at rest, no skate/settle.
@@ -335,17 +353,23 @@
     }
 
     // Normal move: restart the position glide (same 0→1/GLIDE_MS as the node+scroll clock → lockstep,
-    // no wheel), morph to a dot as it travels, then bloom on settle if no new move interrupts.
+    // no wheel). Position glides in BOTH modes; the modes differ only in SIZE.
     // INVARIANT (no-wheel): ringProgress and flipProgressTween MUST be restarted with identical
     // (0→1, GLIDE_MS) params within one effect flush, so they share a frame-start on Svelte's raf
     // clock. A refactor that splits their triggers or changes one duration reintroduces the wheel.
     ringCenterFrom = glideFrom;
-    morphTween.set(0, { duration: GLIDE_MS });     // collapse to dot as it travels
     ringProgress.set(0, { duration: 0 });
     ringProgress.set(1, { duration: GLIDE_MS });
-    settleTimer = setTimeout(() => {
-      morphTween.set(1, { duration: GLIDE_MS });   // bloom at the destination
-    }, GLIDE_MS);
+    if (PUCK_TRANSITION) {
+      // Puck: collapse to a dot as it travels, then bloom on settle if no new move interrupts.
+      morphTween.set(0, { duration: GLIDE_MS });
+      settleTimer = setTimeout(() => {
+        morphTween.set(1, { duration: GLIDE_MS });   // bloom at the destination
+      }, GLIDE_MS);
+    } else {
+      // No-puck: stay a bloomed box the whole way (size tween is old-box → new-box, handled in render).
+      morphTween.set(1, { duration: 0 });
+    }
     return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
   });
 
@@ -410,22 +434,16 @@
     return { update: measure };
   }
 
-  function edgePath(parentId: string, childId: string): string {
-    const p = posOf.get(parentId)!;
-    const c = posOf.get(childId)!;
-    // Square cladogram: diverge at the ANCESTOR marker — vertical riser at the parent's x,
-    // then horizontal to the child. Keeps branches off the spine (they leave perpendicular).
-    const x0 = px(p.x), y0 = py(p.y);
-    const cx = px(p.x), cy = py(c.y); // the elbow corner
-    const x1 = px(c.x);
-    const dy = cy - y0; // riser direction: +down / -up (0 when child shares the parent's row)
-    // A same-row child has no riser, so no corner to round — draw the straight arm.
-    if (dy === 0) return `M ${x0} ${y0} H ${x1}`;
-    // Round the elbow with a quadratic whose control point is the sharp corner; clamp the radius
-    // to half of each leg so short segments don't over-round or overshoot.
-    const dirY = Math.sign(dy);
-    const r = Math.min(CORNER_RADIUS, Math.abs(dy) / 2, (x1 - cx) / 2);
-    return `M ${x0} ${y0} V ${cy - r * dirY} Q ${cx} ${cy} ${cx + r} ${cy} H ${x1}`;
+  // Edge path through the ANIMATED node positions: look both endpoints up in displayedPos (already
+  // pixels — do NOT apply px/py) and delegate the square-cladogram elbow geometry to the pure
+  // edgePathBetween (spine-layout). Returns "" if either endpoint is missing (defensive; skip
+  // rather than throw). An entering child whose parent is persisting will have one static end
+  // until the child fades in — that's expected, not a bug.
+  function edgePathAnim(parentId: string, childId: string): string {
+    const p = displayedPos.get(parentId);
+    const c = displayedPos.get(childId);
+    if (!p || !c) return "";
+    return edgePathBetween(p, c, CORNER_RADIUS);
   }
 
   // Prefers-reduced-motion => instant; otherwise the browser eases to a stop.
@@ -740,11 +758,11 @@
         </linearGradient>
         {#each layout.edges as e (e.parentId + ">" + e.childId)}
           {#if e.onSpine}
-            {@const p = posOf.get(e.parentId)}
-            {@const c = posOf.get(e.childId)}
+            {@const p = displayedPos.get(e.parentId)}
+            {@const c = displayedPos.get(e.childId)}
             {#if p && c}
               <linearGradient id={gradId(e.parentId, e.childId)} gradientUnits="userSpaceOnUse"
-                x1={px(p.x)} y1="0" x2={px(c.x)} y2="0">
+                x1={p.x} y1="0" x2={c.x} y2="0">
                 <stop offset="0" style="stop-color: {colorOf(e.parentId, true, treeStore.getNode(e.parentId)?.isGenus ?? false)}" />
                 <stop offset="1" style="stop-color: {colorOf(e.childId, true, treeStore.getNode(e.childId)?.isGenus ?? false)}" />
               </linearGradient>
@@ -752,11 +770,16 @@
           {/if}
         {/each}
       </defs>
-      <!-- decorative stem: the spine trails left of Dinosauria into deep time (coldest) -->
-      <path class="edge spine" d={`M 0 ${py(0)} H ${px(0)}`} fill="none" style="stroke: {colorOf(treeStore.data.rootId, true, treeStore.getNode(treeStore.data.rootId)?.isGenus ?? false)}" />
+      <!-- decorative stem: the spine trails left of Dinosauria into deep time (coldest). Its y
+           rides the ANIMATED root position so it stays attached as the root glides; px(0) is a
+           constant left origin (only the y term moves, via minY). -->
+      <path class="edge spine" d={`M 0 ${displayedPos.get(treeStore.data.rootId)?.y ?? py(0)} H ${px(0)}`} fill="none" style="stroke: {colorOf(treeStore.data.rootId, true, treeStore.getNode(treeStore.data.rootId)?.isGenus ?? false)}" />
       {#each layout.edges as e (e.parentId + ">" + e.childId)}
-        <!-- spine segments blend between their endpoint dot colors -->
-        <path class="edge" class:spine={e.onSpine} d={edgePath(e.parentId, e.childId)} fill="none"
+        <!-- spine segments blend between their endpoint dot colors; path + opacity track the
+             animated node positions so branches glide with their nodes instead of snapping. -->
+        {@const co = displayedPos.get(e.childId)?.opacity ?? 1}
+        <path class="edge" class:spine={e.onSpine} d={edgePathAnim(e.parentId, e.childId)} fill="none"
+          opacity={co}
           style={e.onSpine ? `stroke: url(#${gradId(e.parentId, e.childId)})` : ""} />
       {/each}
       <!-- "more here" stubs for collapsed clades. Drawn WITH the branch edges (before the ring), not
@@ -764,28 +787,44 @@
            selection ring exactly like a real branch edge does, rather than in front of it. -->
       {#each layout.nodes as n (n.id)}
         {#if isExpandable(n.id)}
-          <line transform={`translate(${px(n.x)} ${py(n.y)})`}
-            x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
+          {@const dp = displayedPos.get(n.id)}
+          {#if dp}
+            <line transform={`translate(${dp.x} ${dp.y})`}
+              x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
+          {/if}
         {/if}
       {/each}
       <!-- The persistent focus ring is drawn HERE — after the branch edges but BEFORE the node
            glyphs/backplates/labels — so it sits behind every node's page-color backplate and glyph
            (SVG paint order = document order; no z-index). This restores the original per-node ring's
            stacking: on top of branch lines, tucked behind the glyph disc it frames.
-           SHAPE = lerpRingGeom(dot, bloom, morph) at the live `ringCenterNow` (position on the shared
-           clock, size on morphTween). The two opacity levers are computed inline as attrs from `morph`
-           (NOT CSS): element `opacity` fades the WHOLE puck (PUCK_TRAVEL_OPACITY as a dot → 1 bloomed),
-           `fill-opacity` carries the fill tint (1 solid dot → 0.18 translucent bloom, label showing
-           through). Only fill/stroke COLOR animates via CSS (see .label-ring) so hue glides node→node
-           with no JS color math. -->
+           POSITION (`ringCenterNow`) rides the shared clock in both modes. SHAPE + paint depend on
+           PUCK_TRANSITION (see the inline ternaries):
+           • false (default): a bloom box the whole way; size lerps outgoing-label-box → incoming
+             (via labelBoxFrom) on the position curve; opacity/fill-opacity constant (1 / 0.18).
+           • true (puck): lerp dot↔bloom by `morph`, and the two opacity levers ride `morph` too —
+             element `opacity` fades the whole puck (PUCK_TRAVEL_OPACITY dot → 1 bloom), `fill-opacity`
+             the tint (1 solid dot → 0.18 translucent bloom).
+           Either way, only fill/stroke COLOR animates via CSS (see .label-ring) — no JS color math. -->
       {#if ringId && ringCenterNow}
         {@const c = ringCenterNow}
         {@const m = morphTween.current}
-        {@const rg = lerpRingGeom(
-          ringGeom("dot", c, labelBox, RING_H, RING_PAD_X, dotRadiusFor(ringId)),
-          ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X, dotRadiusFor(ringId)),
-          m,
-        )}
+        {@const dotR = dotRadiusFor(ringId)}
+        <!-- Puck mode: lerp dot↔bloom by morph `m` (m also drives the opacity levers). No-puck mode:
+             always a bloom box, but tween its SIZE from the outgoing label's box (labelBoxFrom) to the
+             incoming one (labelBox) over the position curve, so the box grows/shrinks between labels
+             as it glides. Position (`c`) is on the shared clock in both. -->
+        {@const rg = PUCK_TRANSITION
+          ? lerpRingGeom(
+              ringGeom("dot", c, labelBox, RING_H, RING_PAD_X, dotR),
+              ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X, dotR),
+              m,
+            )
+          : lerpRingGeom(
+              ringGeom("bloom", c, labelBoxFrom ?? labelBox, RING_H, RING_PAD_X, dotR),
+              ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X, dotR),
+              flipProgress(ringProgress.current, FLIP_FRACTION),
+            )}
         {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
         <rect
           class="label-ring"
@@ -794,8 +833,8 @@
           width={rg.width}
           height={rg.height}
           rx={rg.radius}
-          fill-opacity={m * 0.18 + (1 - m) * 1}
-          opacity={m * 1 + (1 - m) * PUCK_TRAVEL_OPACITY}
+          fill-opacity={PUCK_TRANSITION ? m * 0.18 + (1 - m) * 1 : 0.18}
+          opacity={PUCK_TRANSITION ? m * 1 + (1 - m) * PUCK_TRAVEL_OPACITY : 1}
           style="fill: {hiColor}; stroke: {hiColor}"
         />
       {/if}
