@@ -1,6 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { glyphCenter, ringGeom } from "./ring-glide";
-import type { Point } from "./ring-glide";
+import { glyphCenter, ringGeom, lerpRingGeom } from "./ring-glide";
+import type { Point, RingGeom } from "./ring-glide";
+
+describe("lerpRingGeom", () => {
+  const dot: RingGeom = { x: 0, y: 0, width: 24, height: 24, radius: 12 };
+  const bloom: RingGeom = { x: 10, y: -14, width: 108, height: 28, radius: 6 };
+  it("t=0 returns the first geometry", () => {
+    expect(lerpRingGeom(dot, bloom, 0)).toEqual(dot);
+  });
+  it("t=1 returns the second geometry", () => {
+    expect(lerpRingGeom(dot, bloom, 1)).toEqual(bloom);
+  });
+  it("t=0.5 is the field-wise midpoint", () => {
+    expect(lerpRingGeom(dot, bloom, 0.5)).toEqual({ x: 5, y: -7, width: 66, height: 26, radius: 9 });
+  });
+});
 
 describe("glyphCenter", () => {
   const px = (x: number) => 40 + x * 200; // mirrors SpineTree px()

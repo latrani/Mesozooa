@@ -50,3 +50,17 @@ export function ringGeom(
     radius: 6,
   };
 }
+
+// Interpolate two ring geometries field-by-field. Used to morph the ring between its dot and bloom
+// shapes (t=0 → dot, t=1 → bloom) while both are computed at the SAME live center — so the ring's
+// position rides the shared clock and the size morph is orthogonal (can't induce a wheel).
+export function lerpRingGeom(a: RingGeom, b: RingGeom, t: number): RingGeom {
+  const l = (x: number, y: number) => x + (y - x) * t;
+  return {
+    x: l(a.x, b.x),
+    y: l(a.y, b.y),
+    width: l(a.width, b.width),
+    height: l(a.height, b.height),
+    radius: l(a.radius, b.radius),
+  };
+}

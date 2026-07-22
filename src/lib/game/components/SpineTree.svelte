@@ -5,8 +5,10 @@
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
   import { warmthRampColor } from "../warmth-ramp";
-  import { glyphCenter, ringGeom } from "../ring-glide";
-  import type { GlidePhase, RingGeom, Point } from "../ring-glide";
+  import { glyphCenter, ringGeom, lerpRingGeom } from "../ring-glide";
+  import type { Point } from "../ring-glide";
+  import { layoutDiff, flipProgress, lerpPos, lerp } from "../relayout-flip";
+  import type { Pos, LayoutDiff } from "../relayout-flip";
   import { Tween } from "svelte/motion";
   import { untrack } from "svelte";
   import {
@@ -132,6 +134,98 @@
   let layout = $derived(layoutSpine(treeStore, revealed, tipId));
   let posOf = $derived(new Map(layout.nodes.map((n) => [n.id, n])));
 
+  // --- Relayout FLIP (issue #52 slice 2) ------------------------------------------------------
+  // `layout` is the TARGET; `displayed` is what actually renders, animating toward it on a shared
+  // clock with the ring puck. Master progress 0→1 over GLIDE_MS; per-class flipProgress staggers
+  // completion. Node <g> loop renders from `displayed`; edges/stubs/ring keep reading layout/posOf.
+  const flipProgressTween = new Tween(1, { duration: 0 }); // starts settled (no first-mount fly-in)
+  let flipDiff = $state<LayoutDiff>({ persisting: [], entering: [], leaving: [] });
+  // Re-center scroll, animated on the SAME master clock as the FLIP (spec: "Scroll must ride the
+  // shared clock"). Snapshotted on relayout; the driver below lerps scrollLeft/Top start→target by
+  // the same flipProgress(_, FLIP_FRACTION) curve the persisting nodes use — so the tip node (which
+  // IS a persisting node) stays visually put while the tree reflows around it. null = don't animate
+  // scroll (zoomed, or the target couldn't be computed) → the tip-change effect handles it natively.
+  let scrollFrom: { left: number; top: number } | null = null;
+  let scrollTargetPx: { left: number; top: number } | null = null;
+
+  const parentOf = (id: string) => treeStore.getNode(id)?.parentId ?? null;
+  // The layout's node id -> position map (the animation target), in PIXEL space (px/py applied).
+  // Pixels, not grid coords, because py() subtracts layout.minY — which SHIFTS when the tip changes
+  // (the spine re-anchors). Interpolating grid-y and re-applying the NEW py() each frame would render
+  // frame 0 as py_new(oldY): a spurious uniform vertical teleport (old y, new minY, no cancellation),
+  // then a glide back — the "jump up then back down". Folding px/py in at snapshot time keeps from/to
+  // in ONE consistent pixel frame (same fix as slice-1's coordinate-frame unification; the ring puck
+  // already lives in pixel space for the same reason).
+  let layoutPos = $derived(new Map<string, Pos>(layout.nodes.map((n) => [n.id, { x: px(n.x), y: py(n.y) }])));
+
+  // What the node loop renders: {id, x, y, opacity}. Derived off the master progress so it
+  // recomputes each animation frame. Under reduced motion (or a settled progress of 1) it's just
+  // the layout at full opacity.
+  // NOTE: the node <g> loop renders from THIS (not layout.nodes directly), so nodes only appear
+  // once the relayout $effect below has populated flipDiff. Svelte flushes $effects pre-paint, so
+  // there's no empty-tree flash — but don't assume the node layer is independent of that effect.
+  let displayed = $derived.by(() => {
+    const p = flipProgressTween.current;
+    const out: Array<{ id: string; x: number; y: number; opacity: number }> = [];
+    for (const n of flipDiff.persisting) {
+      const q = lerpPos(n.from, n.to, flipProgress(p, FLIP_FRACTION));
+      out.push({ id: n.id, x: q.x, y: q.y, opacity: 1 });
+    }
+    for (const n of flipDiff.entering) {
+      out.push({ id: n.id, x: n.to.x, y: n.to.y, opacity: flipProgress(p, ENTER_FRACTION) });
+    }
+    for (const n of flipDiff.leaving) {
+      const o = 1 - flipProgress(p, LEAVE_FRACTION);
+      if (o > 0) out.push({ id: n.id, x: n.lastPos.x, y: n.lastPos.y, opacity: o });
+    }
+    return out;
+  });
+
+  // On a relayout: snapshot current displayed positions as the FLIP's `from` (so an interrupted
+  // glide restarts from where nodes visually are), diff against the new layout, restart progress.
+  // Depends on `layout` ONLY; reads displayed/progress under untrack so it never self-triggers.
+  $effect(() => {
+    void layout; // the one tracked dependency
+    const nextPos = untrack(() => layoutPos);
+    // Snapshot POSITION only (not opacity). So an enter/leave fade interrupted by a new relayout
+    // resets opacity (a node reclassified enter→persist snaps to opaque), while position stays
+    // continuous. Invisible at the shipped LEAVE_FRACTION=0 + transient; see #57 for the fade-continuity fix.
+    const fromPos = untrack(() => new Map(displayed.map((d) => [d.id, { x: d.x, y: d.y }])));
+    flipDiff = layoutDiff(fromPos, nextPos, parentOf);
+
+    // Snapshot the re-center scroll so it can animate on this same clock. Only when at default zoom
+    // (the common case) and not first-mount: zoomed re-centers still go through resetZoom's native
+    // path (untouched), and first paint shouldn't fly-scroll. tipId is read untracked — its change
+    // is what triggered this layout, so it's already fresh.
+    const tip = untrack(() => tipId);
+    const atDefaultZoom = untrack(() => zoom) === ZOOM_DEFAULT;
+    if (!reduceMotion && fromPos.size > 0 && atDefaultZoom && scroller && tip) {
+      scrollFrom = { left: scroller.scrollLeft, top: scroller.scrollTop };
+      scrollTargetPx = untrack(() => scrollTargetFor(tip));
+    } else {
+      scrollFrom = null;
+      scrollTargetPx = null; // let the tip-change effect scroll natively (or instant)
+    }
+
+    if (reduceMotion || fromPos.size === 0) {
+      flipProgressTween.set(1, { duration: 0 }); // instant: reduced motion or first-ever layout
+    } else {
+      flipProgressTween.set(0, { duration: 0 });
+      flipProgressTween.set(1, { duration: GLIDE_MS });
+    }
+  });
+
+  // Scroll driver: while a shared-clock re-center is active, lerp the scroll offset start→target
+  // by the persisting-node curve, so scroll and the tip node move as one. Reads the tween (per
+  // frame) + the snapshot; writes only the scroller — no reactive state, so no loop.
+  $effect(() => {
+    const p = flipProgressTween.current;
+    if (!scroller || !scrollFrom || !scrollTargetPx) return;
+    const t = flipProgress(p, FLIP_FRACTION);
+    scroller.scrollLeft = lerp(scrollFrom.left, scrollTargetPx.left, t);
+    scroller.scrollTop = lerp(scrollFrom.top, scrollTargetPx.top, t);
+  });
+
   // Per-node visual y for sibling ordering in the a11y tree (mirrors the SVG's layout).
   let yOf = $derived((id: string) => posOf.get(id)?.y ?? Infinity);
   let a11yRoots = $derived(a11yTree(treeStore, revealed, yOf));
@@ -153,39 +247,46 @@
   let ringId = $derived(treeFocused ? currentId : highlightId);
 
   // --- Ring glide (issue #52 slice 1) ---------------------------------------------------------
-  // One persistent ring element. Its SHAPE (x/y/width/height/radius) is driven by a JS Tween that
-  // retargets from the in-flight value, so rapid arrow-nav just redirects a skating ring. Its PAINT
-  // (fill, stroke, fill-opacity) is animated by CSS transitions instead: CSS interpolates colors
-  // natively (resolving var()/color-mix, no JS color math), and the transition-duration is fed the
-  // same glideMs so paint and shape stay in lockstep. Fill fades to 0 as it collapses to a hollow,
-  // stroke-only glyph frame in transit, and back in on bloom; the stroke color glides node→node.
+  // One persistent ring element, unified onto the shared motion clock (see below). Its POSITION
+  // rides `ringProgress` (same 0→1/GLIDE_MS as the node FLIP + scroll → no wheel); its SIZE rides
+  // `morphTween` (dot↔bloom); only its fill/stroke COLOR animates via a CSS transition (native
+  // color interp, no JS color math). The opacities are computed inline from `morphTween`.
   const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  // Relayout FLIP completion fractions of the GLIDE_MS envelope (shared clock, shared start).
+  // Staggered COMPLETION gives cause→effect: structure settles, branches appear, focus arrives.
+  // Values provisional (look-and-feel pass); the order LEAVE < FLIP < ENTER < puck(1.0) is fixed.
+  const FLIP_FRACTION = 0.6;   // persisting nodes finish sliding
+  const ENTER_FRACTION = 0.8;  // entering nodes finish fading in
+  const LEAVE_FRACTION = 0;    // leaving nodes finish disappearing (0 = instant; honest knob)
   // Puck look-and-feel knobs. PUCK_TRAVEL_OPACITY: overall opacity of the WHOLE puck (fill + border)
   // while traveling as a dot — set on element `opacity`, so the border fades with the fill (the dot's
   // fill is solid, tinted only by this). Bloom is always fully opaque with a 0.18 fill. PUCK_DOT_PAD:
   // px added to the dot's RADIUS beyond the glyph edge, so the dot can sit proud of the disc it frames.
   const PUCK_TRAVEL_OPACITY = 0.5;
   const PUCK_DOT_PAD = 2;
-  let glidePhase = $state<GlidePhase>("bloom");
-  // Duration (ms) for BOTH the shape tween's next retarget and the CSS paint transition. The phase
-  // machine sets it: 0 for instant placements (reduced-motion, first mount, relayout-follow), else
-  // GLIDE_MS. A $state so the driver effect + the --glide-ms style binding re-run when it changes.
-  let glideMs = $state(0);
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
   // First ring placement is instant: the tween starts at (0,0), so the first skate would fly the
   // ring in from the SVG's top-left corner. Cleared after the first real placement.
   let firstPlace = true;
 
-  // Seed is an offscreen placeholder overwritten on first real placement; radius here is arbitrary.
-  const ringTween = new Tween<RingGeom>(
-    { x: 0, y: 0, width: 0, height: 0, radius: 0 },
-    { duration: 0 },
-  );
+  // Ring POSITION rides the shared master clock (flipProgressTween), same as the nodes + scroll, so
+  // it can't wheel: its center interpolates old→new on the SAME flipProgress(_, FLIP_FRACTION) curve.
+  // Ring SIZE is a separate scalar morph (0 = dot, 1 = bloom) — size doesn't wheel, so it's orthogonal.
+  const morphTween = new Tween(1, { duration: 0 });        // 0 = dot, 1 = bloom (size only)
+  const ringProgress = new Tween(1, { duration: 0 });      // position glide 0→1; OWN tween, but always
+  //   restarted with the SAME (0→1, GLIDE_MS) params as the node/scroll clock → identical curve →
+  //   lockstep → no wheel, without sharing state (which would race the FLIP effect's reset).
+  let ringCenterFrom = $state<Point | null>(null);   // ring center at the last transition (interrupt-safe)
 
   function ringCenter(id: string): Point | null {
     const n = posOf.get(id);
     return n ? glyphCenter(n, px, py) : null;
   }
+
+  // from/to are PLAIN state (not derived): set imperatively in the triggers below. This is what lets
+  // the phase machine read the OLD target (still in `ringCenterTo`) to compute the glide's `from`
+  // before overwriting it — a derived would have already jumped to the new node.
+  let ringCenterTo = $state<Point | null>(null);
 
   // The collapsed-ring radius for a node = half ITS glyph size (genus and clade glyphs are sized
   // independently), so the dot frames that node's own disc rather than assuming a shared size.
@@ -194,56 +295,78 @@
     return (treeStore.getNode(id)?.isGenus ? GLYPH_GENUS : GLYPH_CLADE) / 2 + PUCK_DOT_PAD;
   }
 
-  // Geometry the ring should be at, DERIVED from phase + the ringed node's live coords + labelBox.
-  // Because it reads posOf (via ringCenter), it recomputes when a relayout moves the node — so the
-  // tween driver below repositions the ring at its CURRENT phase, without the phase machine (which
-  // ignores layout) re-running. This is the split that fixes the relayout race and is slice 2's hook.
-  let ringTarget = $derived.by<RingGeom | null>(() => {
-    if (!ringId) return null;
-    const c = ringCenter(ringId);
-    return c ? ringGeom(glidePhase, c, labelBox, RING_H, RING_PAD_X, dotRadiusFor(ringId)) : null;
+  // The ring's live center, on the SHARED clock: lerp from→to by the same curve the nodes/scroll use.
+  // Falls back to `to` when there's no `from` (first placement). This is what makes screen-position =
+  // ringCenterNow − scroll(t) a straight path (both terms on one curve) → no wheel.
+  let ringCenterNow = $derived.by<Point | null>(() => {
+    if (!ringCenterTo) return null;
+    if (!ringCenterFrom) return ringCenterTo;
+    return lerpPos(ringCenterFrom, ringCenterTo, flipProgress(ringProgress.current, FLIP_FRACTION));
   });
 
-  // PHASE MACHINE — reacts to a genuine FOCUS change only (keyed to ringId). Reads coords under
-  // untrack so a relayout (posOf change) never re-triggers it. Sole owner of glidePhase, glideMs,
-  // settleTimer, firstPlace.
+
+
+  // PHASE MACHINE — reacts to a genuine FOCUS change (keyed to ringId). Snapshots the ring's
+  // center-from (so a skate/interrupt starts where the ring visually is), drives the dot↔bloom
+  // MORPH, and restarts the shared master clock so the ring's position glides even on a focus-only
+  // move (game arrow-nav, where the layout — hence the FLIP effect — doesn't change). Reads coords
+  // under untrack so a relayout never re-triggers it (slice-1 discipline preserved).
   $effect(() => {
     const id = ringId; // the ONLY tracked dependency
     if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
     if (!id) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
 
-    // Read the center without subscribing to layout — layout changes are the position derived's job.
-    const hasCenter = untrack(() => ringCenter(id) !== null);
-    if (!hasCenter) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+    const newCenter = untrack(() => ringCenter(id));
+    if (!newCenter) return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
 
-    // Instant placement: reduced-motion or the very first mount → bloom at rest, no skate/settle.
+    // Snapshot where the ring visually is RIGHT NOW as the glide's `from` — read before we overwrite
+    // `to`, so ringCenterNow still reflects the old target (interrupt-safe). Then point `to` at the
+    // newly-focused node.
+    const glideFrom = untrack(() => ringCenterNow);
+    ringCenterTo = newCenter;
+
+    // Instant placement: reduced-motion or the very first mount → bloomed at rest, no skate/settle.
     if (reduceMotion || firstPlace) {
       firstPlace = false;
-      glideMs = 0;
-      glidePhase = "bloom";
+      ringCenterFrom = newCenter; // no glide: sit at the target
+      morphTween.set(1, { duration: 0 });
+      ringProgress.set(1, { duration: 0 });
       return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
     }
 
-    // Normal move: collapse to a dot and skate (the driver tweens the position derived), then
-    // bloom on settle if no new focus change arrives within one glide.
-    glideMs = GLIDE_MS;
-    glidePhase = "dot";
+    // Normal move: restart the position glide (same 0→1/GLIDE_MS as the node+scroll clock → lockstep,
+    // no wheel), morph to a dot as it travels, then bloom on settle if no new move interrupts.
+    // INVARIANT (no-wheel): ringProgress and flipProgressTween MUST be restarted with identical
+    // (0→1, GLIDE_MS) params within one effect flush, so they share a frame-start on Svelte's raf
+    // clock. A refactor that splits their triggers or changes one duration reintroduces the wheel.
+    ringCenterFrom = glideFrom;
+    morphTween.set(0, { duration: GLIDE_MS });     // collapse to dot as it travels
+    ringProgress.set(0, { duration: 0 });
+    ringProgress.set(1, { duration: GLIDE_MS });
     settleTimer = setTimeout(() => {
-      glideMs = GLIDE_MS;
-      glidePhase = "bloom";
+      morphTween.set(1, { duration: GLIDE_MS });   // bloom at the destination
     }, GLIDE_MS);
     return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
   });
 
-  // TWEEN DRIVER — the ONLY caller of ringTween.set. Retargets whenever the position derived or the
-  // duration changes. A relayout moves ringTarget → the ring follows at its current phase. glideMs is
-  // set to 0 by the phase machine's instant paths and for relayout-follow (a phase-less target change
-  // keeps the last glideMs, which is fine — a settled ring's glideMs is the bloom duration, a short
-  // reposition; if that ever feels wrong it's a look-and-feel knob, not a correctness issue).
+  // RING LAYOUT-FOLLOW — when a relayout moves the ringed node WITHOUT a focus change (ringId same,
+  // layout different), update `to` so the ring glides to the node's new spot on the shared clock. The
+  // FLIP effect already restarts things on layout; here we just keep `to` fresh and re-anchor `from`
+  // to the ring's current visual center so it glides rather than snaps. Keyed to layout; ringId read
+  // untracked (a ringId change is the phase machine's job, above).
   $effect(() => {
-    const target = ringTarget;
-    if (!target) return;
-    ringTween.set(target, { duration: glideMs });
+    void layout;
+    const id = untrack(() => ringId);
+    if (!id) return;
+    const c = untrack(() => ringCenter(id));
+    if (!c) return;
+    // Only act on a genuine position change (avoid clobbering the phase machine's fresh glide).
+    const to = untrack(() => ringCenterTo);
+    if (to && c.x === to.x && c.y === to.y) return;
+    ringCenterFrom = untrack(() => ringCenterNow);
+    ringCenterTo = c;
+    ringProgress.set(0, { duration: 0 });
+    ringProgress.set(1, { duration: reduceMotion ? 0 : GLIDE_MS });
   });
 
   // A revealed clade whose children are NOT in the layout is "collapsed" — mark it so we can
@@ -309,10 +432,12 @@
   const reduceMotion =
     typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  function scrollToNode(id: string) {
-    if (!scroller) return;
+  // The scroll offset that centers node `id` (at zoom = default). Extracted so the relayout
+  // re-center can animate to it on the shared FLIP clock instead of a competing native scroll.
+  function scrollTargetFor(id: string): { left: number; top: number } | null {
+    if (!scroller) return null;
     const n = posOf.get(id);
-    if (!n) return;
+    if (!n) return null;
     const left = centerOffsetFor(n.depth, {
       xGap: X_GAP,
       pad: STEM + PAD, // node x-origin includes the left stem offset
@@ -325,7 +450,13 @@
     const rawTop = py(n.y) - scroller.clientHeight / 2;
     const maxTop = Math.max(0, vbH - scroller.clientHeight);
     const top = Math.min(Math.max(0, rawTop), maxTop);
-    scroller.scrollTo({ left, top, behavior: reduceMotion ? "auto" : "smooth" });
+    return { left, top };
+  }
+
+  function scrollToNode(id: string) {
+    const t = scrollTargetFor(id);
+    if (!t || !scroller) return;
+    scroller.scrollTo({ left: t.left, top: t.top, behavior: reduceMotion ? "auto" : "smooth" });
   }
 
   // Keep-visible scroll for ARROW browsing: only pan (to the nearest edge) when the focused node
@@ -486,7 +617,14 @@
     void scrollWidth; // re-run when the scrollable width changes too
     if (scroller && tipId && d >= 0) {
       if (tipId !== lastTipId) {
-        resetZoom(); // navigation -> back to the default view, which re-centers on the new tip
+        // If the FLIP's scroll driver is handling this re-center (shared-clock animation, set in the
+        // relayout effect above), don't ALSO fire the native scroll — that's the race we removed.
+        // Still reset zoom to default; just skip the competing scrollToNode.
+        // INVARIANT: `scrollTargetPx` is refreshed by the FLIP effect (declared earlier) on EVERY
+        // layout change before this reads it — and a tipId change always forces a layout change — so
+        // it's never stale here. Don't reorder these effects or read scrollTargetPx without that.
+        if (scrollTargetPx) zoom = ZOOM_DEFAULT;
+        else resetZoom(); // zoomed / non-animated path: native re-center as before
       } else if (rightInset !== lastInset) {
         scrollToNode(tipId);
       }
@@ -633,14 +771,21 @@
       <!-- The persistent focus ring is drawn HERE — after the branch edges but BEFORE the node
            glyphs/backplates/labels — so it sits behind every node's page-color backplate and glyph
            (SVG paint order = document order; no z-index). This restores the original per-node ring's
-           stacking: on top of branch lines, tucked behind the glyph disc it frames. Shape (x/y/w/h/rx)
-           comes from the JS tween; paint (fill/stroke color + the two opacity levers) is left to CSS
-           transitions (see .label-ring), so color glides node→node with no JS color math. Two levers,
-           both over --glide-ms: element `opacity` fades the WHOLE puck (PUCK_TRAVEL_OPACITY while a
-           dot → 1 bloomed), and `fill-opacity` carries the fill tint (1 solid dot → 0.18 translucent
-           bloom, the label showing through). Fill/stroke are the solid highlight color. -->
-      {#if ringId}
-        {@const rg = ringTween.current}
+           stacking: on top of branch lines, tucked behind the glyph disc it frames.
+           SHAPE = lerpRingGeom(dot, bloom, morph) at the live `ringCenterNow` (position on the shared
+           clock, size on morphTween). The two opacity levers are computed inline as attrs from `morph`
+           (NOT CSS): element `opacity` fades the WHOLE puck (PUCK_TRAVEL_OPACITY as a dot → 1 bloomed),
+           `fill-opacity` carries the fill tint (1 solid dot → 0.18 translucent bloom, label showing
+           through). Only fill/stroke COLOR animates via CSS (see .label-ring) so hue glides node→node
+           with no JS color math. -->
+      {#if ringId && ringCenterNow}
+        {@const c = ringCenterNow}
+        {@const m = morphTween.current}
+        {@const rg = lerpRingGeom(
+          ringGeom("dot", c, labelBox, RING_H, RING_PAD_X, dotRadiusFor(ringId)),
+          ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X, dotRadiusFor(ringId)),
+          m,
+        )}
         {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
         <rect
           class="label-ring"
@@ -649,18 +794,19 @@
           width={rg.width}
           height={rg.height}
           rx={rg.radius}
-          fill-opacity={glidePhase === "bloom" ? 0.18 : 1}
-          opacity={glidePhase === "bloom" ? 1 : PUCK_TRAVEL_OPACITY}
-          style="fill: {hiColor}; stroke: {hiColor}; --glide-ms: {glideMs}ms"
+          fill-opacity={m * 0.18 + (1 - m) * 1}
+          opacity={m * 1 + (1 - m) * PUCK_TRAVEL_OPACITY}
+          style="fill: {hiColor}; stroke: {hiColor}"
         />
       {/if}
-      {#each layout.nodes as n (n.id)}
-        {@const node = treeStore.getNode(n.id)}
-        {@const isHi = n.id === ringId}
+      {#each displayed as d (d.id)}
+        {@const n = posOf.get(d.id)}
+        {@const node = treeStore.getNode(d.id)}
+        {@const isHi = d.id === ringId}
         {@const isGenusNode = node?.isGenus ?? false}
         {@const glyphSize = isGenusNode ? GLYPH_GENUS : GLYPH_CLADE}
         {@const glyphDY = isGenusNode ? GLYPH_OFFSET_Y_GENUS : GLYPH_OFFSET_Y_CLADE}
-        {@const glyphFill = colorOf(n.id, n.onSpine, isGenusNode)}
+        {@const glyphFill = colorOf(d.id, n?.onSpine ?? false, isGenusNode)}
         <!-- The SVG is aria-hidden (decorative visual layer); the keyboard/AT path lives in
              the sibling <ul role="tree"> below. onclick here is a pure pointer convenience, so
              the missing key handler is intentional, not a gap. -->
@@ -668,15 +814,16 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <g
           class="node"
-          class:spine={n.onSpine}
+          class:spine={n?.onSpine}
           class:highlight={isHi}
           class:genus={node?.isGenus}
           class:playable={gradeByPlayable && node?.isGenus && node.playable}
           class:nonplayable={gradeByPlayable && node?.isGenus && !node.playable}
           class:clickable={!!onnodeselect}
           class:link={linkLabels && !!onnodeselect}
-          transform={`translate(${px(n.x)} ${py(n.y)})`}
-          onclick={() => onNodeClick(n.id)}
+          transform={`translate(${d.x} ${d.y})`}
+          opacity={d.opacity}
+          onclick={() => onNodeClick(d.id)}
         >
           <!-- page-color backing disc: sits just under the glyph and over the label, so it fills
                the glyph's cutouts AND masks the tucked ring corner — neither peeks through. -->
@@ -694,7 +841,7 @@
                width (name, on-spine font-size, count) so the ring re-measures when e.g. expanding a
                highlighted clade bumps it on-spine (bigger font → wider text). -->
           <text class="lbl" x={LABEL_OFFSET + RING_PAD_X} y={LABEL_BASELINE_DY}
-            use:measureLabel={isHi ? `${node?.name}|${n.onSpine}|${showCounts && !node?.isGenus ? node?.descendantGenusCount : ""}` : null}>
+            use:measureLabel={isHi ? `${node?.name}|${n?.onSpine}|${showCounts && !node?.isGenus ? node?.descendantGenusCount : ""}` : null}>
             {displayName(node?.name)}{#if showCounts && !node?.isGenus}<tspan class="count" dx="4">{node?.descendantGenusCount}</tspan>{/if}
           </text>
         </g>
@@ -798,12 +945,12 @@
      colored by warmth). No dot ring — the label outline alone marks the selection. */
   .label-ring {
     stroke-width: 2;
-    /* Paint animates via CSS (color interpolation is native here — no JS color math); shape is the
-       JS tween. --glide-ms is set inline per-move (0 for instant/reduced-motion placements). */
-    transition: fill var(--glide-ms, 0ms) linear,
-                stroke var(--glide-ms, 0ms) linear,
-                fill-opacity var(--glide-ms, 0ms) linear,
-                opacity var(--glide-ms, 0ms) linear;
+    /* Only the fill/stroke COLOR animates via CSS (native color interpolation, no JS color math) so
+       the ring's hue glides node→node. Shape rides the JS position clock (ringProgress) and the
+       opacities ride the JS morph tween — both set as attrs per frame, so they must NOT be
+       CSS-transitioned here (that would double-animate them). */
+    transition: fill var(--ring-color-ms, 160ms) linear,
+                stroke var(--ring-color-ms, 160ms) linear;
   }
   .node.highlight .lbl { font-weight: var(--fw-black); }
   .zoom-controls {
