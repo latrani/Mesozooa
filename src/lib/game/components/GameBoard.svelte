@@ -98,7 +98,7 @@
       </div>
     {:else}
       <div class="input-row">
-        <SearchBox entries={availableEntries} onpick={(id) => store.guess(id)} placeholder="Guess a dinosaur…" />
+        <SearchBox id="guess" entries={availableEntries} onpick={(id) => store.guess(id)} placeholder="Guess a dinosaur…" />
         {#if store.hint && store.canHint}
           <button type="button" class="btn-secondary" onclick={() => store.hint?.()} disabled={!store.canHint}>
             Hint {#if store.nextHintCost != null} ({store.nextHintCost} move{store.nextHintCost === 1 ? "" : "s"}){/if}

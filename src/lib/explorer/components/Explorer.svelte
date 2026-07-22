@@ -48,7 +48,7 @@
 <main class="explorer">
   <BoardLayout>
     {#snippet cluster()}
-      <SearchBox entries={taxa} onpick={(id) => explorer.jumpTo(id)} placeholder="Find any taxon…" />
+      <SearchBox id="explore" entries={taxa} onpick={(id) => explorer.jumpTo(id)} placeholder="Find any taxon…" />
       {#if recent.length}
         <ul class="recent" aria-label="Recently viewed">
           {#each recent as c (c.nodeId)}
