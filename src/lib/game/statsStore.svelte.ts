@@ -4,6 +4,18 @@ import { todayString } from "./daily";
 
 const STATS_KEY = "mesozooa:stats:1";
 
+/** The read surface StatsContent renders. The live store satisfies it; the gallery supplies
+    frozen fixture views (same pattern as FixtureStore for GameBoard). */
+export interface StatsView {
+  readonly streak: { current: number; best: number; lastWinDate: string | null };
+  readonly week: { played: number; won: number; ratio: number | null };
+  readonly month: { played: number; won: number; ratio: number | null };
+  readonly dailyAvg: number | null;
+  readonly overallAvg: number | null;
+  readonly allTime: { played: number; won: number; ratio: number | null };
+  reset: () => void;
+}
+
 function load(): Stats {
   if (typeof localStorage === "undefined") return emptyStats();
   return deserializeStats(localStorage.getItem(STATS_KEY));

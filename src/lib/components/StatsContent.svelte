@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { statsStore } from "../game/statsStore.svelte";
+  import { statsStore, type StatsView } from "../game/statsStore.svelte";
+
+  // Defaults to the live singleton (the app never passes a source). The gallery passes a frozen
+  // fixture view so multiple stats states render side by side on one page.
+  let { source = statsStore }: { source?: StatsView } = $props();
 
   let confirming = $state(false);
 
@@ -7,7 +11,7 @@
   const avg = (m: number | null) => (m === null ? "—" : m.toFixed(1));
 
   // Empty state: nothing ever recorded.
-  let empty = $derived(statsStore.allTime.played === 0);
+  let empty = $derived(source.allTime.played === 0);
 </script>
 
 <div class="stats">
@@ -15,24 +19,24 @@
     <p class="stats-empty">Play the daily to start a streak.</p>
   {:else}
     <div class="streak">
-      <span class="big">{statsStore.streak.current}</span>
+      <span class="big">{source.streak.current}</span>
       <span class="streak-label">day streak</span>
-      <span class="streak-best">Best: {statsStore.streak.best}</span>
+      <span class="streak-best">Best: {source.streak.best}</span>
     </div>
 
     <dl class="grid">
-      <div><dt>Last 7 days</dt><dd>{statsStore.week.played} plays · {pct(statsStore.week.ratio)} won</dd></div>
-      <div><dt>Last 30 days</dt><dd>{statsStore.month.played} plays · {pct(statsStore.month.ratio)} won</dd></div>
-      <div><dt>Avg moves (daily)</dt><dd>{avg(statsStore.dailyAvg)}</dd></div>
-      <div><dt>Avg moves (overall)</dt><dd>{avg(statsStore.overallAvg)}</dd></div>
-      <div><dt>All-time</dt><dd>{statsStore.allTime.played} plays · {pct(statsStore.allTime.ratio)} won</dd></div>
+      <div><dt>Last 7 days</dt><dd>{source.week.played} plays · {pct(source.week.ratio)} won</dd></div>
+      <div><dt>Last 30 days</dt><dd>{source.month.played} plays · {pct(source.month.ratio)} won</dd></div>
+      <div><dt>Avg moves (daily)</dt><dd>{avg(source.dailyAvg)}</dd></div>
+      <div><dt>Avg moves (overall)</dt><dd>{avg(source.overallAvg)}</dd></div>
+      <div><dt>All-time</dt><dd>{source.allTime.played} plays · {pct(source.allTime.ratio)} won</dd></div>
     </dl>
 
     <div class="reset">
       {#if confirming}
         <span class="reset-warn">Erase all stats? This can't be undone.</span>
         <button type="button" class="btn-secondary btn-small" onclick={() => (confirming = false)}>Cancel</button>
-        <button type="button" class="btn-secondary btn-small" onclick={() => { statsStore.reset(); confirming = false; }}>Erase</button>
+        <button type="button" class="btn-secondary btn-small" onclick={() => { source.reset(); confirming = false; }}>Erase</button>
       {:else}
         <button type="button" class="btn-secondary btn-small" onclick={() => (confirming = true)}>Reset stats</button>
       {/if}
