@@ -14,6 +14,7 @@ import {
   leafHintActive,
 } from "./engine-core";
 import { serializeGame, deserializeGame, PRACTICE_KEY } from "./persistence";
+import { statsStore } from "./statsStore.svelte";
 
 // Practice is a single slot: the current round survives reloads (and silent post-deploy
 // reloads) exactly like Daily. Solved/forfeited end-state persists; newRound overwrites it.
@@ -65,16 +66,24 @@ export function createPractice() {
       return nextHintRun(state, treeStore).length > 0;
     },
     guess(id: string) {
+      const was = state.status;
       state = applyGuess(state, id, treeStore, warmth);
       save();
+      if (was === "playing" && state.status !== "playing" && !state.seeded) {
+        statsStore.record({ mode: "practice", won: state.status === "won", moves: movesUsed(state) });
+      }
     },
     hint() {
       state = applyHint(state, treeStore, warmth);
       save();
     },
     forfeit() {
+      const was = state.status;
       state = applyForfeit(state);
       save();
+      if (was === "playing" && state.status !== "playing" && !state.seeded) {
+        statsStore.record({ mode: "practice", won: false, moves: movesUsed(state) });
+      }
     },
     newRound() {
       state = newRoundState(treeStore);
