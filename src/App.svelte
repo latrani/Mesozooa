@@ -45,6 +45,65 @@
   // Read the URL on load, before first paint.
   nav.hydrate();
 
+  // --- active-mode indicator -------------------------------------------------------------
+  // One bar owned by the <nav>, positioned by BOTH insets (left + right) rather than
+  // left + width. That's what buys the squash-and-stretch: the two edges get different
+  // transition durations, so the leading edge sprints ahead, the trailing edge dawdles, and
+  // the bar is momentarily longer than either label before snapping to its new width.
+  const modes = $derived([
+    { tab: "daily" as const, label: `Daily${hasProgress(daily.state) ? " – in progress" : ""}` },
+    { tab: "practice" as const, label: `Practice${hasProgress(game.state) ? " – in progress" : ""}` },
+    { tab: "explore" as const, label: "Explore" },
+  ]);
+
+  let navEl = $state<HTMLElement>();
+  const btns: (HTMLButtonElement | undefined)[] = [];
+  let indL = $state(0);
+  let indR = $state(0);
+  let dir = $state<"left" | "right">("right");
+  // Gates the transition until after the first measurement, so the bar doesn't fly in from
+  // left: 0 on every page load.
+  let ready = $state(false);
+  let lastMid = 0;
+
+  function measure() {
+    const el = btns[modes.findIndex((m) => m.tab === nav.tab)];
+    if (!el || !navEl) return;
+    const mid = el.offsetLeft + el.offsetWidth / 2;
+    // Direction comes from the bar's own midpoint travel, NOT from the tab index. That way one
+    // rule covers both cases: a tab click, and a re-layout that shoves the active button
+    // sideways without anyone clicking (see the ResizeObserver below). Equal midpoints (a pure
+    // re-measure) leave the previous direction alone.
+    if (ready && mid !== lastMid) dir = mid > lastMid ? "right" : "left";
+    lastMid = mid;
+    indL = el.offsetLeft;
+    indR = navEl.clientWidth - (el.offsetLeft + el.offsetWidth);
+  }
+
+  // Re-measure on tab change and on either label gaining/losing its "in progress" suffix.
+  $effect(() => {
+    void [nav.tab, modes];
+    measure();
+  });
+
+  // The other re-measure triggers, which are the ones you'd never think to enumerate: window
+  // resize, the Arsenal webfont swapping in after first paint (every button changes width), and
+  // — the sneaky one — hasProgress flipping on a button that ISN'T active. Daily sits first, so
+  // "Daily — in progress" appearing shoves Practice and Explore rightward while you're standing
+  // on one of them; the bar has to follow with no click involved. Observing the buttons as well
+  // as the nav catches the case where two labels change and the nav's own width nets out the same.
+  $effect(() => {
+    if (!navEl) return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(navEl);
+    for (const b of btns) if (b) ro.observe(b);
+    const raf = requestAnimationFrame(() => (ready = true));
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  });
+
   // Write: mirror app state into the hash, only when it actually differs.
   $effect(() => {
     const h = currentHash();
@@ -73,10 +132,24 @@
   </span>
   <span class="tagline">Find today's dinosaur!</span>
   <HowToPlay />
-  <nav class="modes">
-    <button type="button" class:active={nav.tab === "daily"} aria-current={nav.tab === "daily" ? "page" : undefined} onclick={() => nav.set("daily")}>Daily{#if hasProgress(daily.state)}{" — in progress"}{/if}</button>
-    <button type="button" class:active={nav.tab === "practice"} aria-current={nav.tab === "practice" ? "page" : undefined} onclick={() => nav.set("practice")}>Practice{#if hasProgress(game.state)}{" — in progress"}{/if}</button>
-    <button type="button" class:active={nav.tab === "explore"} aria-current={nav.tab === "explore" ? "page" : undefined} onclick={() => nav.set("explore")}>Explore</button>
+  <nav
+    class="modes"
+    class:ready
+    bind:this={navEl}
+    data-dir={dir}
+    style="--ind-l: {indL}px; --ind-r: {indR}px"
+  >
+    {#each modes as m, i (m.tab)}
+      <button
+        type="button"
+        bind:this={btns[i]}
+        class:active={nav.tab === m.tab}
+        aria-current={nav.tab === m.tab ? "page" : undefined}
+        onclick={() => nav.set(m.tab)}>{m.label}</button
+      >
+    {/each}
+    <!-- decorative: aria-current on the buttons already carries "which mode am I in" -->
+    <span class="indicator" aria-hidden="true"></span>
   </nav>
 </header>
 
@@ -148,6 +221,16 @@
     margin-left: auto;
     align-self: center;   /* keep the nav vertically centered, out of the baseline row */
     font-size: var(--type-heading);
+    position: relative;   /* the sliding indicator positions against this */
+    /* --- the two knobs -------------------------------------------------------------------
+       --ind-dur: how long the whole slide takes (the TRAILING edge's duration, so it's what
+         you feel as the overall speed). Local on purpose: --dur is shared app-wide, so tuning
+         the nav there would retime every other transition too.
+       --ind-lead: the LEADING edge's duration. The gap between the two IS the stretch — the
+         smaller the fraction, the further the bar shoots ahead before its back edge catches up.
+         Set it equal to --ind-dur for a rigid glide with no squash at all. */
+    --ind-dur: 750ms;
+    --ind-lead: calc(var(--ind-dur) * .3);
   }
   .modes button {
     background: none; border: 0; cursor: pointer;
@@ -157,10 +240,22 @@
   }
   .modes button:hover { color: var(--cream); }
   .modes button.active { color: var(--cream); }
-  .modes button.active::after {
-    content: ""; position: absolute; left: 0; right: 0; bottom: -4px;
-    height: 3px; background: var(--accent); border-radius: 2px;
+  /* One bar for all three tabs, driven by measured insets (see the script). Both edges are
+     positioned, so animating them at different speeds stretches the bar mid-flight. */
+  .indicator {
+    position: absolute; bottom: -4px; height: 3px;
+    left: var(--ind-l); right: var(--ind-r);
+    background: var(--accent); border-radius: 2px;
+    pointer-events: none;
   }
+  /* .ready gates the transition past the first measurement, so no fly-in on load. Travelling
+     right, the right edge leads (short duration) and the left edge trails (long); mirrored
+     going left. base.css flattens all of this under prefers-reduced-motion. */
+  .modes.ready .indicator {
+    transition: left var(--ind-dur) var(--ease), right var(--ind-dur) var(--ease);
+  }
+  .modes.ready[data-dir="right"] .indicator { transition-duration: var(--ind-dur), var(--ind-lead); }
+  .modes.ready[data-dir="left"] .indicator { transition-duration: var(--ind-lead), var(--ind-dur); }
   /* slim attribution footer — muted, right-aligned, no divider; one unit of top padding */
   .app-footer {
     display: flex; justify-content: flex-end; text-align: right;
