@@ -1,9 +1,8 @@
 # Relayout FLIP: edges (and stems/stubs) must track animated node positions
 
-**Status:** design draft — **awaiting Morgan's review** (one design decision flagged below, plus a
-"how far to go" scope call). Written non-interactively while Morgan was away; do NOT implement
-until the flagged questions are answered.
-**Issue:** follow-up to #52 (relayout FLIP). File as a new issue on merge.
+**Status:** **approved** — Morgan reviewed the three flagged questions (resolutions below).
+Ready to implement (edge-tracking scope only; retract-then-extend deferred to the scope-C epic).
+**Issue:** follow-up to #52 (relayout FLIP). File as a new issue on implementation.
 **Component:** `src/lib/game/components/SpineTree.svelte`
 
 ## The two reported symptoms
@@ -109,10 +108,12 @@ until the nodes actually arrive there — which directly kills the "connects imm
 everything moves" jab. But it reads as a smooth reposition, not an explicit retract-then-grow
 gesture.
 
-My recommendation: **ship edge-tracking first** (removes the artifact, low risk, consistent with the
-"one shared clock" discipline). If, once you see it, you still want the deliberate retract-then-extend
-feel, that's a separate heavier feature to spec on its own. I suspect edge-tracking alone will feel
-right, but that's a your-eyes call — same as the whole slice-2 tuning was.
+**Resolved:** ship edge-tracking now; the retract-then-extend choreography moves to the **scope-C
+epic** (see *Resolutions*). Morgan's insight: retract-then-extend is *parent/LCA-anchored* edge
+motion — the same topology-aware character as scope-C's grow-in-from-parent and shrink-out-toward-
+parent. All three want the same mechanism (per-edge phase envelopes keyed to tree topology, not
+straight-line endpoint interpolation), so they belong together as one coherent feature rather than
+three separate deferrals.
 
 ## Testing
 
@@ -123,11 +124,18 @@ right, but that's a your-eyes call — same as the whole slice-2 tuning was.
   final on frame 0); confirm reduced-motion still instant; confirm no gradient/color detach.
 - `tsc --noEmit` + `svelte-check` before commit.
 
-## Open questions to answer before implementing (flagged for Morgan)
+## Resolutions (Morgan, 2026-07-21)
 
-1. **Entering-child asymmetry:** go with (A) rubber-band, or pull in (B) glide-entering-from-parent?
-   (I recommend A.)
-2. **Scope:** is edge-tracking enough, or do you want the retract-then-extend choreography too?
-   (I recommend edge-tracking first, decide on choreography after seeing it.)
-3. **Edge opacity:** confirm you want edges to fade with entering nodes (I think yes — otherwise
-   solid branches reach to ghost nodes). Any preference on `min(parent,child)` vs child-only?
+1. **Entering-child asymmetry → (A) rubber-band.** Entering nodes stay static+fade; edges rubber-band
+   from the gliding parent to the fixed new child. Making entering nodes glide is scope-C.
+2. **Retract-then-extend spine choreography → deferred to the scope-C epic** (not this fix). It's the
+   same topology-anchored motion as grow/shrink; grouping them shares the mechanism. Edge-tracking
+   ships now and is expected to remove the reported jarring; if the deliberate gesture is still wanted
+   after seeing it, it's already captured in the epic.
+3. **Edge opacity → yes, edges fade with entering nodes.** Use the child's opacity (the branch fades
+   in with the node it reaches). `min(parent,child)` is fine too if simpler in practice; child-opacity
+   is the intent.
+
+All three resolved → this spec is approved for implementation at **edge-tracking scope**. Next step:
+writing-plans, then execute. The deferred topology-aware choreography (grow-in, shrink-out, spine
+retract-then-extend) is tracked in the scope-C epic **[#58](https://github.com/latrani/Mesozooa/issues/58)**.
