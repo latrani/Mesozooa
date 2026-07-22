@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { layoutSpine, centerOffsetFor } from "./spine-layout";
+import { layoutSpine, centerOffsetFor, edgePathBetween } from "./spine-layout";
 import { createTreeStore } from "./treeStore";
 import { assembleTree, pruneSubtree } from "../tree/assemble";
 import { markPlayable } from "../tree/playable";
@@ -257,6 +257,27 @@ describe("layoutSpine — off-spine nesting is planar", () => {
     expect(new Set(side.map((b) => b.attach)).size).toBeGreaterThanOrEqual(2);
     // deepest-innermost: the deep-attached leaf sits NEARER the axis than the shallow chain root.
     expect(Math.abs(dl.y)).toBeLessThan(Math.abs(ac.y));
+  });
+});
+
+describe("edgePathBetween", () => {
+  it("same-row child → straight horizontal arm (no elbow)", () => {
+    expect(edgePathBetween({ x: 40, y: 100 }, { x: 240, y: 100 }, 16)).toBe("M 40 100 H 240");
+  });
+  it("child below → rounded elbow at parent x, child y", () => {
+    // dy=52>0, dirY=1, r=min(16,26,100)=16
+    expect(edgePathBetween({ x: 40, y: 100 }, { x: 240, y: 152 }, 16))
+      .toBe("M 40 100 V 136 Q 40 152 56 152 H 240");
+  });
+  it("child above → elbow up (dirY=-1)", () => {
+    // dy=-52, dirY=-1, r=min(16,26,100)=16; V goes to cy - r*dirY = 48-16*-1 = 64
+    const s = edgePathBetween({ x: 40, y: 100 }, { x: 240, y: 48 }, 16);
+    expect(s).toBe("M 40 100 V 64 Q 40 48 56 48 H 240");
+  });
+  it("clamps radius on a short riser", () => {
+    // dy=10 → r=min(16,5,100) = 5
+    expect(edgePathBetween({ x: 40, y: 100 }, { x: 240, y: 110 }, 16))
+      .toBe("M 40 100 V 105 Q 40 110 45 110 H 240");
   });
 });
 
