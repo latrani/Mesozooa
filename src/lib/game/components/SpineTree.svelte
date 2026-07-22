@@ -275,7 +275,7 @@
   // (old label's box → new label's box) + color, no dot phase. Position rides the shared clock in
   // BOTH modes, so neither wheels during a relayout. Kept as a toggle: the FLIP is now tight enough
   // that the puck flourish is optional, but it's still nice and may be useful elsewhere.
-  const PUCK_TRANSITION = true;
+  const PUCK_TRANSITION = false;
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
   // In no-puck mode, the box interpolates from the PREVIOUS label's measured box to the new one, so
   // we snapshot the old box at each transition (labelBox re-measures to the new label ~1 frame later).
