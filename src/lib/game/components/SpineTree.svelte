@@ -1,6 +1,6 @@
 <script lang="ts">
   import { treeStore } from "../treeData";
-  import { layoutSpine, centerOffsetFor } from "../spine-layout";
+  import { layoutSpine, centerOffsetFor, edgePathBetween } from "../spine-layout";
   import { a11yTree, buildNav, resolveKey } from "../a11y-tree";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
@@ -181,6 +181,12 @@
     return out;
   });
 
+  // id -> the ANIMATED render position ({x,y,opacity} in PIXEL space) for this frame. Edges,
+  // spine gradients, the root stem, and collapsed-clade stubs read this instead of the final
+  // layout (posOf + px/py) so they track gliding nodes during a relayout rather than snapping.
+  // CAUTION: these values are ALREADY pixels — use d.x/d.y directly, never wrap in px()/py().
+  let displayedPos = $derived(new Map(displayed.map((d) => [d.id, d])));
+
   // On a relayout: snapshot current displayed positions as the FLIP's `from` (so an interrupted
   // glide restarts from where nodes visually are), diff against the new layout, restart progress.
   // Depends on `layout` ONLY; reads displayed/progress under untrack so it never self-triggers.
@@ -251,7 +257,7 @@
   // rides `ringProgress` (same 0→1/GLIDE_MS as the node FLIP + scroll → no wheel); its SIZE rides
   // `morphTween` (dot↔bloom); only its fill/stroke COLOR animates via a CSS transition (native
   // color interp, no JS color math). The opacities are computed inline from `morphTween`.
-  const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  const GLIDE_MS = 2000; // one speed for every move (playtest: snappy feels good on click too). Tunable.
   // Relayout FLIP completion fractions of the GLIDE_MS envelope (shared clock, shared start).
   // Staggered COMPLETION gives cause→effect: structure settles, branches appear, focus arrives.
   // Values provisional (look-and-feel pass); the order LEAVE < FLIP < ENTER < puck(1.0) is fixed.
@@ -410,22 +416,16 @@
     return { update: measure };
   }
 
-  function edgePath(parentId: string, childId: string): string {
-    const p = posOf.get(parentId)!;
-    const c = posOf.get(childId)!;
-    // Square cladogram: diverge at the ANCESTOR marker — vertical riser at the parent's x,
-    // then horizontal to the child. Keeps branches off the spine (they leave perpendicular).
-    const x0 = px(p.x), y0 = py(p.y);
-    const cx = px(p.x), cy = py(c.y); // the elbow corner
-    const x1 = px(c.x);
-    const dy = cy - y0; // riser direction: +down / -up (0 when child shares the parent's row)
-    // A same-row child has no riser, so no corner to round — draw the straight arm.
-    if (dy === 0) return `M ${x0} ${y0} H ${x1}`;
-    // Round the elbow with a quadratic whose control point is the sharp corner; clamp the radius
-    // to half of each leg so short segments don't over-round or overshoot.
-    const dirY = Math.sign(dy);
-    const r = Math.min(CORNER_RADIUS, Math.abs(dy) / 2, (x1 - cx) / 2);
-    return `M ${x0} ${y0} V ${cy - r * dirY} Q ${cx} ${cy} ${cx + r} ${cy} H ${x1}`;
+  // Edge path through the ANIMATED node positions: look both endpoints up in displayedPos (already
+  // pixels — do NOT apply px/py) and delegate the square-cladogram elbow geometry to the pure
+  // edgePathBetween (spine-layout). Returns "" if either endpoint is missing (defensive; skip
+  // rather than throw). An entering child whose parent is persisting will have one static end
+  // until the child fades in — that's expected, not a bug.
+  function edgePathAnim(parentId: string, childId: string): string {
+    const p = displayedPos.get(parentId);
+    const c = displayedPos.get(childId);
+    if (!p || !c) return "";
+    return edgePathBetween(p, c, CORNER_RADIUS);
   }
 
   // Prefers-reduced-motion => instant; otherwise the browser eases to a stop.
@@ -740,11 +740,11 @@
         </linearGradient>
         {#each layout.edges as e (e.parentId + ">" + e.childId)}
           {#if e.onSpine}
-            {@const p = posOf.get(e.parentId)}
-            {@const c = posOf.get(e.childId)}
+            {@const p = displayedPos.get(e.parentId)}
+            {@const c = displayedPos.get(e.childId)}
             {#if p && c}
               <linearGradient id={gradId(e.parentId, e.childId)} gradientUnits="userSpaceOnUse"
-                x1={px(p.x)} y1="0" x2={px(c.x)} y2="0">
+                x1={p.x} y1="0" x2={c.x} y2="0">
                 <stop offset="0" style="stop-color: {colorOf(e.parentId, true, treeStore.getNode(e.parentId)?.isGenus ?? false)}" />
                 <stop offset="1" style="stop-color: {colorOf(e.childId, true, treeStore.getNode(e.childId)?.isGenus ?? false)}" />
               </linearGradient>
@@ -752,11 +752,16 @@
           {/if}
         {/each}
       </defs>
-      <!-- decorative stem: the spine trails left of Dinosauria into deep time (coldest) -->
-      <path class="edge spine" d={`M 0 ${py(0)} H ${px(0)}`} fill="none" style="stroke: {colorOf(treeStore.data.rootId, true, treeStore.getNode(treeStore.data.rootId)?.isGenus ?? false)}" />
+      <!-- decorative stem: the spine trails left of Dinosauria into deep time (coldest). Its y
+           rides the ANIMATED root position so it stays attached as the root glides; px(0) is a
+           constant left origin (only the y term moves, via minY). -->
+      <path class="edge spine" d={`M 0 ${displayedPos.get(treeStore.data.rootId)?.y ?? py(0)} H ${px(0)}`} fill="none" style="stroke: {colorOf(treeStore.data.rootId, true, treeStore.getNode(treeStore.data.rootId)?.isGenus ?? false)}" />
       {#each layout.edges as e (e.parentId + ">" + e.childId)}
-        <!-- spine segments blend between their endpoint dot colors -->
-        <path class="edge" class:spine={e.onSpine} d={edgePath(e.parentId, e.childId)} fill="none"
+        <!-- spine segments blend between their endpoint dot colors; path + opacity track the
+             animated node positions so branches glide with their nodes instead of snapping. -->
+        {@const co = displayedPos.get(e.childId)?.opacity ?? 1}
+        <path class="edge" class:spine={e.onSpine} d={edgePathAnim(e.parentId, e.childId)} fill="none"
+          opacity={co}
           style={e.onSpine ? `stroke: url(#${gradId(e.parentId, e.childId)})` : ""} />
       {/each}
       <!-- "more here" stubs for collapsed clades. Drawn WITH the branch edges (before the ring), not
@@ -764,8 +769,11 @@
            selection ring exactly like a real branch edge does, rather than in front of it. -->
       {#each layout.nodes as n (n.id)}
         {#if isExpandable(n.id)}
-          <line transform={`translate(${px(n.x)} ${py(n.y)})`}
-            x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
+          {@const dp = displayedPos.get(n.id)}
+          {#if dp}
+            <line transform={`translate(${dp.x} ${dp.y})`}
+              x1="6" y1="0" x2="96" y2="0" stroke="url(#sp-stub-fade)" stroke-width="2.5" stroke-linecap="round" />
+          {/if}
         {/if}
       {/each}
       <!-- The persistent focus ring is drawn HERE — after the branch edges but BEFORE the node
