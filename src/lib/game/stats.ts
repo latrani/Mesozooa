@@ -68,3 +68,31 @@ export function deserializeStats(raw: string | null): Stats {
     return emptyStats();
   }
 }
+
+// Whole-day difference between two "YYYY-MM-DD" strings (b - a). Parsed as UTC midnight so DST
+// never shifts the count. No Date.now(); inputs are explicit.
+export function dayDiff(a: string, b: string): number {
+  const ms = Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`);
+  return Math.round(ms / 86_400_000);
+}
+
+export function windowStats(
+  stats: Stats,
+  now: number,
+  days: number,
+): { played: number; won: number; ratio: number | null } {
+  const cutoff = now - days * 86_400_000;
+  let played = 0;
+  let won = 0;
+  for (const p of stats.log) {
+    if (p.t >= cutoff) {
+      played += 1;
+      if (p.won) won += 1;
+    }
+  }
+  return { played, won, ratio: played === 0 ? null : won / played };
+}
+
+export function avgMoves(acc: Acc): number | null {
+  return acc.won === 0 ? null : acc.moveSum / acc.won;
+}
