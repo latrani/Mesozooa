@@ -46,6 +46,17 @@ function isAcc(a: unknown): a is Acc {
   return !!a && typeof r.played === "number" && typeof r.won === "number" && typeof r.moveSum === "number";
 }
 
+function isPlayLog(p: unknown): p is PlayLog {
+  const r = p as Record<string, unknown>;
+  return (
+    !!p && typeof p === "object" &&
+    typeof r.t === "number" &&
+    (r.mode === "daily" || r.mode === "practice") &&
+    typeof r.won === "boolean" &&
+    typeof r.moves === "number"
+  );
+}
+
 export function deserializeStats(raw: string | null): Stats {
   if (raw === null) return emptyStats();
   try {
@@ -59,7 +70,7 @@ export function deserializeStats(raw: string | null): Stats {
       (streak.lastWinDate === null || typeof streak.lastWinDate === "string") &&
       isAcc(o.daily) &&
       isAcc(o.overall) &&
-      Array.isArray(o.log)
+      Array.isArray(o.log) && o.log.every(isPlayLog)
     ) {
       return o as unknown as Stats;
     }
@@ -74,6 +85,16 @@ export function deserializeStats(raw: string | null): Stats {
 export function dayDiff(a: string, b: string): number {
   const ms = Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`);
   return Math.round(ms / 86_400_000);
+}
+
+// The streak's CURRENT value as of `today`, accounting for a lazy break: recordPlay only
+// updates the streak on a recorded play, so between plays a missed day leaves a stale `current`.
+// Displayed current is live only while lastWinDate is today or yesterday; otherwise the streak
+// is already dead (the next win can only restart at 1). `best`/`lastWinDate` are untouched.
+export function currentStreak(streak: StreakRec, today: string): number {
+  if (streak.lastWinDate === null) return streak.current;
+  const gap = dayDiff(streak.lastWinDate, today);
+  return gap === 0 || gap === 1 ? streak.current : 0;
 }
 
 export function windowStats(

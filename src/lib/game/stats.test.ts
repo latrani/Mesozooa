@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { emptyStats, serializeStats, deserializeStats, dayDiff, windowStats, avgMoves, recordPlay } from "./stats";
+import { emptyStats, serializeStats, deserializeStats, dayDiff, windowStats, avgMoves, recordPlay, currentStreak } from "./stats";
 
 describe("emptyStats", () => {
   it("is a zeroed record", () => {
@@ -26,6 +26,14 @@ describe("serializeStats / deserializeStats", () => {
   it("returns emptyStats on garbage", () => {
     expect(deserializeStats("not json")).toEqual(emptyStats());
     expect(deserializeStats(JSON.stringify({ version: 99 }))).toEqual(emptyStats());
+  });
+  it("returns emptyStats when a log entry is malformed", () => {
+    const bad = { ...emptyStats(), log: [null] };
+    expect(deserializeStats(JSON.stringify(bad))).toEqual(emptyStats());
+  });
+  it("returns emptyStats when a log entry is missing fields", () => {
+    const bad = { ...emptyStats(), log: [{ t: 1, mode: "daily" }] };
+    expect(deserializeStats(JSON.stringify(bad))).toEqual(emptyStats());
   });
 });
 
@@ -124,6 +132,22 @@ describe("recordPlay — streak", () => {
     let s = recordPlay(emptyStats(), dailyWin(), "2026-07-22"); // current 1
     s = recordPlay(s, { t: 3, mode: "practice", won: false, moves: 4 }, "2026-07-22");
     expect(s.streak.current).toBe(1);
+  });
+});
+
+describe("currentStreak", () => {
+  const rec = (current: number, lastWinDate: string | null) => ({ current, best: 9, lastWinDate });
+  it("shows the live streak when the last win was today", () => {
+    expect(currentStreak(rec(3, "2026-07-22"), "2026-07-22")).toBe(3);
+  });
+  it("shows the live streak when the last win was yesterday (still extendable)", () => {
+    expect(currentStreak(rec(3, "2026-07-21"), "2026-07-22")).toBe(3);
+  });
+  it("shows 0 once a day was missed (gap >= 2)", () => {
+    expect(currentStreak(rec(3, "2026-07-20"), "2026-07-22")).toBe(0);
+  });
+  it("returns the stored current when there is no last win date", () => {
+    expect(currentStreak(rec(0, null), "2026-07-22")).toBe(0);
   });
 });
 

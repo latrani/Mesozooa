@@ -1,5 +1,5 @@
 import type { PlayLog, Stats } from "./stats";
-import { emptyStats, deserializeStats, serializeStats, recordPlay, windowStats, avgMoves } from "./stats";
+import { emptyStats, deserializeStats, serializeStats, recordPlay, windowStats, avgMoves, currentStreak } from "./stats";
 import { todayString } from "./daily";
 
 const STATS_KEY = "mesozooa:stats:1";
@@ -21,7 +21,7 @@ function createStatsStore() {
       return state;
     },
     get streak() {
-      return state.streak;
+      return { ...state.streak, current: currentStreak(state.streak, todayString()) };
     },
     get week() {
       return windowStats(state, Date.now(), 7);
