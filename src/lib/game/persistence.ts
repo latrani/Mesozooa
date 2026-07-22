@@ -1,6 +1,9 @@
-import type { GameState, GuessResult, GuessKind } from "./types";
+import type { GameState, GameMode, GuessResult, GuessKind } from "./types";
 
 const DAILY_PREFIX = "mesozooa:daily:1:";
+
+// Practice is a single slot (no date to namespace by) — the current round, whatever its status.
+export const PRACTICE_KEY = "mesozooa:practice:1";
 
 export function dailyKey(date: string): string {
   return DAILY_PREFIX + date;
@@ -12,7 +15,7 @@ export function staleDailyKeys(allKeys: string[], today: string): string[] {
   return allKeys.filter((k) => k.startsWith(DAILY_PREFIX) && k !== keep);
 }
 
-export function serializeDaily(state: GameState): string {
+export function serializeGame(state: GameState): string {
   return JSON.stringify(state);
 }
 
@@ -35,7 +38,7 @@ function isValidGuessRow(g: unknown): g is GuessResult {
   );
 }
 
-export function deserializeDaily(json: string): GameState | null {
+export function deserializeGame(json: string, expectedMode: GameMode): GameState | null {
   try {
     const obj = JSON.parse(json);
     if (
@@ -44,7 +47,7 @@ export function deserializeDaily(json: string): GameState | null {
       Array.isArray(obj.guesses) &&
       obj.guesses.every(isValidGuessRow) &&
       typeof obj.status === "string" &&
-      obj.mode === "daily" &&
+      obj.mode === expectedMode &&
       typeof obj.hintsUsed === "number" &&
       (obj.maxGuesses === null || typeof obj.maxGuesses === "number")
     ) {

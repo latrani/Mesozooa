@@ -6,7 +6,7 @@
   import { formatHash, parseHash, type Route } from "./lib/route";
   import { hasProgress } from "./lib/game/engine-core";
   import { daily } from "./lib/game/dailyStore.svelte";
-  import { game } from "./lib/game/gameStore.svelte";
+  import { practice } from "./lib/game/practiceStore.svelte";
   import meta from "./data/meta.json";
   import Daily from "./lib/game/components/Daily.svelte";
   import Practice from "./lib/game/components/Practice.svelte";
@@ -52,7 +52,7 @@
   // the bar is momentarily longer than either label before snapping to its new width.
   const modes = $derived([
     { tab: "daily" as const, label: `Daily${hasProgress(daily.state) ? " – in progress" : ""}` },
-    { tab: "practice" as const, label: `Practice${hasProgress(game.state) ? " – in progress" : ""}` },
+    { tab: "practice" as const, label: `Practice${hasProgress(practice.state) ? " – in progress" : ""}` },
     { tab: "explore" as const, label: "Explore" },
   ]);
 

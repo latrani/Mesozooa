@@ -1,6 +1,6 @@
 import { explorer } from "./explorer/explorerStore.svelte";
 import { treeStore } from "./game/treeData";
-import { game } from "./game/gameStore.svelte";
+import { practice } from "./game/practiceStore.svelte";
 import { resolveTaxonRef } from "./explorer/explorer-core";
 import { parseHash, type Route, type Tab } from "./route";
 
@@ -28,7 +28,7 @@ function createNav() {
         // playable genus, then redirect to a clean #/practice so the answer never lingers in the
         // URL you play under. A non-playable/unknown ref just lands on plain practice.
         const id = resolveTaxonRef(treeStore, route.taxon);
-        if (id && treeStore.getNode(id)?.playable) game.startWith(id);
+        if (id && treeStore.getNode(id)?.playable) practice.startWith(id);
         // replaceState (not location.hash=): the transient seed URL becomes no history entry, so
         // Back never lands on it and it fires no hashchange.
         if (typeof history !== "undefined") history.replaceState(null, "", "#/practice");

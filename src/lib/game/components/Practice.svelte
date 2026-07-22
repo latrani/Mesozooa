@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { game } from "../gameStore.svelte";
+  import { practice } from "../practiceStore.svelte";
   import { nav } from "../../nav.svelte";
   import GameBoard from "./GameBoard.svelte";
 </script>
 
 <main class="practice">
   <GameBoard
-    store={game}
-    disabled={game.state.status !== "playing"}
+    store={practice}
+    disabled={practice.state.status !== "playing"}
     onexplore={(id) => nav.exploreAround(id)}
-    onnew={() => game.newRound()}
+    onnew={() => practice.newRound()}
   />
 </main>
 

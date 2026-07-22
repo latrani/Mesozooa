@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { serializeDaily, deserializeDaily, dailyKey, staleDailyKeys } from "./persistence";
+import { serializeGame, deserializeGame, dailyKey, staleDailyKeys } from "./persistence";
 import type { GameState } from "./types";
 
 const sample: GameState = {
@@ -13,23 +13,29 @@ const sample: GameState = {
   hintsUsed: 0,
 };
 
-describe("serializeDaily / deserializeDaily", () => {
+const practiceSample: GameState = { ...sample, mode: "practice", maxGuesses: null };
+
+describe("serializeGame / deserializeGame", () => {
   it("round-trips a daily state", () => {
-    expect(deserializeDaily(serializeDaily(sample))).toEqual(sample);
+    expect(deserializeGame(serializeGame(sample), "daily")).toEqual(sample);
+  });
+  it("round-trips a practice state", () => {
+    expect(deserializeGame(serializeGame(practiceSample), "practice")).toEqual(practiceSample);
   });
   it("returns null on non-JSON", () => {
-    expect(deserializeDaily("not json")).toBeNull();
+    expect(deserializeGame("not json", "daily")).toBeNull();
   });
   it("returns null when required fields are missing", () => {
-    expect(deserializeDaily(JSON.stringify({ target: "Q1" }))).toBeNull();
+    expect(deserializeGame(JSON.stringify({ target: "Q1" }), "daily")).toBeNull();
   });
   it("returns null when a guess row is malformed", () => {
     const bad = { ...sample, guesses: [{ guessId: "Q9" }] }; // missing sharedNodeId/kind/warmth
-    expect(deserializeDaily(JSON.stringify(bad))).toBeNull();
+    expect(deserializeGame(JSON.stringify(bad), "daily")).toBeNull();
   });
-  it("returns null for a non-daily-mode blob", () => {
-    const practice = { ...sample, mode: "practice" };
-    expect(deserializeDaily(JSON.stringify(practice))).toBeNull();
+  it("returns null when the stored mode doesn't match the expected mode", () => {
+    // A practice blob must not deserialize as daily, and vice versa.
+    expect(deserializeGame(serializeGame(practiceSample), "daily")).toBeNull();
+    expect(deserializeGame(serializeGame(sample), "practice")).toBeNull();
   });
   it("backfills cost and normalizes legacy kinds on rows from before the rename", () => {
     const legacy = JSON.stringify({
@@ -45,7 +51,7 @@ describe("serializeDaily / deserializeDaily", () => {
       maxGuesses: 20,
       hintsUsed: 2,
     });
-    const state = deserializeDaily(legacy);
+    const state = deserializeGame(legacy, "daily");
     expect(state).not.toBeNull();
     expect(state!.guesses[0].cost).toBe(1); // guess backfills to 1
     expect(state!.guesses[1].kind).toBe("branchHint"); // legacy "hint" -> branchHint

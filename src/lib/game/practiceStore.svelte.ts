@@ -13,10 +13,29 @@ import {
   movesUsed,
   leafHintActive,
 } from "./engine-core";
+import { serializeGame, deserializeGame, PRACTICE_KEY } from "./persistence";
 
-export function createGame() {
-  let state = $state<GameState>(newRoundState(treeStore));
+// Practice is a single slot: the current round survives reloads (and silent post-deploy
+// reloads) exactly like Daily. Solved/forfeited end-state persists; newRound overwrites it.
+function loadOrCreate(): GameState {
+  if (typeof localStorage !== "undefined") {
+    const raw = localStorage.getItem(PRACTICE_KEY);
+    const restored = raw ? deserializeGame(raw, "practice") : null;
+    if (restored) return restored;
+  }
+  return newRoundState(treeStore);
+}
+
+export function createPractice() {
+  let state = $state<GameState>(loadOrCreate());
   const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore.data, state.target));
+
+  function save() {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(PRACTICE_KEY, serializeGame(state));
+    }
+  }
+
   return {
     get state(): GameState {
       return state;
@@ -47,20 +66,25 @@ export function createGame() {
     },
     guess(id: string) {
       state = applyGuess(state, id, treeStore, warmth);
+      save();
     },
     hint() {
       state = applyHint(state, treeStore, warmth);
+      save();
     },
     forfeit() {
       state = applyForfeit(state);
+      save();
     },
     newRound() {
       state = newRoundState(treeStore);
+      save();
     },
     startWith(targetId: string) {
       state = newRoundState(treeStore, Math.random, targetId);
+      save();
     },
   };
 }
 
-export const game = createGame();
+export const practice = createPractice();

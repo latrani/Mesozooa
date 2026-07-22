@@ -15,7 +15,7 @@ import {
 } from "./engine-core";
 import { dailyAnswer, todayString } from "./daily";
 import dailyCalendar from "../../data/daily-calendar.json";
-import { serializeDaily, deserializeDaily, dailyKey, staleDailyKeys } from "./persistence";
+import { serializeGame, deserializeGame, dailyKey, staleDailyKeys } from "./persistence";
 
 // Drop persisted state from earlier days so keys don't accumulate.
 function pruneStale(today: string): void {
@@ -28,7 +28,7 @@ function pruneStale(today: string): void {
 function loadOrCreate(date: string): GameState {
   if (typeof localStorage !== "undefined") {
     const raw = localStorage.getItem(dailyKey(date));
-    const restored = raw ? deserializeDaily(raw) : null;
+    const restored = raw ? deserializeGame(raw, "daily") : null;
     // Recompute stored warmth so restored games reflect the current warmth model.
     if (restored) return refreshWarmth(restored, treeStore, warmthForTarget(treeStore.data, restored.target));
   }
@@ -44,7 +44,7 @@ function createDaily() {
 
   function save() {
     if (typeof localStorage !== "undefined") {
-      localStorage.setItem(dailyKey(date), serializeDaily(state));
+      localStorage.setItem(dailyKey(date), serializeGame(state));
     }
   }
 
