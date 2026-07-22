@@ -96,3 +96,39 @@ export function windowStats(
 export function avgMoves(acc: Acc): number | null {
   return acc.won === 0 ? null : acc.moveSum / acc.won;
 }
+
+function bump(acc: Acc, won: boolean, moves: number): Acc {
+  return {
+    played: acc.played + 1,
+    won: acc.won + (won ? 1 : 0),
+    moveSum: acc.moveSum + (won ? moves : 0),
+  };
+}
+
+// Returns a NEW Stats. Not idempotent for the log/accumulators — the caller (the store hook)
+// must fire this exactly once per completed game. The same-day guard protects the STREAK only.
+export function recordPlay(stats: Stats, play: PlayLog, today: string): Stats {
+  const next: Stats = {
+    ...stats,
+    daily: play.mode === "daily" ? bump(stats.daily, play.won, play.moves) : stats.daily,
+    overall: bump(stats.overall, play.won, play.moves),
+    log: [...stats.log, play],
+    streak: { ...stats.streak },
+  };
+
+  if (play.mode === "daily") {
+    if (play.won) {
+      if (next.streak.lastWinDate === today) {
+        // same-day repeat: leave the streak untouched
+      } else {
+        const consecutive = next.streak.lastWinDate !== null && dayDiff(next.streak.lastWinDate, today) === 1;
+        next.streak.current = consecutive ? next.streak.current + 1 : 1;
+        next.streak.best = Math.max(next.streak.best, next.streak.current);
+        next.streak.lastWinDate = today;
+      }
+    } else {
+      next.streak.current = 0;
+    }
+  }
+  return next;
+}

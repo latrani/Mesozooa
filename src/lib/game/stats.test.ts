@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { emptyStats, serializeStats, deserializeStats, dayDiff, windowStats, avgMoves } from "./stats";
+import { emptyStats, serializeStats, deserializeStats, dayDiff, windowStats, avgMoves, recordPlay } from "./stats";
 
 describe("emptyStats", () => {
   it("is a zeroed record", () => {
@@ -71,3 +71,60 @@ describe("avgMoves", () => {
     expect(avgMoves({ played: 3, won: 0, moveSum: 0 })).toBeNull();
   });
 });
+
+describe("recordPlay — accumulators", () => {
+  it("bumps overall + daily on a daily win, adds moves to both moveSums", () => {
+    const s = recordPlay(emptyStats(), { t: 1, mode: "daily", won: true, moves: 6 }, "2026-07-22");
+    expect(s.overall).toEqual({ played: 1, won: 1, moveSum: 6 });
+    expect(s.daily).toEqual({ played: 1, won: 1, moveSum: 6 });
+    expect(s.log).toHaveLength(1);
+  });
+  it("bumps only overall on a practice play, and only moveSum on a win", () => {
+    const win = recordPlay(emptyStats(), { t: 1, mode: "practice", won: true, moves: 9 }, "2026-07-22");
+    expect(win.overall).toEqual({ played: 1, won: 1, moveSum: 9 });
+    expect(win.daily).toEqual({ played: 0, won: 0, moveSum: 0 });
+    const loss = recordPlay(emptyStats(), { t: 1, mode: "practice", won: false, moves: 9 }, "2026-07-22");
+    expect(loss.overall).toEqual({ played: 1, won: 0, moveSum: 0 }); // loss adds no moves
+  });
+  it("does not mutate the input", () => {
+    const s0 = emptyStats();
+    recordPlay(s0, { t: 1, mode: "daily", won: true, moves: 6 }, "2026-07-22");
+    expect(s0).toEqual(emptyStats());
+  });
+});
+
+describe("recordPlay — streak", () => {
+  const dailyWin = (moves = 5): PlayImport => ({ t: 1, mode: "daily", won: true, moves });
+  it("starts a streak at 1 on the first daily win", () => {
+    const s = recordPlay(emptyStats(), dailyWin(), "2026-07-22");
+    expect(s.streak).toEqual({ current: 1, best: 1, lastWinDate: "2026-07-22" });
+  });
+  it("extends on consecutive days", () => {
+    let s = recordPlay(emptyStats(), dailyWin(), "2026-07-21");
+    s = recordPlay(s, dailyWin(), "2026-07-22");
+    expect(s.streak).toEqual({ current: 2, best: 2, lastWinDate: "2026-07-22" });
+  });
+  it("resets to 1 after a gap, keeping best", () => {
+    let s = recordPlay(emptyStats(), dailyWin(), "2026-07-20");
+    s = recordPlay(s, dailyWin(), "2026-07-21"); // current 2, best 2
+    s = recordPlay(s, dailyWin(), "2026-07-25"); // gap
+    expect(s.streak).toEqual({ current: 1, best: 2, lastWinDate: "2026-07-25" });
+  });
+  it("is idempotent for a second win on the same day", () => {
+    let s = recordPlay(emptyStats(), dailyWin(), "2026-07-22");
+    s = recordPlay(s, dailyWin(), "2026-07-22");
+    expect(s.streak.current).toBe(1);
+  });
+  it("resets current to 0 on a daily loss but preserves best", () => {
+    let s = recordPlay(emptyStats(), dailyWin(), "2026-07-21"); // current 1, best 1
+    s = recordPlay(s, { t: 2, mode: "daily", won: false, moves: 20 }, "2026-07-22");
+    expect(s.streak).toEqual({ current: 0, best: 1, lastWinDate: "2026-07-21" });
+  });
+  it("ignores practice plays for the streak", () => {
+    let s = recordPlay(emptyStats(), dailyWin(), "2026-07-22"); // current 1
+    s = recordPlay(s, { t: 3, mode: "practice", won: false, moves: 4 }, "2026-07-22");
+    expect(s.streak.current).toBe(1);
+  });
+});
+
+type PlayImport = import("./stats").PlayLog;
