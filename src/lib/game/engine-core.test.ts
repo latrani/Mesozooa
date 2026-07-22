@@ -441,3 +441,13 @@ describe("hasProgress", () => {
     expect(hasProgress(won)).toBe(false);
   });
 });
+
+describe("newRoundState seeded flag", () => {
+  it("marks a seeded round when given a playable target", () => {
+    const id = store.playableGenera()[0].id;
+    expect(newRoundState(store, Math.random, id).seeded).toBe(true);
+  });
+  it("leaves seeded undefined for a normal random round", () => {
+    expect(newRoundState(store).seeded).toBeUndefined();
+  });
+});

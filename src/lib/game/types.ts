@@ -22,4 +22,6 @@ export interface GameState {
   mode: GameMode;
   maxGuesses: number | null;
   hintsUsed: number;
+  /** set only when a practice round is started from a seed URL; excluded from stats. */
+  seeded?: true;
 }

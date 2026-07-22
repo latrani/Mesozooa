@@ -81,11 +81,17 @@ export function newRoundState(
   targetId?: string,
 ): GameState {
   const pool = store.playableGenera();
-  const target =
-    targetId && store.isPlayable(targetId)
-      ? targetId
-      : pool[Math.floor(rng() * pool.length)].id;
-  return { target, guesses: [], status: "playing", mode: "practice", maxGuesses: null, hintsUsed: 0 };
+  const seeded = targetId !== undefined && store.isPlayable(targetId);
+  const target = seeded ? targetId! : pool[Math.floor(rng() * pool.length)].id;
+  return {
+    target,
+    guesses: [],
+    status: "playing",
+    mode: "practice",
+    maxGuesses: null,
+    hintsUsed: 0,
+    ...(seeded ? { seeded: true } : {}),
+  };
 }
 
 export function newDailyState(target: string, maxGuesses = DAILY_MAX_GUESSES): GameState {
