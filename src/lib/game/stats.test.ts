@@ -147,7 +147,8 @@ describe("currentStreak", () => {
     expect(currentStreak(rec(3, "2026-07-20"), "2026-07-22")).toBe(0);
   });
   it("returns the stored current when there is no last win date", () => {
-    expect(currentStreak(rec(0, null), "2026-07-22")).toBe(0);
+    // non-zero stored current so this proves "returns stored", not a hardcoded 0
+    expect(currentStreak(rec(3, null), "2026-07-22")).toBe(3);
   });
 });
 
