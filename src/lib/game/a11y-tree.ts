@@ -72,6 +72,17 @@ export function a11yTree(
   return roots.sort(cmp).map(build);
 }
 
+// Spoken label for a treeitem. The sr-tree is the only structure a screen-reader user gets, and
+// the visual genus-vs-clade distinction (footprint vs tracks glyph) has no aural equivalent — so
+// name the type explicitly ("Deinonychus, genus" / "Dromaeosauridae, clade"). Clades also carry
+// their descendant-genus count, which reads naturally right after the type ("clade, 12 genera").
+// Grammatical "1 genus" vs "N genera" for the count.
+export function a11yLabel(n: Pick<A11yNode, "name" | "isGenus" | "descendantGenusCount">): string {
+  if (n.isGenus) return `${n.name}, genus`;
+  const unit = n.descendantGenusCount === 1 ? "genus" : "genera";
+  return `${n.name}, clade, ${n.descendantGenusCount} ${unit}`;
+}
+
 export function flattenVisible(roots: A11yNode[]): A11yNode[] {
   const out: A11yNode[] = [];
   const walk = (n: A11yNode) => {

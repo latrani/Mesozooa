@@ -1,7 +1,7 @@
 <script lang="ts">
   import { treeStore } from "../treeData";
   import { layoutSpine, centerOffsetFor, edgePathBetween } from "../spine-layout";
-  import { a11yTree, buildNav, resolveKey } from "../a11y-tree";
+  import { a11yTree, buildNav, resolveKey, a11yLabel } from "../a11y-tree";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
   import { warmthRampColor } from "../warmth-ramp";
@@ -913,7 +913,7 @@
     onfocus={() => onItemFocus(n.id)}
     onblur={onItemBlur}
   >
-    <span>{n.name}{#if !n.isGenus}, {n.descendantGenusCount} {n.descendantGenusCount === 1 ? "genus" : "genera"}{/if}</span>
+    <span>{a11yLabel(n)}</span>
     {#if n.children.length}
       <ul role="group">
         {#each n.children as c (c.id)}{@render treeitem(c)}{/each}

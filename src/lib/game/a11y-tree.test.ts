@@ -78,6 +78,26 @@ describe("flattenVisible", () => {
   });
 });
 
+import { a11yLabel } from "./a11y-tree";
+
+describe("a11yLabel", () => {
+  it("names a genus explicitly (no count)", () => {
+    expect(a11yLabel({ name: "Deinonychus", isGenus: true, descendantGenusCount: 0 })).toBe(
+      "Deinonychus, genus",
+    );
+  });
+  it("names a clade and appends its descendant-genus count", () => {
+    expect(a11yLabel({ name: "Dromaeosauridae", isGenus: false, descendantGenusCount: 12 })).toBe(
+      "Dromaeosauridae, clade, 12 genera",
+    );
+  });
+  it("uses the singular unit for a one-genus clade", () => {
+    expect(a11yLabel({ name: "Monotypica", isGenus: false, descendantGenusCount: 1 })).toBe(
+      "Monotypica, clade, 1 genus",
+    );
+  });
+});
+
 import { buildNav, resolveKey } from "./a11y-tree";
 
 describe("buildNav + resolveKey", () => {
