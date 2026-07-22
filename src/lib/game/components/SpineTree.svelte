@@ -798,12 +798,14 @@
            glyphs/backplates/labels — so it sits behind every node's page-color backplate and glyph
            (SVG paint order = document order; no z-index). This restores the original per-node ring's
            stacking: on top of branch lines, tucked behind the glyph disc it frames.
-           SHAPE = lerpRingGeom(dot, bloom, morph) at the live `ringCenterNow` (position on the shared
-           clock, size on morphTween). The two opacity levers are computed inline as attrs from `morph`
-           (NOT CSS): element `opacity` fades the WHOLE puck (PUCK_TRAVEL_OPACITY as a dot → 1 bloomed),
-           `fill-opacity` carries the fill tint (1 solid dot → 0.18 translucent bloom, label showing
-           through). Only fill/stroke COLOR animates via CSS (see .label-ring) so hue glides node→node
-           with no JS color math. -->
+           POSITION (`ringCenterNow`) rides the shared clock in both modes. SHAPE + paint depend on
+           PUCK_TRANSITION (see the inline ternaries):
+           • false (default): a bloom box the whole way; size lerps outgoing-label-box → incoming
+             (via labelBoxFrom) on the position curve; opacity/fill-opacity constant (1 / 0.18).
+           • true (puck): lerp dot↔bloom by `morph`, and the two opacity levers ride `morph` too —
+             element `opacity` fades the whole puck (PUCK_TRAVEL_OPACITY dot → 1 bloom), `fill-opacity`
+             the tint (1 solid dot → 0.18 translucent bloom).
+           Either way, only fill/stroke COLOR animates via CSS (see .label-ring) — no JS color math. -->
       {#if ringId && ringCenterNow}
         {@const c = ringCenterNow}
         {@const m = morphTween.current}
