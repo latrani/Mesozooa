@@ -148,6 +148,7 @@
       {highlightId}
       {rightInset}
       showCounts={false}
+      speakShared
       warmthProvider={store.warmthProvider}
       onnodeselect={ended && onexplore ? (id) => onexplore(id) : undefined}
       linkLabels={ended}

@@ -72,15 +72,35 @@ export function a11yTree(
   return roots.sort(cmp).map(build);
 }
 
-// Spoken label for a treeitem. The sr-tree is the only structure a screen-reader user gets, and
-// the visual genus-vs-clade distinction (footprint vs tracks glyph) has no aural equivalent — so
-// name the type explicitly ("Deinonychus, genus" / "Dromaeosauridae, clade"). Clades also carry
-// their descendant-genus count, which reads naturally right after the type ("clade, 12 genera").
+export interface A11yLabelOpts {
+  /** Speak the shared/not-shared trail signal (game only — Explore has no target). When set, the
+      visual warm-spine "this clade contains the target" cue gets an aural equivalent. */
+  shared?: boolean;
+  /** Append the descendant-genus count to clades. On in Explore (faithful reference cladogram);
+      off in the game, where the count is a confusing non-playable signal (matches showCounts). */
+  withCount?: boolean;
+}
+
+// Spoken label for a treeitem. The sr-tree is the only structure a screen-reader user gets, so
+// cues the sighted layer carries visually must be spoken here or they're simply absent:
+//  - genus vs clade: the footprint-vs-tracks glyph has no aural equivalent → name the type.
+//  - shared trail: the warm thick spine ("this clade contains the target") → ", shared" / ", not
+//    shared" when opts.shared is provided. The spine IS pathToRoot(warmest), i.e. exactly the
+//    clades known to hold the answer, so the flag must be read from that same source (onSpine),
+//    never re-derived — one tree, one source of truth.
+//  - count: clades carry their descendant-genus count only where the visual does (opts.withCount).
 // Grammatical "1 genus" vs "N genera" for the count.
-export function a11yLabel(n: Pick<A11yNode, "name" | "isGenus" | "descendantGenusCount">): string {
-  if (n.isGenus) return `${n.name}, genus`;
-  const unit = n.descendantGenusCount === 1 ? "genus" : "genera";
-  return `${n.name}, clade, ${n.descendantGenusCount} ${unit}`;
+export function a11yLabel(
+  n: Pick<A11yNode, "name" | "isGenus" | "descendantGenusCount">,
+  opts: A11yLabelOpts = {},
+): string {
+  let label = n.isGenus ? `${n.name}, genus` : `${n.name}, clade`;
+  if (!n.isGenus && opts.withCount) {
+    const unit = n.descendantGenusCount === 1 ? "genus" : "genera";
+    label += `, ${n.descendantGenusCount} ${unit}`;
+  }
+  if (opts.shared !== undefined) label += opts.shared ? ", shared" : ", not shared";
+  return label;
 }
 
 export function flattenVisible(roots: A11yNode[]): A11yNode[] {

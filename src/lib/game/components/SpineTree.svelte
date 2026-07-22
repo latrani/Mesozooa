@@ -55,6 +55,7 @@
     rightInset = 0,
     nodeColor,
     showCounts = true,
+    speakShared = false,
     gradeByPlayable = false,
     linkLabels = false,
     warmthProvider,
@@ -72,8 +73,13 @@
         centering targets the visible area LEFT of it. */
     rightInset?: number;
     /** show the descendant-genus count beside each clade label. On in Explore (the faithful
-        reference cladogram); off in the game, where it's a confusing non-playable signal. */
+        reference cladogram); off in the game, where it's a confusing non-playable signal.
+        Gates the count in BOTH the visual label and the sr-tree so the two never disagree. */
     showCounts?: boolean;
+    /** speak the shared/not-shared trail signal in the sr-tree — the aural equivalent of the warm
+        thick spine. On in the game (the spine IS the target's shared lineage); off in Explore,
+        whose spine leads to the focused node and carries no "shared with target" meaning. */
+    speakShared?: boolean;
     /** grade genus labels by playability. On in Explore, so a name scanned here is worth
         carrying to the guess box; off in the game, whose pool is playable-only anyway. */
     gradeByPlayable?: boolean;
@@ -913,7 +919,9 @@
     onfocus={() => onItemFocus(n.id)}
     onblur={onItemBlur}
   >
-    <span>{a11yLabel(n)}</span>
+    <!-- shared flag reads the SAME posOf.onSpine the visual warmth color uses (SpineTree line ~848),
+         so the spoken trail can't drift from the seen one. Off-layout nodes read false. -->
+    <span>{a11yLabel(n, { withCount: showCounts, shared: speakShared ? (posOf.get(n.id)?.onSpine ?? false) : undefined })}</span>
     {#if n.children.length}
       <ul role="group">
         {#each n.children as c (c.id)}{@render treeitem(c)}{/each}

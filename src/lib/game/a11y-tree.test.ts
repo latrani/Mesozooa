@@ -81,20 +81,31 @@ describe("flattenVisible", () => {
 import { a11yLabel } from "./a11y-tree";
 
 describe("a11yLabel", () => {
-  it("names a genus explicitly (no count)", () => {
-    expect(a11yLabel({ name: "Deinonychus", isGenus: true, descendantGenusCount: 0 })).toBe(
-      "Deinonychus, genus",
-    );
+  const genus = { name: "Deinonychus", isGenus: true, descendantGenusCount: 0 };
+  const clade = { name: "Dromaeosauridae", isGenus: false, descendantGenusCount: 12 };
+
+  it("names a genus explicitly, no count even when asked (a genus has none)", () => {
+    expect(a11yLabel(genus)).toBe("Deinonychus, genus");
+    expect(a11yLabel(genus, { withCount: true })).toBe("Deinonychus, genus");
   });
-  it("names a clade and appends its descendant-genus count", () => {
-    expect(a11yLabel({ name: "Dromaeosauridae", isGenus: false, descendantGenusCount: 12 })).toBe(
-      "Dromaeosauridae, clade, 12 genera",
-    );
+  it("names a clade without a count by default (game: showCounts off)", () => {
+    expect(a11yLabel(clade)).toBe("Dromaeosauridae, clade");
+  });
+  it("appends the descendant-genus count when asked (Explore: showCounts on)", () => {
+    expect(a11yLabel(clade, { withCount: true })).toBe("Dromaeosauridae, clade, 12 genera");
   });
   it("uses the singular unit for a one-genus clade", () => {
-    expect(a11yLabel({ name: "Monotypica", isGenus: false, descendantGenusCount: 1 })).toBe(
+    expect(a11yLabel({ name: "Monotypica", isGenus: false, descendantGenusCount: 1 }, { withCount: true })).toBe(
       "Monotypica, clade, 1 genus",
     );
+  });
+  it("speaks the shared/not-shared trail signal when provided (game only)", () => {
+    expect(a11yLabel(clade, { shared: true })).toBe("Dromaeosauridae, clade, shared");
+    expect(a11yLabel(clade, { shared: false })).toBe("Dromaeosauridae, clade, not shared");
+    expect(a11yLabel(genus, { shared: false })).toBe("Deinonychus, genus, not shared");
+  });
+  it("omits the shared signal entirely when not provided (Explore has no target)", () => {
+    expect(a11yLabel(clade, { withCount: true })).not.toContain("shared");
   });
 });
 
