@@ -139,3 +139,19 @@ three separate deferrals.
 All three resolved → this spec is approved for implementation at **edge-tracking scope**. Next step:
 writing-plans, then execute. The deferred topology-aware choreography (grow-in, shrink-out, spine
 retract-then-extend) is tracked in the scope-C epic **[#58](https://github.com/latrani/Mesozooa/issues/58)**.
+
+## Follow-on: `PUCK_TRANSITION` toggle (added post-implementation)
+
+Once edge-tracking landed, the FLIP was tight enough that the ring's dramatic dot-collapse-and-skate
+("puck") felt optional. Rather than remove it, it's now a boolean in `SpineTree.svelte`:
+
+- **`PUCK_TRANSITION = true`** (default, shipped) — the puck: box collapses to a glyph-sized dot,
+  skates glyph-to-glyph, re-blooms into the label box. (Slice-1 behavior.)
+- **`PUCK_TRANSITION = false`** — the ring stays a label box and glides label→label, tweening
+  position + **size** (the outgoing label's box → the incoming label's box, since label widths
+  differ — snapshotted via `labelBoxFrom`) + color. No dot phase, stays a solid bloom (opacity 1,
+  fill-opacity 0.18) throughout.
+
+**Position rides the shared clock in BOTH modes**, so neither wheels during a relayout — the mode
+only changes SIZE behavior (dot-morph vs. box-to-box), not the position invariant. Kept as a knob
+because the puck is still nice and may suit other contexts; the default stays the puck for now.

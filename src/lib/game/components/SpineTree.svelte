@@ -257,7 +257,7 @@
   // rides `ringProgress` (same 0→1/GLIDE_MS as the node FLIP + scroll → no wheel); its SIZE rides
   // `morphTween` (dot↔bloom); only its fill/stroke COLOR animates via a CSS transition (native
   // color interp, no JS color math). The opacities are computed inline from `morphTween`.
-  const GLIDE_MS = 2000; // one speed for every move (playtest: snappy feels good on click too). Tunable.
+  const GLIDE_MS = 200; // one speed for every move (playtest: snappy feels good on click too). Tunable.
   // Relayout FLIP completion fractions of the GLIDE_MS envelope (shared clock, shared start).
   // Staggered COMPLETION gives cause→effect: structure settles, branches appear, focus arrives.
   // Values provisional (look-and-feel pass); the order LEAVE < FLIP < ENTER < puck(1.0) is fixed.
@@ -270,7 +270,16 @@
   // px added to the dot's RADIUS beyond the glyph edge, so the dot can sit proud of the disc it frames.
   const PUCK_TRAVEL_OPACITY = 0.5;
   const PUCK_DOT_PAD = 2;
+  // Ring transition style. true = the "puck": box collapses to a glyph-sized dot, skates, re-blooms.
+  // false = the ring stays a label box and simply glides label→label, tweening position + size
+  // (old label's box → new label's box) + color, no dot phase. Position rides the shared clock in
+  // BOTH modes, so neither wheels during a relayout. Kept as a toggle: the FLIP is now tight enough
+  // that the puck flourish is optional, but it's still nice and may be useful elsewhere.
+  const PUCK_TRANSITION = true;
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  // In no-puck mode, the box interpolates from the PREVIOUS label's measured box to the new one, so
+  // we snapshot the old box at each transition (labelBox re-measures to the new label ~1 frame later).
+  let labelBoxFrom = $state<{ x: number; y: number; width: number; height: number } | null>(null);
   // First ring placement is instant: the tween starts at (0,0), so the first skate would fly the
   // ring in from the SVG's top-left corner. Cleared after the first real placement.
   let firstPlace = true;
@@ -329,6 +338,9 @@
     // `to`, so ringCenterNow still reflects the old target (interrupt-safe). Then point `to` at the
     // newly-focused node.
     const glideFrom = untrack(() => ringCenterNow);
+    // Snapshot the outgoing label's box so no-puck mode can tween old-box → new-box (labelBox itself
+    // re-measures to the incoming label a frame later).
+    labelBoxFrom = untrack(() => labelBox);
     ringCenterTo = newCenter;
 
     // Instant placement: reduced-motion or the very first mount → bloomed at rest, no skate/settle.
@@ -341,17 +353,23 @@
     }
 
     // Normal move: restart the position glide (same 0→1/GLIDE_MS as the node+scroll clock → lockstep,
-    // no wheel), morph to a dot as it travels, then bloom on settle if no new move interrupts.
+    // no wheel). Position glides in BOTH modes; the modes differ only in SIZE.
     // INVARIANT (no-wheel): ringProgress and flipProgressTween MUST be restarted with identical
     // (0→1, GLIDE_MS) params within one effect flush, so they share a frame-start on Svelte's raf
     // clock. A refactor that splits their triggers or changes one duration reintroduces the wheel.
     ringCenterFrom = glideFrom;
-    morphTween.set(0, { duration: GLIDE_MS });     // collapse to dot as it travels
     ringProgress.set(0, { duration: 0 });
     ringProgress.set(1, { duration: GLIDE_MS });
-    settleTimer = setTimeout(() => {
-      morphTween.set(1, { duration: GLIDE_MS });   // bloom at the destination
-    }, GLIDE_MS);
+    if (PUCK_TRANSITION) {
+      // Puck: collapse to a dot as it travels, then bloom on settle if no new move interrupts.
+      morphTween.set(0, { duration: GLIDE_MS });
+      settleTimer = setTimeout(() => {
+        morphTween.set(1, { duration: GLIDE_MS });   // bloom at the destination
+      }, GLIDE_MS);
+    } else {
+      // No-puck: stay a bloomed box the whole way (size tween is old-box → new-box, handled in render).
+      morphTween.set(1, { duration: 0 });
+    }
     return () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
   });
 
@@ -789,11 +807,22 @@
       {#if ringId && ringCenterNow}
         {@const c = ringCenterNow}
         {@const m = morphTween.current}
-        {@const rg = lerpRingGeom(
-          ringGeom("dot", c, labelBox, RING_H, RING_PAD_X, dotRadiusFor(ringId)),
-          ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X, dotRadiusFor(ringId)),
-          m,
-        )}
+        {@const dotR = dotRadiusFor(ringId)}
+        <!-- Puck mode: lerp dot↔bloom by morph `m` (m also drives the opacity levers). No-puck mode:
+             always a bloom box, but tween its SIZE from the outgoing label's box (labelBoxFrom) to the
+             incoming one (labelBox) over the position curve, so the box grows/shrinks between labels
+             as it glides. Position (`c`) is on the shared clock in both. -->
+        {@const rg = PUCK_TRANSITION
+          ? lerpRingGeom(
+              ringGeom("dot", c, labelBox, RING_H, RING_PAD_X, dotR),
+              ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X, dotR),
+              m,
+            )
+          : lerpRingGeom(
+              ringGeom("bloom", c, labelBoxFrom ?? labelBox, RING_H, RING_PAD_X, dotR),
+              ringGeom("bloom", c, labelBox, RING_H, RING_PAD_X, dotR),
+              flipProgress(ringProgress.current, FLIP_FRACTION),
+            )}
         {@const hiColor = colorOf(ringId, posOf.get(ringId)?.onSpine ?? false, treeStore.getNode(ringId)?.isGenus ?? false) ?? "var(--turq)"}
         <rect
           class="label-ring"
@@ -802,8 +831,8 @@
           width={rg.width}
           height={rg.height}
           rx={rg.radius}
-          fill-opacity={m * 0.18 + (1 - m) * 1}
-          opacity={m * 1 + (1 - m) * PUCK_TRAVEL_OPACITY}
+          fill-opacity={PUCK_TRANSITION ? m * 0.18 + (1 - m) * 1 : 0.18}
+          opacity={PUCK_TRANSITION ? m * 1 + (1 - m) * PUCK_TRAVEL_OPACITY : 1}
           style="fill: {hiColor}; stroke: {hiColor}"
         />
       {/if}
