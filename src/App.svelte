@@ -91,10 +91,7 @@
 <footer class="app-footer">
   <span>
     Inspired by <a href="https://metazooa.com" target="_blank" rel="noopener noreferrer">Metazooa</a>
-    · Data: <a href="https://www.wikidata.org" target="_blank" rel="noopener noreferrer">Wikidata</a> (CC0)
-    · <a href="https://paleobiodb.org" target="_blank" rel="noopener noreferrer">Paleobiology Database</a>
-    · <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer">Wikipedia</a>
-    · updated {meta.dataPulledAt}
+    · Data: <a href="https://www.wikidata.org" target="_blank" rel="noopener noreferrer">Wikidata</a> (CC0), <a href="https://paleobiodb.org" target="_blank" rel="noopener noreferrer">Paleobiology Database</a>, <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer">Wikipedia</a>. Updated {meta.dataPulledAt}
   </span>
 </footer>
 
@@ -106,7 +103,7 @@
     align-items: baseline;
     gap: var(--space-5);
     /* vertical padding halved from the side padding */
-    padding: var(--space-3) var(--space-5);
+    padding: var(--space-2) var(--space-5);
     /* edge-to-edge terracotta placard casting a soft shadow DOWN onto the tree below, so the
        tree canvas reads as inset. z-index keeps the shadow above the canvas. */
     position: relative; z-index: 4;
@@ -119,7 +116,7 @@
     display: flex;
     /* baseline so the wordmark defines this cluster's baseline (which the tagline aligns to) */
     align-items: baseline;
-    gap: var(--space-2);
+    gap: var(--space-4);
   }
   .brand-claw {
     height: 1.6rem;
@@ -139,6 +136,7 @@
     font-size: var(--type-body);
     font-weight: var(--fw-medium);
     color: var(--cream-dim);
+    font-weight: bold;
   }
   /* on narrow screens the nav needs the room — drop the tagline before it crowds */
   @media (max-width: 640px) {
@@ -149,7 +147,7 @@
     gap: var(--space-5);
     margin-left: auto;
     align-self: center;   /* keep the nav vertically centered, out of the baseline row */
-    font-size: var(--type-body);
+    font-size: var(--type-heading);
   }
   .modes button {
     background: none; border: 0; cursor: pointer;
@@ -168,10 +166,13 @@
     display: flex; justify-content: flex-end; text-align: right;
     /* no top padding: the bottom placard above already pads; footer only needs to clear the
        viewport edge below. Both are --bg-surface, so they read as one continuous strip. */
-    padding: 0 var(--space-5) var(--space-2);
+    padding: var(--space-1) var(--space-5);
     font-size: var(--type-meta); color: var(--ink-mute);
-    background: var(--bg-surface);
+    background: linear-gradient(var(--placard-dp), var(--placard));
+    border-top: 1px solid var(--placard-edge);
+    box-shadow: 0 6px 16px -8px rgba(51, 38, 26, 0.35);
+    color: var(--cream);
   }
-  .app-footer a { color: var(--ink-soft); font-weight: var(--fw-semibold); }
-  .app-footer a:hover { color: var(--mahogany); }
+  .app-footer a { color: var(--cream-dim); font-weight: var(--fw-semibold); }
+  .app-footer a:hover { color: var(--cream); }
 </style>

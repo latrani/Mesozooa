@@ -41,6 +41,9 @@ a { color: var(--mahogany); }
   padding: .75rem 1.25rem; cursor: pointer; text-align: center;
   transition: filter var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
 }
+.btn-small {
+  padding: 0.375rem 0.625rem;
+}
 .btn-primary {
   font-weight: var(--fw-black); color: var(--action-primary-text);
   background: linear-gradient(var(--action-primary-hi), var(--action-primary));

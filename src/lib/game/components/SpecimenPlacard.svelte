@@ -52,10 +52,10 @@
     background: linear-gradient(var(--specimen-surface), var(--specimen-dp));
     border: 1px solid var(--specimen-edge); border-radius: var(--radius-card);
     box-shadow: var(--shadow-placard), var(--inset-hi);
-    padding: var(--space-5); color: var(--specimen-text);
+    padding: var(--space-3) var(--space-4); color: var(--specimen-text);
     --btn-secondary-ink: var(--cream);
   }
-  .title { font-size: var(--type-heading); font-weight: var(--fw-bold); }
+  .title { font-size: var(--type-title); font-weight: var(--fw-bold); font-family: var(--font-head); }
   .figure { margin: 0; display: flex; flex-direction: column; gap: 2px; }
   .shadowbox {
     border-radius: 5px; position: relative; overflow: hidden;
