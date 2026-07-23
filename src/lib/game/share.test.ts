@@ -19,7 +19,7 @@ describe("buildShareParts", () => {
     const parts = buildShareParts(state, "2026-07-12");
     expect(parts.headline).toBe("Mesozooa 2026-07-12");
     expect(parts.score).toBe("3/20 · 🔦1");
-    expect(parts.grid.join("")).toContain("⬛"); // cold guess
+    expect(parts.grid.join("")).toContain("🧊"); // cold guess
     expect(parts.grid.join("")).toContain("💡"); // hint
     expect(parts.grid.join("")).toContain("🎯"); // winning guess
   });
@@ -35,7 +35,7 @@ describe("buildShareParts", () => {
     const parts = buildShareParts(state, "2026-07-12");
     expect(parts.score).toBe("X/20");
     expect(parts.grid.join("")).not.toContain("🎯");
-    expect(parts.grid.join("")).toContain("🟥"); // hot guess
+    expect(parts.grid.join("")).toContain("🌋"); // hot guess
   });
   it("wraps the emoji grid 5 per row", () => {
     const state: GameState = {

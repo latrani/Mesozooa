@@ -56,9 +56,10 @@
     padding: var(--space-4);
     margin: 0 0 var(--space-4);
     line-height: 1.4;
+    font-size: var(--type-title)
   }
   .share-block { margin: 0; }
   /* pre keeps the emoji grid rows aligned */
-  .share-grid { font-family: inherit; white-space: pre; }
+  .share-grid { font-family: inherit; white-space: pre; font-size: var(--type-display)}
   .share-actions { display: flex; justify-content: flex-end; }
 </style>

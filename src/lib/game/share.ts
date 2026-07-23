@@ -2,11 +2,11 @@ import type { GameState } from "./types";
 import { DAILY_MAX_GUESSES } from "./engine-core";
 
 function bucket(fraction: number): string {
-  if (fraction >= 0.8) return "🟥";
-  if (fraction >= 0.6) return "🟧";
-  if (fraction >= 0.4) return "⬜";
-  if (fraction >= 0.2) return "🟦";
-  return "⬛";
+  if (fraction >= 0.8) return "🌋";
+  if (fraction >= 0.6) return "🔥";
+  if (fraction >= 0.4) return "⛅";
+  if (fraction >= 0.2) return "💧";
+  return "🧊";
 }
 
 // The three "thoughts" of a share result, each its own block. The preview renders these with
