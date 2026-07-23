@@ -162,7 +162,16 @@ not three cases.
   thumbnail too, which did not earn its width, and the expanded card restated the title directly
   beneath it. The thumbnail is gone and the card's own heading is suppressed on phone, so the peek
   row IS the sheet's title bar.
-- **Expanded** — the full card.
+- **Expanded** — the full card. **Revised by playtest (2026-07-22):** this was first an inner scroll
+  box of fixed height. It is now a real DRAWER: the sheet's own height is the model. A tap opens it
+  to its content height, capped at half the viewport, and dragging the heading row upward grows the
+  whole drawer past that cap (heading and all, as a physical drawer slides) up to 90% of the
+  viewport or the card's natural height, whichever is smaller. `scrollFade` marks the bottom edge
+  whenever content remains below. The body only scrolls internally once the drawer is at full
+  extent and the card is still taller, which is a fallback rather than the primary mechanic.
+
+  The drag lives ON the heading row and nowhere else, which is what keeps it clear of the tree's
+  own pan gesture — the collision that originally motivated deferring drag entirely.
 
 Resting states: Daily and Practice rest at peek; Explore rests at peek and is raised on demand; end
 state auto-raises. One component, one gesture, three contexts.
