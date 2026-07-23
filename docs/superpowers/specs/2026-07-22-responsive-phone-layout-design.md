@@ -41,7 +41,9 @@ deleted, not left as a decoy.
 
 ## Height budget
 
-The number the rest of the design serves. 390×844, ~735px usable:
+The number the rest of the design serves. 390×844.
+
+Planned (before any of it was built), against the ~735px assumed usable:
 
 ```
 header .................  44px
@@ -50,6 +52,17 @@ chip band ..............  56px   (2 chips)
 plaque peek ............  56px
                         ------
 tree ...................  487px
+```
+
+**Measured (2026-07-22, chromium at 390×844), after the playtest reversals below.** The estimate was
+pessimistic: the header grew to two rows and the tree STILL beat its budget, which is what made the
+two-row header affordable in the first place.
+
+```
+header .................  91px   (two rows)
+tree, idle .............  610px
+tree, mid-round ........  432px  (input + chip band + eyebrows present)
+tree, sheet expanded ...  219px  (sheet is dismissible by design)
 ```
 
 ## Region stack
