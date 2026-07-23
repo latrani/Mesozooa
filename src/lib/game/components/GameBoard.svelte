@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import { treeStore } from "../treeData";
   import type { GameState } from "../types";
   import SearchBox from "./SearchBox.svelte";
@@ -104,6 +104,17 @@
     if (!ended) return;
     if (untrack(() => viewport.isPhone)) sheetExpanded = true;
   });
+
+  // End state replaces the focused search input with the result banner, so focus would otherwise
+  // fall to <body>. Move it to the mode's primary action — Share (daily) or New round (practice) —
+  // which leads the action row in DOM, so Tab flows on to the rest. Same fix at every width; the
+  // buttons live in the top cluster regardless of viewport. #59
+  let shareBtn = $state<HTMLButtonElement>();
+  let newBtn = $state<HTMLButtonElement>();
+  $effect(() => {
+    if (!ended) return;
+    tick().then(() => untrack(() => shareBtn ?? newBtn)?.focus());
+  });
 </script>
 
 <BoardLayout bind:sheetExpanded>
@@ -116,13 +127,13 @@
           <span class="result-line">{#if won}Congratulations! {answerName} guessed in {moveCount} {moveCount === 1 ? "move" : "moves"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {moveCount} {moveCount === 1 ? "move" : "moves"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
         </div>
         {#if onshare}
-          <button type="button" class="btn-secondary" onclick={() => onshare?.()}>Share</button>
+          <button type="button" class="btn-secondary" bind:this={shareBtn} onclick={() => onshare?.()}>Share</button>
         {/if}
         {#if store.state.mode === "daily"}
           <button type="button" class="btn-secondary" onclick={() => (statsModal.open = true)}>Stats</button>
         {/if}
         {#if onnew}
-          <button type="button" class="btn-secondary" onclick={() => onnew?.()}>New round</button>
+          <button type="button" class="btn-secondary" bind:this={newBtn} onclick={() => onnew?.()}>New round</button>
         {/if}
       </div>
     {:else}
