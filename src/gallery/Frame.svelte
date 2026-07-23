@@ -32,7 +32,12 @@
 </main>
 
 <style>
+  /* The board expects a locked, full-height shell (base.css does this for #app in the real app).
+     The gallery mounts into #gallery, so the frame supplies the same contract itself. */
   .frame-main {
-    padding: var(--space-2) 0;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 </style>

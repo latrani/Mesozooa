@@ -5,7 +5,6 @@
   import { specimenView } from "../lib/game/specimen-view";
   import { treeStore } from "../lib/game/treeData";
   import SpineTree from "../lib/game/components/SpineTree.svelte";
-  import WarmestTrail from "../lib/game/components/WarmestTrail.svelte";
   import GuessList from "../lib/game/components/GuessList.svelte";
   import GameBoard from "../lib/game/components/GameBoard.svelte";
   import { warmthRampColor } from "../lib/game/warmth-ramp";
@@ -188,15 +187,9 @@
     {/each}
   </section>
 
-  <!-- TRAIL + GUESSES -->
+  <!-- GUESSES -->
   <section>
-    <h2>Trail &amp; guess history</h2>
-    <div class="panel wide">
-      <span class="panel-label">trail — deep lineage</span>
-      <div class="panel-body">
-        <WarmestTrail warmestId={fixtureStore(stateSolvedWon).warmestId} onpan={() => {}} />
-      </div>
-    </div>
+    <h2>Guess history</h2>
     <div class="panel wide">
       <span class="panel-label">guess list — cold/warm/hot + hint</span>
       <div class="panel-body">
@@ -229,14 +222,15 @@
     {/each}
   </section>
 
-  <!-- FULL BOARD (narrow via iframe) -->
+  <!-- FULL BOARD (phone via iframe — the iframe's own viewport makes media queries AND
+       viewport.isPhone fire against 390px, not the gallery window) -->
   <section>
-    <h2>Full board — narrow (420px)</h2>
+    <h2>Full board — phone (390px)</h2>
     <div class="frame-row">
       {#each boardStates as s (s.key)}
         <div class="frame-wrap">
           <span class="panel-label">{s.label}</span>
-          <iframe title={"narrow-" + s.key} src={"/gallery.html?frame=" + s.key} width="420" height="760"></iframe>
+          <iframe title={"phone-" + s.key} src={"/gallery.html?frame=" + s.key} width="390" height="740"></iframe>
         </div>
       {/each}
     </div>
