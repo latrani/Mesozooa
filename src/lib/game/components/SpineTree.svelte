@@ -1,6 +1,6 @@
 <script lang="ts">
   import { treeStore } from "../treeData";
-  import { layoutSpine, centerOffsetFor, edgePathBetween, isStepBack, coyotePadDelta } from "../spine-layout";
+  import { layoutSpine, centerOffsetFor, edgePathBetween, isStepBack, coyotePadDelta, keepVisible1D } from "../spine-layout";
   import { a11yTree, buildNav, resolveKey, a11yLabel } from "../a11y-tree";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
@@ -510,16 +510,8 @@
     const maxLeft = Math.max(0, contentWidth * zoom + runway - scroller.clientWidth);
     const maxTop = Math.max(0, vbH * zoom - scroller.clientHeight);
 
-    let left = scroller.scrollLeft;
-    if (nodeX < left + KEEP_VISIBLE_MARGIN_X) left = nodeX - KEEP_VISIBLE_MARGIN_X;
-    else if (nodeX > left + viewW - KEEP_VISIBLE_MARGIN_X) left = nodeX - viewW + KEEP_VISIBLE_MARGIN_X;
-
-    let top = scroller.scrollTop;
-    if (nodeY < top + KEEP_VISIBLE_MARGIN_Y) top = nodeY - KEEP_VISIBLE_MARGIN_Y;
-    else if (nodeY > top + scroller.clientHeight - KEEP_VISIBLE_MARGIN_Y) top = nodeY - scroller.clientHeight + KEEP_VISIBLE_MARGIN_Y;
-
-    left = Math.min(Math.max(0, left), maxLeft);
-    top = Math.min(Math.max(0, top), maxTop);
+    const left = keepVisible1D(nodeX, scroller.scrollLeft, viewW, KEEP_VISIBLE_MARGIN_X, maxLeft);
+    const top = keepVisible1D(nodeY, scroller.scrollTop, scroller.clientHeight, KEEP_VISIBLE_MARGIN_Y, maxTop);
     if (left !== scroller.scrollLeft || top !== scroller.scrollTop) {
       scroller.scrollTo({ left, top, behavior: reduceMotion ? "auto" : "smooth" });
     }
@@ -653,12 +645,18 @@
     if (scroller && tipId && d >= 0) {
       if (tipId !== lastTipId) {
         if (isStepBack(treeStore, lastTipId, tipId)) {
-          // Step-back: HOLD both axes. Null the FLIP scroll target so the shared-clock scroll driver
-          // doesn't animate, and skip the native recenter — scrollLeft/Top stay frozen while the node
-          // FLIP collapses the branch in place. Extend the coyote pad by the collapsed columns' width
-          // (accumulates across consecutive step-backs) so the clamp can't yank the frozen view.
+          // Step-back: freeze scrollLeft (no forward slide) but keep the new tip VISIBLE vertically —
+          // the collapse re-splays the fan around a new minY, so a frozen scrollTop can strand the tip
+          // off-screen (spec §1a). Null the FLIP scroll target so the shared-clock driver doesn't
+          // animate; extend the coyote pad so the clamp can't yank the frozen scrollLeft.
           scrollTargetPx = null;
           coyotePad += coyotePadDelta(lastWidth, layout.width, X_GAP);
+          const n = posOf.get(tipId);
+          if (n) {
+            const maxTop = Math.max(0, vbH * zoom - scroller.clientHeight);
+            const top = keepVisible1D(py(n.y) * zoom, scroller.scrollTop, scroller.clientHeight, KEEP_VISIBLE_MARGIN_Y, maxTop);
+            if (top !== scroller.scrollTop) scroller.scrollTo({ left: scroller.scrollLeft, top, behavior: reduceMotion ? "auto" : "smooth" });
+          }
         } else {
           // Forward / lateral (deeper tip, sibling, search jump, history chip): recenter as before,
           // and drop any coyote pad — the tree re-extends / moves, so held dead space is stale.
