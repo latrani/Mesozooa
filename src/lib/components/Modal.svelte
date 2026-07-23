@@ -42,7 +42,11 @@
       <h2 id={titleId}>{title}</h2>
       <button type="button" class="modal-close" aria-label="Close" onclick={() => (open = false)}>✕</button>
     </header>
-    <div class="modal-body">
+    <!-- tabindex 0: the body is a scroll container that may hold no focusable child (Stats). Without
+         it a keyboard user on a short window could not scroll to the bottom. A scrollable region
+         SHOULD be focusable (WAI), so the noninteractive-tabindex lint is a false positive here. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="modal-body" tabindex="0">
       {@render children()}
     </div>
   </div>
