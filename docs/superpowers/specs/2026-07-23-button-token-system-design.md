@@ -63,6 +63,22 @@ Unify under `--btn-*`, so token↔class is 1:1 with `.btn-primary` / `.btn-secon
 
 The `--action-primary-*` names in tokens.css §semantic and in visual-spec §2.5 are updated.
 
+### `-ink` means foreground/text; border is separate where it differs
+
+Primary and secondary have *different anatomies*, and the token set is honest about that. The rule:
+**`-ink` is always the foreground (text) color.** Border is a separate concern:
+
+- **Primary is NOT borderless.** It is a raised turquoise chip: `--btn-primary-hi`→`--btn-primary-surface`
+  gradient, `--btn-primary-edge` (a 1px *dark-turquoise* rim — different from the cream text; the dark
+  rim under a lit gradient is what reads as beveled/raised), plus `--shadow-lift` + `--inset-hi`.
+  So primary keeps a distinct `--btn-primary-ink` (cream text) AND `--btn-primary-edge` (border).
+  **Primary's appearance does not change — only its token names.**
+- **Secondary's border equals its ink** (both mahogany, or both cream when inverse), so secondary
+  needs no `-edge` token: `border: 2px solid var(--btn-secondary-ink)` is correct and intentional.
+
+So `-ink` is consistent (foreground everywhere); the presence/absence of a separate `-edge` reflects
+the real anatomy of each role, not an inconsistency.
+
 ## 4. Secondary becomes filled, with an inverse
 
 ```css
@@ -131,7 +147,22 @@ Audit every reader/overrider of the renamed tokens and migrate or drop:
 - **Commented dead code:** the `/* background: none; */` etc. block in `HowToPlay.svelte` is
   removed.
 
-## 7. Spec + docs updates
+## 7. Gallery specimens (new "Buttons" section)
+
+Add a **Buttons** `<section>` to `src/gallery/Gallery.svelte`, following the existing
+section/panel pattern, so the button roles are visually iterable like every other component:
+
+- **Primary** — a `.btn-primary` on the light page ground (the gallery's default `--bg-page`).
+- **Secondary on light** — a `.btn-secondary` on the light page ground.
+- **Secondary-inverse on dark** — a `.btn-secondary.btn-secondary-inverse` inside a panel whose body
+  background is set to a placard ground (`background: var(--placard)`), mirroring how the header /
+  sheet paint behind their buttons — so the inverse pair is verified against a real dark ground.
+
+Each specimen shows resting + a note to hover for the hover state (the gallery is static; hover is
+live in-browser). Include a disabled example of each. This section is the standing visual check that
+no button relies on the ground behind it. It also serves the §8 "walk the gallery" verification.
+
+## 8. Spec + docs updates
 
 - **Visual design spec §2:** add the locked "no ghost controls" principle (§2.5 token block gets
   the `--btn-*` rename; a new short principle line states the opaque-pair rule).
@@ -139,18 +170,18 @@ Audit every reader/overrider of the renamed tokens and migrate or drop:
   mahogany chips (opaque), not outline-only; note the inverse for dark grounds.
 - **CLAUDE.md visual system note:** no change needed (it points at this spec).
 
-## 8. Verification
+## 9. Verification
 
 - **Type/build:** `npx tsc --noEmit` + `npx svelte-check` clean.
 - **Bug repro (in-browser, desktop, tall placard):** hover each zoom segment while it overlaps the
   placard; confirm each stays legible and only the hovered segment changes. This is the #64
   acceptance test.
-- **Every secondary surface stays legible:** walk the gallery (`/gallery.html`) — cluster actions,
-  zoom, header links, sheet — on both light and dark grounds; confirm no button relies on the
-  ground behind it (each has an opaque fill).
+- **Every secondary surface stays legible:** walk the gallery (`/gallery.html`) — the new Buttons
+  section (§7) plus cluster actions, zoom, header links, sheet — on both light and dark grounds;
+  confirm no button relies on the ground behind it (each has an opaque fill).
 - **Hover determinism:** confirm hover no longer produces a translucent result anywhere.
 
-## 9. Out of scope
+## 10. Out of scope
 
 - Retuning the exact chip hexes / the 12% hover-mix ratio — a visual-pass decision.
 - Any change to `.btn-primary` appearance (only its tokens are renamed).
