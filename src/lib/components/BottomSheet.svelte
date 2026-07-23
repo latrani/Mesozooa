@@ -65,6 +65,15 @@
     return () => ro.disconnect();
   });
 
+  // Publish the retracted footprint (heading + the drawer's own inset) so anything floating at the
+  // bottom of the board -- the tree's zoom controls -- can sit clear of it. A shared custom
+  // property rather than a magic number, because the heading's height moves with its content.
+  $effect(() => {
+    const px = peekH ? peekH + 12 : 0;
+    document.documentElement.style.setProperty("--drawer-peek-h", `${px}px`);
+    return () => document.documentElement.style.removeProperty("--drawer-peek-h");
+  });
+
   // `expanded` is the outside world's handle (the game raises the drawer at end of round). Setting
   // it drives `pull`; the drag writes `pull` and reports back. untrack keeps the two from looping.
   $effect(() => {

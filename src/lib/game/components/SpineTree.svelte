@@ -1013,6 +1013,14 @@
     border: 2px solid var(--btn-secondary-ink); border-radius: var(--radius-pill);
     overflow: hidden;
   }
+  /* Phone: the specimen drawer is an OVERLAY pinned to the bottom, so the controls have to clear
+     its retracted footprint or they sit underneath it. --drawer-peek-h is published by the drawer
+     itself (heading height + its inset); the fallback keeps this honest anywhere it is absent. */
+  @media (max-width: 640px) {
+    .zoom-controls {
+      bottom: calc(var(--drawer-peek-h, 0px) + env(safe-area-inset-bottom) + var(--space-3));
+    }
+  }
   .zoom-controls button {
     display: flex; align-items: center; justify-content: center;
     width: 2.2rem; height: 2rem; font-size: var(--type-body); cursor: pointer;
