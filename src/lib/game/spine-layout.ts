@@ -251,3 +251,22 @@ export function isStepBack(store: TreeStore, oldTip: string | null, newTip: stri
 export function coyotePadDelta(oldWidth: number, newWidth: number, xGap: number): number {
   return Math.max(0, (oldWidth - newWidth) * xGap);
 }
+
+/**
+ * Keep-visible pan for ONE axis: given a node coordinate (in scaled content px), the current scroll
+ * offset, the viewport length, an edge margin, and the max scroll, return the new scroll offset that
+ * keeps the coord at least `margin` inside both edges — unchanged when it already is. Result clamped
+ * to [0, maxScroll]. Extracted from scrollFocusIntoView so the step-back vertical nudge can reuse it.
+ */
+export function keepVisible1D(
+  coord: number,
+  scroll: number,
+  viewportLen: number,
+  margin: number,
+  maxScroll: number,
+): number {
+  let next = scroll;
+  if (coord < scroll + margin) next = coord - margin;
+  else if (coord > scroll + viewportLen - margin) next = coord - viewportLen + margin;
+  return Math.min(Math.max(0, next), maxScroll);
+}
