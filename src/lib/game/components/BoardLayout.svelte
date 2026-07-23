@@ -47,6 +47,10 @@
       // desktop-only; 0 fallback keeps the block flush to the viewport edge if it's absent.
       const footerH = document.querySelector<HTMLElement>(".app-footer")?.offsetHeight ?? 0;
       root.style.setProperty("--placard-rest-bot", `${footerH + 16}px`); // 16 == --space-4 gap
+      // Vertical reach is the ONLY variable: the placard and the controls are both right-anchored,
+      // and the placard column is far wider, so it always horizontally contains the controls' column
+      // (#67 — spec §3.2 says "horizontal AND vertical", but horizontal overlap is a structural
+      // invariant of this locked layout, so testing it would be always-true ceremony).
       // The card's on-screen bottom at scrollTop 0 == its scrollHeight (rest pad is inside the box).
       // Compare to the zoom controls' DEFAULT (unshifted) band top, so shifting them never changes
       // this test (no oscillation). Measure the controls' height; fall back if not mounted yet.
