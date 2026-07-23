@@ -249,13 +249,13 @@ describe("phoneChips", () => {
   it("shows latest then warmest when they differ", () => {
     // chipsFor returns newest-first, so the LAST row given is chips[0].
     const chips = chipsFor(
-      [row("guess", "TR", "TF"), row("guess", "AL", "Q430")],
+      [row("guess", "TR", "TF"), row("guess", "TC", "Q430")],
       store,
       {},
     );
     const sel = phoneChips(chips, "TF");
     expect(sel.shown).toHaveLength(2);
-    expect(sel.shown[0]).toBe(chips[0]); // latest = the Q430 guess
+    expect(sel.shown[0]).toBe(chips[0]); // latest = the Triceratops guess
     expect(sel.warmestChip).toBe(sel.shown[1]);
     if (sel.shown[1].kind !== "guess") throw new Error("kind");
     expect(sel.shown[1].sharedNodeId).toBe("TF");
@@ -264,7 +264,7 @@ describe("phoneChips", () => {
 
   it("counts every chip it omits", () => {
     const chips = chipsFor(
-      [row("guess", "TR", "TF"), row("guess", "AL", "Q430"), row("guess", "ST", "Q430")],
+      [row("guess", "TR", "TF"), row("guess", "TC", "Q430"), row("guess", "LO", "T")],
       store,
       {},
     );
@@ -282,14 +282,17 @@ describe("phoneChips", () => {
   });
 
   it("picks a branchHint as warmest when it revealed the warmest node", () => {
-    const chips = chipsFor([row("guess", "AL", "Q430"), row("branchHint", "TF", "TF")], store, {});
+    // branchHint first so it is NOT also the latest chip — this test is about the warmest slot.
+    const chips = chipsFor([row("branchHint", "TF", "TF"), row("guess", "TC", "Q430")], store, {});
     const sel = phoneChips(chips, "TF");
+    expect(sel.shown).toHaveLength(2);
+    expect(sel.shown[0].kind).toBe("guess"); // latest
     expect(sel.warmestChip).not.toBeNull();
     expect(sel.warmestChip!.kind).toBe("branchHint");
   });
 
   it("pins the answer chip first at end state and still shows latest", () => {
-    const chips = chipsFor([row("guess", "AL", "Q430")], store, {
+    const chips = chipsFor([row("guess", "TC", "Q430")], store, {
       answerId: "TR",
       won: false,
       lastGuessFraction: 0.4,
