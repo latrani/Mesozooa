@@ -39,6 +39,12 @@
   let selection = $derived(phoneChips(chips, warmestId));
 
   let expanded = $state(false);
+  // A new round empties the guess log; the band must return to its collapsed default rather than
+  // inheriting the previous round's expansion.
+  $effect(() => {
+    if (guesses.length === 0) expanded = false;
+  });
+
   let collapsed = $derived(viewport.isPhone && !expanded);
   // Expanding renders the SAME chip objects in their true order. Because the keys below are
   // stable, Svelte reuses the two already-visible chips' DOM nodes and mounts only the newcomers
