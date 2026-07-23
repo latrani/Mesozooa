@@ -211,7 +211,7 @@
     // path (untouched), and first paint shouldn't fly-scroll. tipId is read untracked — its change
     // is what triggered this layout, so it's already fresh.
     const tip = untrack(() => tipId);
-    const atDefaultZoom = untrack(() => zoom) === ZOOM_DEFAULT;
+    const atDefaultZoom = untrack(() => zoom === defaultZoomFor(viewport.isPhone));
     if (!reduceMotion && fromPos.size > 0 && atDefaultZoom && scroller && tip) {
       scrollFrom = { left: scroller.scrollLeft, top: scroller.scrollTop };
       scrollTargetPx = untrack(() => scrollTargetFor(tip));
@@ -580,7 +580,7 @@
 
   // Exposed for the trail scrubber (Plan 2).
   export function panTo(id: string) {
-    if (zoom !== ZOOM_DEFAULT) {
+    if (zoom !== defaultZoomFor(viewport.isPhone)) {
       zoom = defaultZoomFor(viewport.isPhone);
       // wait for the SVG to resize back to 1:1 before centering on the target
       requestAnimationFrame(() => scrollToNode(id));
@@ -933,7 +933,7 @@
 {#if layout.nodes.length}
   <div class="zoom-controls btn-secondary" role="group" aria-label="Zoom">
     <button type="button" aria-label="Zoom out" onclick={() => zoomButton(-1)} disabled={zoom <= ZOOM_MIN}>&minus;</button>
-    <button type="button" aria-label="Reset zoom" onclick={resetZoom} disabled={zoom === ZOOM_DEFAULT}>⌂</button>
+    <button type="button" aria-label="Reset zoom" onclick={resetZoom} disabled={zoom === defaultZoomFor(viewport.isPhone)}>⌂</button>
     <button type="button" aria-label="Zoom in" onclick={() => zoomButton(1)} disabled={zoom >= ZOOM_MAX}>+</button>
   </div>
 {/if}
