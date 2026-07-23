@@ -931,10 +931,10 @@
   </li>
 {/snippet}
 {#if layout.nodes.length}
-  <div class="zoom-controls btn-secondary" role="group" aria-label="Zoom">
-    <button type="button" aria-label="Zoom out" onclick={() => zoomButton(-1)} disabled={zoom <= ZOOM_MIN}>&minus;</button>
-    <button type="button" aria-label="Reset zoom" onclick={resetZoom} disabled={zoom === defaultZoomFor(viewport.isPhone)}>⌂</button>
-    <button type="button" aria-label="Zoom in" onclick={() => zoomButton(1)} disabled={zoom >= ZOOM_MAX}>+</button>
+  <div class="zoom-controls" role="group" aria-label="Zoom">
+    <button type="button" class="btn-secondary" aria-label="Zoom out" onclick={() => zoomButton(-1)} disabled={zoom <= ZOOM_MIN}>&minus;</button>
+    <button type="button" class="btn-secondary" aria-label="Reset zoom" onclick={resetZoom} disabled={zoom === defaultZoomFor(viewport.isPhone)}>⌂</button>
+    <button type="button" class="btn-secondary" aria-label="Zoom in" onclick={() => zoomButton(1)} disabled={zoom >= ZOOM_MAX}>+</button>
   </div>
 {/if}
 </div>
@@ -1006,10 +1006,13 @@
                 stroke var(--ring-color-ms, 160ms) linear;
   }
   .node.highlight .lbl { font-weight: var(--fw-black); }
+  /* Pure geometry: the composite frame only. It supplies the opaque ground, the outer border, the
+     rounded ends and the clip; each segment is its own .btn-secondary that covers its OWN hover.
+     No :hover here — that container-hover was #64 (it stole the ground and blanked the buttons). */
   .zoom-controls {
     position: absolute; z-index: 5; right: var(--space-4); bottom: var(--space-4);
     display: flex; align-items: stretch; padding: 0;
-    background: var(--bg-surface);
+    background: var(--btn-secondary-surface);
     border: 2px solid var(--btn-secondary-ink); border-radius: var(--radius-pill);
     overflow: hidden;
   }
@@ -1021,18 +1024,17 @@
       bottom: calc(var(--drawer-peek-h, 0px) + env(safe-area-inset-bottom) + var(--space-3));
     }
   }
-  .zoom-controls button {
+  /* Each segment is a real .btn-secondary (opaque fill + own hover from base.css). Here we only
+     neutralize its individual frame so the three butt into the one composite pill: drop the pill
+     radius and outer border (the container supplies both), size to a compact square, and let a
+     single hairline sit between segments. */
+  .zoom-controls .btn-secondary {
     display: flex; align-items: center; justify-content: center;
-    width: 2.2rem; height: 2rem; font-size: var(--type-body); cursor: pointer;
-    background: transparent; border: 0; color: var(--btn-secondary-ink);
-    font-weight: var(--fw-bold);
+    width: 2.2rem; height: 2rem; padding: 0;
+    border: 0; border-radius: 0;
   }
-  /* hairline dividers between segments */
-  .zoom-controls button + button { border-left: 1px solid var(--btn-secondary-ink); }
-  .zoom-controls button:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--btn-secondary-ink) 12%, transparent);
-  }
-  .zoom-controls button:disabled { cursor: default; opacity: 0.5; }
+  /* hairline seams between segments */
+  .zoom-controls .btn-secondary + .btn-secondary { border-left: 1px solid var(--btn-secondary-ink); }
   .tree-empty {
     color: var(--ink-soft); font-size: var(--type-body); padding: var(--space-6);
     flex: 1 1 auto; width: 100%; min-height: 200px;

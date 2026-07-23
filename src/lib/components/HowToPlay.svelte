@@ -4,7 +4,7 @@
   let open = $state(false);
 </script>
 
-<button type="button" class="how-to-play-link btn-secondary btn-small" onclick={() => (open = true)} aria-label="How to play">
+<button type="button" class="how-to-play-link btn-secondary btn-secondary-inverse btn-small" onclick={() => (open = true)} aria-label="How to play">
   <span class="label-full">How to play</span><span class="label-short" aria-hidden="true">?</span>
 </button>
 
@@ -31,19 +31,7 @@
 
 <style>
   .how-to-play-link {
-    --btn-secondary-ink: var(--cream);
-    /* background: none; */
-    /* border: 0; */
-    /* cursor: pointer; */
-    /* padding: 0; */
-    /* font-size: var(--type-body); */
-    /* font-weight: var(--fw-medium); */
-    /* color: var(--cream-dim); */
-    /* text-decoration: underline; */
     align-self: baseline;   /* share the tagline's baseline, not the header's center line */
-  }
-  .how-to-play-link:hover {
-    color: var(--cream);
   }
   .how-to-play-body {
     display: flex; flex-direction: column; gap: var(--space-3);

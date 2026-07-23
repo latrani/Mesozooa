@@ -117,6 +117,36 @@
     </div>
   </section>
 
+  <!-- BUTTONS — the opaque surface+ink pairs; each role must stay legible without borrowing the
+       ground behind it (#64). Hover each in-browser: the tint mixes into the OPAQUE surface. -->
+  <section>
+    <h2>Buttons</h2>
+    <div class="panel-row">
+      <div class="panel">
+        <span class="panel-label">primary — on light</span>
+        <div class="panel-body btn-slot">
+          <button type="button" class="btn-primary">Copy and close</button>
+          <button type="button" class="btn-primary" disabled>Disabled</button>
+        </div>
+      </div>
+      <div class="panel">
+        <span class="panel-label">secondary — on light</span>
+        <div class="panel-body btn-slot">
+          <button type="button" class="btn-secondary">Hint</button>
+          <button type="button" class="btn-secondary" disabled>Disabled</button>
+        </div>
+      </div>
+      <div class="panel">
+        <span class="panel-label">secondary-inverse — on dark</span>
+        <!-- placard ground = the real dark surface the header/sheet paint behind their buttons -->
+        <div class="panel-body btn-slot dark">
+          <button type="button" class="btn-secondary btn-secondary-inverse">How to play</button>
+          <button type="button" class="btn-secondary btn-secondary-inverse" disabled>Disabled</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- SPECIMEN -->
   <section>
     <h2>Specimen — all states</h2>
@@ -265,6 +295,9 @@
   .panel-label { display: block; font-size: var(--type-meta); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: .1em; color: var(--ink-mute); padding: var(--space-2) var(--space-3); border-bottom: 1px dashed var(--hairline); }
   .panel-body { padding: var(--space-4); overflow: auto; }
   .specimen-slot { width: 20rem; }
+  .btn-slot { display: flex; gap: var(--space-3); align-items: center; }
+  /* the dark ground the inverse pair is meant to sit on (mirrors header/sheet) */
+  .btn-slot.dark { background: var(--placard); border-radius: var(--radius-card); }
   /* Stats render inside the Modal, which sits on --bg-surface — match it so the dark --ink text
      has the same contrast context it ships with. */
   .stats-slot { width: 20rem; background: var(--bg-surface); border-radius: var(--radius-card); }
