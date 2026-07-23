@@ -302,6 +302,10 @@
       gap: var(--space-2) var(--space-3);
       padding: var(--space-2) var(--space-3);
     }
+    /* Push the utilities to the right edge of row 1, so the row reads brand-left / actions-right
+       and the second row's tab bar spans beneath both. Targets the first of the two: everything
+       after it follows. :global because the button lives inside HowToPlay. */
+    .app-header :global(.how-to-play-link) { margin-left: auto; }
     /* 32px is a desktop signage size; at 390px it alone pushes the utilities onto a third row.
        --type-title keeps the wordmark clearly dominant while leaving room for both buttons. */
     .wordmark { font-size: var(--type-title); }
