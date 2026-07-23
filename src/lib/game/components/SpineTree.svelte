@@ -212,12 +212,17 @@
     // is what triggered this layout, so it's already fresh.
     const tip = untrack(() => tipId);
     const atDefaultZoom = untrack(() => zoom === defaultZoomFor(viewport.isPhone));
-    if (!reduceMotion && fromPos.size > 0 && atDefaultZoom && scroller && tip) {
+    // On a step-back, do NOT arm the scroll animation: the driver (next effect) would otherwise glide
+    // scrollLeft to the recenter target before the tip-change effect can stop it (effect-ordering bug,
+    // spec §1d). lastTipId is still the old tip here (the tip-change effect updates it later this
+    // flush), so isStepBack classifies the pending move correctly.
+    const steppingBack = !!tip && isStepBack(treeStore, untrack(() => lastTipId), tip);
+    if (!reduceMotion && fromPos.size > 0 && atDefaultZoom && scroller && tip && !steppingBack) {
       scrollFrom = { left: scroller.scrollLeft, top: scroller.scrollTop };
       scrollTargetPx = untrack(() => scrollTargetFor(tip));
     } else {
       scrollFrom = null;
-      scrollTargetPx = null; // let the tip-change effect scroll natively (or instant)
+      scrollTargetPx = null; // step-back OR non-animated path: let the tip-change effect handle scroll
     }
 
     if (reduceMotion || fromPos.size === 0) {
