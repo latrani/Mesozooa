@@ -23,6 +23,42 @@
     void viewport.isPhone;
     sheetExpanded = false;
   });
+
+  // The desktop placard is a fixed top-floating layer (see the style block). It publishes two vars, the
+  // same documentElement channel the mobile drawer uses for --drawer-peek-h, because the readers
+  // (the placard's own rest pad; the zoom controls in a different stacking context) can't see this
+  // element directly:
+  //   --placard-rest-top : scroll-box top pad, so at rest the card sits below the header as today.
+  //   --placard-clearance: how far the zoom controls slide LEFT, non-zero only when the card is
+  //                        tall enough to reach their bottom-right corner (#65 open question).
+  let placardEl = $state<HTMLElement>();
+  $effect(() => {
+    if (viewport.isPhone) return; // phone uses the BottomSheet; no fixed layer, no vars
+    const el = placardEl;
+    if (!el) return;
+    const root = document.documentElement;
+    const measure = () => {
+      const headerH = document.querySelector<HTMLElement>(".app-header")?.offsetHeight ?? 0;
+      root.style.setProperty("--placard-rest-top", `${headerH + 16}px`); // 16 == --space-4 cluster pad
+      // The card's on-screen bottom at scrollTop 0 == its scrollHeight (rest pad is inside the box).
+      // Compare to the zoom controls' DEFAULT (unshifted) band top, so shifting them never changes
+      // this test (no oscillation). Measure the controls' height; fall back if not mounted yet.
+      const zh = document.querySelector<HTMLElement>(".zoom-controls")?.offsetHeight ?? 36;
+      const controlsBandTop = window.innerHeight - 16 - zh; // 16 == --space-4 bottom inset
+      const overlaps = el.scrollHeight > controlsBandTop;
+      root.style.setProperty("--placard-clearance", overlaps ? `${el.offsetWidth + 24}px` : "0px"); // 24 == --space-5 gap
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+      root.style.removeProperty("--placard-rest-top");
+      root.style.removeProperty("--placard-clearance");
+    };
+  });
 </script>
 
 <div class="board">
@@ -31,7 +67,7 @@
       {@render cluster()}
     </div>
     {#if !viewport.isPhone}
-      <div class="specimen-float" bind:clientWidth={placardW}>
+      <div class="specimen-float" bind:this={placardEl} bind:clientWidth={placardW}>
         {@render placard(false)}
       </div>
     {/if}
@@ -66,7 +102,19 @@
     }
     /* reserve room on the right so wrapping cluster content never slides under the floating placard */
     .cluster-main { display: flex; flex-direction: column; gap: var(--space-4); padding-right: 22rem; }
-    .specimen-float { position: absolute; top: var(--space-4); right: var(--space-5); z-index: 5; width: max-content; }
+    /* The placard is the top-floating element: a fixed layer above the header (z 8 > header 4),
+       clipped only by the viewport edges. It scrolls as ONE rigid block — the rest pad seats the
+       card below the header at scrollTop 0 (pixel-identical to the old absolute rest), and scrolling
+       slides the whole card up over the header and down over the footer. The layer is inert so the
+       tree stays interactive behind it; the card re-enables pointers. (Mirrors the mobile drawer.) */
+    .specimen-float {
+      position: fixed; top: 0; right: var(--space-5); z-index: 8;
+      width: max-content; max-height: 100dvh;
+      overflow-y: auto; overscroll-behavior: contain;
+      padding-top: var(--placard-rest-top, var(--space-4));
+      pointer-events: none;
+    }
+    .specimen-float > :global(*) { pointer-events: auto; }
     .tree-body { position: relative; flex: 1 1 auto; min-height: 0; }
     .tree-body :global(.tree-viewport) { position: absolute; inset: 0; }
     /* SpineTree relies on its consumer to make .tree-scroll the flex row that seats the fixed
