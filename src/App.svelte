@@ -216,12 +216,6 @@
   /* Phone: one header row, and the claw carries the brand alone. It is already rotated 180deg
      outside the tree specifically so it reads as an "M", so the wordmark is redundant at this
      width and the ~40px a second row would cost is 8% of the tree's height budget. */
-  @media (max-width: 640px) {
-    .tagline { display: none; }
-    .wordmark { display: none; }
-    .app-header { gap: var(--space-3); padding: var(--space-2) var(--space-3); }
-    .modes { gap: var(--space-3); font-size: var(--type-label); }
-  }
   .modes {
     display: flex;
     gap: var(--space-5);
@@ -244,6 +238,10 @@
     font-weight: var(--fw-semibold);
     color: var(--cream-dim);
     padding: .15rem 0; position: relative;
+    /* nowrap: the progress dot is an inline-block after the label, so without this it wraps to a
+       second line, doubling the button's height and lifting its text off the other tabs' baseline
+       (which also inflates the whole header). */
+    white-space: nowrap;
   }
   .modes button:hover { color: var(--cream); }
   .modes button.active { color: var(--cream); }
@@ -290,7 +288,16 @@
   /* Phone: the attribution strip wraps to ~4 lines of --type-meta, roughly 10% of the tree's
      height budget, for text nobody reads in a strip. It lives in How to play > About instead;
      per-image CC credits stay on the specimen card, so the license obligation is met either way. */
+  /* Phone. This block MUST stay after the base .modes rule: a media query adds no specificity, so
+     when it sat earlier in the file the later `.modes { gap: var(--space-5); font-size: var(--type-heading) }`
+     silently won and neither the tighter gap nor the smaller label ever applied. That overflowed
+     the header and clipped the "Explore" tab off the right edge. */
   @media (max-width: 640px) {
+    .tagline { display: none; }
+    /* the claw is already rotated 180deg to read as an "M", so it carries the brand alone here */
+    .wordmark { display: none; }
+    .app-header { gap: var(--space-3); padding: var(--space-2) var(--space-3); }
+    .modes { gap: var(--space-3); font-size: var(--type-label); }
     .app-footer { display: none; }
   }
 </style>
