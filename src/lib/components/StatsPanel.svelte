@@ -16,4 +16,7 @@
     align-self: baseline; /* share the tagline baseline, matching HowToPlay */
   }
   .stats-link:hover { color: var(--cream); }
+  @media (max-width: 640px) {
+    .stats-link { padding: .25rem .45rem; font-size: var(--type-label); }
+  }
 </style>

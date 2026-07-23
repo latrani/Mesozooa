@@ -34,4 +34,8 @@
   .how-to-play-body {
     display: flex; flex-direction: column; gap: var(--space-3);
   }
+  /* Phone: the header row is at its width budget, so the label shortens to fit. */
+  @media (max-width: 640px) {
+    .how-to-play-link { padding: .25rem .45rem; font-size: var(--type-label); }
+  }
 </style>

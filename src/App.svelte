@@ -52,9 +52,9 @@
   // transition durations, so the leading edge sprints ahead, the trailing edge dawdles, and
   // the bar is momentarily longer than either label before snapping to its new width.
   const modes = $derived([
-    { tab: "daily" as const, label: `Daily${hasProgress(daily.state) ? " – in progress" : ""}` },
-    { tab: "practice" as const, label: `Practice${hasProgress(practice.state) ? " – in progress" : ""}` },
-    { tab: "explore" as const, label: "Explore" },
+    { tab: "daily" as const, label: "Daily", progress: hasProgress(daily.state) },
+    { tab: "practice" as const, label: "Practice", progress: hasProgress(practice.state) },
+    { tab: "explore" as const, label: "Explore", progress: false },
   ]);
 
   let navEl = $state<HTMLElement>();
@@ -147,7 +147,7 @@
         bind:this={btns[i]}
         class:active={nav.tab === m.tab}
         aria-current={nav.tab === m.tab ? "page" : undefined}
-        onclick={() => nav.set(m.tab)}>{m.label}</button
+        onclick={() => nav.set(m.tab)}>{m.label}{#if m.progress}<span class="progress-dot" aria-label="in progress"></span>{/if}</button
       >
     {/each}
     <!-- decorative: aria-current on the buttons already carries "which mode am I in" -->
@@ -213,9 +213,14 @@
     color: var(--cream-dim);
     font-weight: bold;
   }
-  /* on narrow screens the nav needs the room — drop the tagline before it crowds */
+  /* Phone: one header row, and the claw carries the brand alone. It is already rotated 180deg
+     outside the tree specifically so it reads as an "M", so the wordmark is redundant at this
+     width and the ~40px a second row would cost is 8% of the tree's height budget. */
   @media (max-width: 640px) {
     .tagline { display: none; }
+    .wordmark { display: none; }
+    .app-header { gap: var(--space-3); padding: var(--space-2) var(--space-3); }
+    .modes { gap: var(--space-3); font-size: var(--type-body); }
   }
   .modes {
     display: flex;
@@ -242,6 +247,10 @@
   }
   .modes button:hover { color: var(--cream); }
   .modes button.active { color: var(--cream); }
+  .progress-dot {
+    display: inline-block; width: .4em; height: .4em; margin-left: .35em;
+    border-radius: 50%; background: var(--accent); vertical-align: middle;
+  }
   /* One bar for all three tabs, driven by measured insets (see the script). Both edges are
      positioned, so animating them at different speeds stretches the bar mid-flight. */
   .indicator {
