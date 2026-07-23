@@ -57,9 +57,6 @@
     background: var(--bg-surface);
     color: var(--ink);
     max-width: min(32rem, 90vw);
-    /* Without a cap, tall content (How to play, now carrying attributions; Stats) overflows the
-       viewport on a phone with no way to reach the bottom. */
-    max-height: 85dvh;
     overflow: hidden;
   }
   .modal::backdrop {
@@ -67,6 +64,10 @@
   }
   .modal-inner {
     padding: var(--space-4);
+    /* Load-bearing, not decorative: this cap bounds the flex column so .modal-body can shrink
+       (flex + min-height:0) and become the scroll container. Without it tall content (How to play
+       with attributions; Stats) grows the column past the viewport with no way to reach the
+       bottom. .modal itself needs no separate cap — it content-sizes to this. */
     max-height: 85dvh;
     display: flex; flex-direction: column; min-height: 0;
   }
