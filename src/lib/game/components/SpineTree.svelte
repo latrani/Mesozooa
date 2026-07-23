@@ -502,6 +502,7 @@
   const KEEP_VISIBLE_MARGIN_Y = 60;
   function scrollFocusIntoView(id: string) {
     if (!scroller) return;
+    if (suppressFocusScroll) { suppressFocusScroll = false; return; }
     const n = posOf.get(id);
     if (!n) return;
     const nodeX = px(n.x) * zoom;
@@ -545,8 +546,14 @@
   // clicking IS navigation, grabs focus. The click may relayout (Explore re-center) and rebuild the
   // <li>s; focusItem sets focusId + treeFocused (via onItemFocus), and the focus-restore effect
   // re-focuses the rebuilt item, so keyboard position survives the rebuild.
+  // Set for one step-back click: suppresses the focus-driven keep-visible scroll so the tip-change
+  // effect is the ONLY thing that moves the viewport (spec §1b — otherwise the click's focus pans the
+  // camera forward horizontally before the effect freezes it). Cleared on read in scrollFocusIntoView.
+  let suppressFocusScroll = false;
   function onNodeClick(id: string) {
     if (!onnodeselect) return;
+    // Detect step-back BEFORE onnodeselect mutates the store: tipId is still the old tip here.
+    if (tipId && isStepBack(treeStore, tipId, id)) suppressFocusScroll = true;
     onnodeselect(id);
     focusItem(id);
   }
