@@ -933,7 +933,7 @@
 {#if layout.nodes.length}
   <div class="zoom-controls" role="group" aria-label="Zoom">
     <button type="button" class="btn-secondary" aria-label="Zoom out" onclick={() => zoomButton(-1)} disabled={zoom <= ZOOM_MIN}>&minus;</button>
-    <button type="button" class="btn-secondary" aria-label="Reset zoom" onclick={resetZoom} disabled={zoom === defaultZoomFor(viewport.isPhone)}>⌂</button>
+    <button type="button" class="btn-secondary" aria-label="Reset zoom" onclick={resetZoom}>⌂</button>
     <button type="button" class="btn-secondary" aria-label="Zoom in" onclick={() => zoomButton(1)} disabled={zoom >= ZOOM_MAX}>+</button>
   </div>
 {/if}

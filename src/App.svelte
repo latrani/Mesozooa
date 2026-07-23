@@ -130,8 +130,8 @@
   <span class="brand">
     <svg class="brand-claw" viewBox={clawViewBox} aria-hidden="true"><g transform={clawSpin}>{@html clawInner}</g></svg>
     <span class="wordmark">Mesozooa</span>
+    <span class="tagline">Find today's dinosaur!</span>
   </span>
-  <span class="tagline">Find today's dinosaur!</span>
   <HowToPlay />
   <StatsPanel />
   <nav
@@ -191,7 +191,7 @@
     display: flex;
     /* baseline so the wordmark defines this cluster's baseline (which the tagline aligns to) */
     align-items: baseline;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
   .brand-claw {
     height: 1.6rem;

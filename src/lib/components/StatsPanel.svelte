@@ -12,6 +12,6 @@
 
 <style>
   .stats-link {
-    align-self: baseline; /* share the tagline baseline, matching HowToPlay */
+    align-self: center;
   }
 </style>

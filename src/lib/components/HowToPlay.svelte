@@ -31,7 +31,7 @@
 
 <style>
   .how-to-play-link {
-    align-self: baseline;   /* share the tagline's baseline, not the header's center line */
+    align-self: center;
   }
   .how-to-play-body {
     display: flex; flex-direction: column; gap: var(--space-3);
