@@ -231,3 +231,14 @@ export function centerOffsetFor(depth: number, m: ViewMetrics): number {
   const max = Math.max(0, m.contentWidth - m.viewportWidth);
   return Math.min(Math.max(0, raw), max);
 }
+
+/**
+ * A "step-back" move: the new tip is a PROPER ancestor of the old tip (navigating shallower in the
+ * same lineage). `pathToRoot(id)` includes `id` itself, so the `newTip !== oldTip` guard is required
+ * — without it, a same-node no-op would report as a step-back. Returns false on first mount
+ * (oldTip null) and for forward/lateral moves.
+ */
+export function isStepBack(store: TreeStore, oldTip: string | null, newTip: string): boolean {
+  if (!oldTip || oldTip === newTip) return false;
+  return store.pathToRoot(oldTip).includes(newTip);
+}

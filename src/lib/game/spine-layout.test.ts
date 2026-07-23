@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { layoutSpine, centerOffsetFor, edgePathBetween } from "./spine-layout";
+import { layoutSpine, centerOffsetFor, edgePathBetween, isStepBack } from "./spine-layout";
 import { createTreeStore } from "./treeStore";
 import { assembleTree, pruneSubtree } from "../tree/assemble";
 import { markPlayable } from "../tree/playable";
@@ -306,5 +306,19 @@ describe("centerOffsetFor", () => {
     // max scroll is governed by the whole scroller (contentWidth - viewportWidth = 1400),
     // not the inset window — a deep node must not scroll past the content end.
     expect(centerOffsetFor(50, { ...m, rightInset: 200 })).toBe(1400);
+  });
+});
+
+describe("isStepBack", () => {
+  it("is true when the new tip is a proper ancestor of the old tip", () => {
+    expect(isStepBack(store, "TF", "T")).toBe(true);   // parent
+    expect(isStepBack(store, "TR", "T")).toBe(true);    // grandparent
+    expect(isStepBack(store, "TF", "Q430")).toBe(true); // the root
+  });
+  it("is false for forward, lateral, same-node, and first-mount moves", () => {
+    expect(isStepBack(store, "T", "TF")).toBe(false);   // deeper (forward)
+    expect(isStepBack(store, "TF", "O")).toBe(false);   // sibling subtree (lateral)
+    expect(isStepBack(store, "TF", "TF")).toBe(false);  // same node (pathToRoot includes self)
+    expect(isStepBack(store, null, "TF")).toBe(false);  // first mount
   });
 });
