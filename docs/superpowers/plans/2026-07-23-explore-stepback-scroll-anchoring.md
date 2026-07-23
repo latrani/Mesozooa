@@ -569,6 +569,76 @@ git commit -m "feat(spine-tree): suppress focus-scroll on step-back click (#66)"
 
 ---
 
+> **CORRECTION 2 — Task 10 added 2026-07-23 after a second live-test round.** Task 4 put the
+> scroll-stopping `scrollTargetPx = null` in the tip-change effect, but instrumentation showed the
+> FLIP scroll driver (which runs BEFORE the tip-change effect in creation order) already wrote the
+> recenter target — so the horizontal slide persisted (~82px). The real fix is to not *arm* the
+> scroll in the FLIP effect on a step-back. See revised spec §1d. Task 10 does this; then Task 9's
+> verification re-runs.
+
+### Task 10: Guard the scroll-arming in the FLIP effect on step-back
+
+**Files:**
+- Modify: `src/lib/game/components/SpineTree.svelte:215` (the FLIP effect's scroll-arming condition)
+
+**Interfaces:**
+- Consumes: `isStepBack`, `treeStore`, `lastTipId` (declared later in the script but in scope at effect-run time), `tip` (the untracked `tipId` snapshot already computed at `:213`).
+
+**Context — the arming block today (`:213-221`):**
+
+```ts
+    const tip = untrack(() => tipId);
+    const atDefaultZoom = untrack(() => zoom === defaultZoomFor(viewport.isPhone));
+    if (!reduceMotion && fromPos.size > 0 && atDefaultZoom && scroller && tip) {
+      scrollFrom = { left: scroller.scrollLeft, top: scroller.scrollTop };
+      scrollTargetPx = untrack(() => scrollTargetFor(tip));
+    } else {
+      scrollFrom = null;
+      scrollTargetPx = null; // let the tip-change effect scroll natively (or instant)
+    }
+```
+
+At FLIP-effect time `lastTipId` still holds the OLD tip (the tip-change effect updates it later in the same flush), so `isStepBack(treeStore, lastTipId, tip)` correctly classifies the pending move. Read `lastTipId` untracked to match the surrounding discipline (it's a plain `let`, not reactive, so untrack is belt-and-suspenders but keeps intent clear).
+
+- [ ] **Step 1: Add the step-back term to the arming condition**
+
+Replace the arming block with:
+
+```ts
+    const tip = untrack(() => tipId);
+    const atDefaultZoom = untrack(() => zoom === defaultZoomFor(viewport.isPhone));
+    // On a step-back, do NOT arm the scroll animation: the driver (next effect) would otherwise glide
+    // scrollLeft to the recenter target before the tip-change effect can stop it (effect-ordering bug,
+    // spec §1d). lastTipId is still the old tip here (the tip-change effect updates it later this
+    // flush), so isStepBack classifies the pending move correctly.
+    const steppingBack = !!tip && isStepBack(treeStore, untrack(() => lastTipId), tip);
+    if (!reduceMotion && fromPos.size > 0 && atDefaultZoom && scroller && tip && !steppingBack) {
+      scrollFrom = { left: scroller.scrollLeft, top: scroller.scrollTop };
+      scrollTargetPx = untrack(() => scrollTargetFor(tip));
+    } else {
+      scrollFrom = null;
+      scrollTargetPx = null; // step-back OR non-animated path: let the tip-change effect handle scroll
+    }
+```
+
+- [ ] **Step 2: Verify types + build**
+
+Run: `npx tsc --noEmit && npx svelte-check`
+Expected: no new errors. (If `lastTipId` is flagged "used before declaration", it is a `let` hoisted in module/instance scope and only *read* at effect-run time, which is after init — but if the linter objects, move the `let lastTipId` / `let lastWidth` / `let lastInset` declarations ABOVE the `$effect` at `:200`. Prefer the minimal change; only relocate if the build actually errors.)
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/lib/game/components/SpineTree.svelte
+git commit -m "fix(spine-tree): don't arm FLIP scroll on step-back (effect-ordering, #66)"
+```
+
+- [ ] **Step 4: Note for Task 4's comment**
+
+Task 4's step-back branch still carries `scrollTargetPx = null` with a comment claiming it stops the driver. That line is now redundant (the FLIP effect already nulled it) but harmless. Leave it; the controller's final review can decide whether to prune the stale comment. Do NOT remove it in this task — a later effect re-run on the same layout could theoretically re-arm, and the belt-and-suspenders null is cheap insurance.
+
+---
+
 ### Task 9: Full verification sweep + issue close
 
 **Files:** none (verification only).
