@@ -84,6 +84,8 @@
   let startY = 0;
   let startPull = 0;
   let moved = false;
+  /** a gesture that began on the heading may TAP-toggle; one begun on the card only drags */
+  let fromPeek = false;
 
   function setPull(next: number) {
     pull = Math.max(0, Math.min(next, maxPull));
@@ -91,11 +93,15 @@
   }
 
   function onPointerDown(e: PointerEvent) {
+    // Links and buttons inside the card keep their own behaviour: pressing Wikipedia or Share must
+    // not be swallowed by the drag.
+    if ((e.target as HTMLElement | null)?.closest("a, button, input")) return;
     dragging = true;
     moved = false;
+    fromPeek = !!(e.target as HTMLElement | null)?.closest(".peek");
     startY = e.clientY;
     startPull = pull;
-    peekEl?.setPointerCapture(e.pointerId);
+    sheetEl?.setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -109,9 +115,11 @@
   function onPointerUp(e: PointerEvent) {
     if (!dragging) return;
     dragging = false;
-    try { peekEl?.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+    try { sheetEl?.releasePointerCapture(e.pointerId); } catch { /* already released */ }
     if (!moved) {
-      setPull(pull > 0 ? 0 : openPull());
+      // Only the heading toggles on a tap. Tapping the card itself should do nothing, or reading
+      // it would keep snapping the drawer shut.
+      if (fromPeek) setPull(pull > 0 ? 0 : openPull());
       return;
     }
     // Only a DELIBERATE release tidies a sliver away. pointercancel must not, or an interrupted
@@ -130,11 +138,18 @@
 <!-- A layer over the board, not a band inside it: the drawer slides ACROSS the UI. The layer
      itself is inert to pointers so the tree underneath stays fully interactive. -->
 <div class="drawer-layer">
+  <!-- svelte-ignore a11y_no_static_element_interactions -- the drag is a pointer-only enhancement;
+       the heading inside is a real role=button with keyboard handling, which is the a11y path -->
   <div
     class="sheet"
     class:sliding={dragging}
     bind:this={sheetEl}
     style="transform: translateY({offset}px)"
+    onpointerdown={onPointerDown}
+    onpointermove={onPointerMove}
+    onpointerup={onPointerUp}
+    onpointercancel={onPointerUp}
+    ondragstart={(e) => e.preventDefault()}
   >
     <div
       class="peek"
@@ -143,13 +158,7 @@
       bind:this={peekEl}
       aria-expanded={pull > 0}
       aria-controls={bodyId}
-      onpointerdown={onPointerDown}
-      onpointermove={onPointerMove}
-      onpointerup={onPointerUp}
-      onpointercancel={onPointerUp}
       onkeydown={onKeydown}
-      ondragstart={(e) => e.preventDefault()}
-      draggable="false" 
     >
       <span class="grabber" aria-hidden="true"></span>
       <span class="peek-content">{@render peek()}</span>
@@ -172,22 +181,30 @@
 </div>
 
 <style>
+  /* Fixed, not absolute: the drawer must be able to travel ABOVE the app header, both so a long
+     pull is not clipped at the board's top edge and so the heading stays grabbable no matter how
+     far up it has been pulled. z-index clears the header's 4. */
   .drawer-layer {
-    position: absolute; inset: 0; z-index: 6;
+    position: fixed; inset: 0; z-index: 8;
     pointer-events: none; overflow: hidden;
   }
   .sheet {
+    --drawer-inset: 12px;
     /* bottom-anchored and translated DOWN by `offset`: at offset 0 the block is fully out with its
        base on the screen edge; at offset == maxPull only the heading shows. Height is never
        constrained, so the stowed part simply hangs past the bottom and is clipped by the layer. */
-    position: absolute; left: 0; right: 0; bottom: 0;
+    position: absolute; left: var(--drawer-inset); right: var(--drawer-inset);
+    bottom: calc(var(--drawer-inset) + env(safe-area-inset-bottom));
     pointer-events: auto;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--specimen-edge);
+    /* the whole object drags, so nothing inside it may claim the gesture */
+    touch-action: none; user-select: none; -webkit-user-drag: none;
     background: linear-gradient(var(--specimen-surface), var(--specimen-dp));
-    border-top: 1px solid var(--specimen-edge);
     color: var(--specimen-text);
     --btn-secondary-ink: var(--cream);
-    box-shadow: 0 -6px 16px -8px rgba(51, 38, 26, 0.35);
-    display: flex; flex-direction: column;
+    box-shadow: var(--shadow-placard, 0 -6px 16px -8px rgba(51, 38, 26, 0.35));
+    display: flex; flex-direction: column; overflow: hidden;
     will-change: transform;
   }
   /* settle smoothly on tap-open/close, but never lag the finger mid-drag */
@@ -200,10 +217,7 @@
     padding: var(--space-3) var(--space-4) var(--space-2);
     background: none; border: 0; cursor: grab;
     color: inherit; text-align: left;
-    flex: 0 0 auto; touch-action: none; user-select: none;
-    /* Suppress the browser's native element/text drag. Without it the platform hijacks the
-       pointer stream one move in and the drawer freezes mid-pull. */
-    -webkit-user-drag: none;
+    flex: 0 0 auto;
   }
   .peek:active { cursor: grabbing; }
   .grabber {
