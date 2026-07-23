@@ -31,6 +31,8 @@
   //   --placard-rest-top : scroll-box top pad, so at rest the card sits below the header as today.
   //   --placard-clearance: how far the zoom controls slide LEFT, non-zero only when the card is
   //                        tall enough to reach their bottom-right corner (#65 open question).
+  //   --placard-rest-bot : scroll-box bottom pad, so the block can scroll UP far enough to expose
+  //                        the footer with a --space-4 gap above it (mirrors the top rest gap).
   let placardEl = $state<HTMLElement>();
   $effect(() => {
     if (viewport.isPhone) return; // phone uses the BottomSheet; no fixed layer, no vars
@@ -40,6 +42,11 @@
     const measure = () => {
       const headerH = document.querySelector<HTMLElement>(".app-header")?.offsetHeight ?? 0;
       root.style.setProperty("--placard-rest-top", `${headerH + 16}px`); // 16 == --space-4 cluster pad
+      // Bottom rest pad = footer height + a --space-4 gap, so scrolling the block fully up lands its
+      // bottom one --space-4 above the footer (symmetric with the header rest gap). Footer is
+      // desktop-only; 0 fallback keeps the block flush to the viewport edge if it's absent.
+      const footerH = document.querySelector<HTMLElement>(".app-footer")?.offsetHeight ?? 0;
+      root.style.setProperty("--placard-rest-bot", `${footerH + 16}px`); // 16 == --space-4 gap
       // The card's on-screen bottom at scrollTop 0 == its scrollHeight (rest pad is inside the box).
       // Compare to the zoom controls' DEFAULT (unshifted) band top, so shifting them never changes
       // this test (no oscillation). Measure the controls' height; fall back if not mounted yet.
@@ -56,6 +63,7 @@
       ro.disconnect();
       window.removeEventListener("resize", measure);
       root.style.removeProperty("--placard-rest-top");
+      root.style.removeProperty("--placard-rest-bot");
       root.style.removeProperty("--placard-clearance");
     };
   });
@@ -108,10 +116,22 @@
        slides the whole card up over the header and down over the footer. The layer is inert so the
        tree stays interactive behind it; the card re-enables pointers. (Mirrors the mobile drawer.) */
     .specimen-float {
-      position: fixed; top: 0; right: var(--space-5); z-index: 8;
+      /* --shadow-gutter: room INSIDE the scroll box for the card's soft shadow to render, so it
+         isn't sheared flat against the clip edge when nudged/scrolled. The right gutter would push
+         the card left of its anchor, so `right` is pulled back by the same amount to keep the card's
+         resting edge exactly at --space-5 from the viewport. */
+      --shadow-gutter: var(--space-4);
+      position: fixed; top: 0; right: calc(var(--space-5) - var(--shadow-gutter)); z-index: 8;
       width: max-content; max-height: 100dvh;
-      overflow-y: auto; overscroll-behavior: contain;
+      /* only vertical scroll; overflow-y:auto would otherwise force overflow-x:auto and clip the
+         shadow on the sides too */
+      overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
       padding-top: var(--placard-rest-top, var(--space-4));
+      /* bottom pad = footer clearance: lands the scrolled-up block a --space-4 above the footer.
+         That --space-4 gap is >= the visible shadow extent, so it doubles as the bottom shadow
+         gutter — no need to add the gutter on top (that would double the visible footer gap). */
+      padding-bottom: var(--placard-rest-bot, var(--space-4));
+      padding-left: var(--shadow-gutter); padding-right: var(--shadow-gutter);
       pointer-events: none;
     }
     .specimen-float > :global(*) { pointer-events: auto; }
