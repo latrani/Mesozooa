@@ -1,9 +1,10 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
   import type { SpecimenView } from "../specimen-view";
   import PaperSlip from "./PaperSlip.svelte";
 
-  let { view, action, peek = false }: { view: SpecimenView; action?: Snippet; peek?: boolean } = $props();
+  // Pure display of a SpecimenView — identical in Daily, Practice and Explore. End-state actions
+  // (Share/Stats/New round) live beside the result banner instead (#63).
+  let { view, peek = false }: { view: SpecimenView; peek?: boolean } = $props();
 </script>
 
 {#if peek}
@@ -51,8 +52,6 @@
     {#if view.link}
       <a class="wiki" href={view.link.href} target="_blank" rel="noopener noreferrer">{view.link.label}</a>
     {/if}
-
-    {@render action?.()}
   </aside>
 {/if}
 
@@ -94,7 +93,6 @@
   .credit-author { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .credit-license { white-space: nowrap; flex: none; }
   .credit a { color: inherit; text-decoration: underline; }
-  :global(.specimen-placard .actions) { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-1); }
 
   /* PEEK — the sheet's always-visible row. Fixed-height thumbnail + a text column; no grid,
      no vertical centering of mismatched rows, so there is nothing for the old #22 jitter to

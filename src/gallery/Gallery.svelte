@@ -125,15 +125,7 @@
         <div class="panel">
           <span class="panel-label">{s.label}</span>
           <div class="panel-body specimen-slot">
-            <SpecimenPlacard view={specimenView(s.state, treeStore)}>
-              {#snippet action()}
-                {#if s.state.status !== "playing"}
-                  <div class="actions">
-                    <button type="button" class="btn-secondary" onclick={() => {}}>New round</button>
-                  </div>
-                {/if}
-              {/snippet}
-            </SpecimenPlacard>
+            <SpecimenPlacard view={specimenView(s.state, treeStore)} />
           </div>
         </div>
       {/each}

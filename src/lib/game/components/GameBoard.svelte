@@ -7,7 +7,7 @@
   import SpineTree from "./SpineTree.svelte";
   import SpecimenPlacard from "./SpecimenPlacard.svelte";
   import BoardLayout from "./BoardLayout.svelte";
-  import StatsContent from "../../components/StatsContent.svelte";
+  import { statsModal } from "../../components/statsModal.svelte";
   import { specimenView } from "../specimen-view";
   import type { WarmthProvider } from "../warmth";
   import { viewport } from "../../viewport.svelte";
@@ -105,12 +105,22 @@
 <BoardLayout bind:sheetExpanded>
   {#snippet cluster()}
     {#if ended}
-      <div class="result" class:won class:lost={!won} aria-live="polite">
-        <span class="result-line">{#if won}Congratulations! {answerName} guessed in {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
+      <!-- End state reuses the input row's geometry: banner in the field's place, end actions
+           trailing it exactly where Hint/Forfeit sit during play (#63). -->
+      <div class="input-row">
+        <div class="result" class:won class:lost={!won} aria-live="polite">
+          <span class="result-line">{#if won}Congratulations! {answerName} guessed in {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
+        </div>
+        {#if onshare}
+          <button type="button" class="btn-secondary" onclick={() => onshare?.()}>Share</button>
+        {/if}
+        {#if store.state.mode === "daily"}
+          <button type="button" class="btn-secondary" onclick={() => (statsModal.open = true)}>Stats</button>
+        {/if}
+        {#if onnew}
+          <button type="button" class="btn-secondary" onclick={() => onnew?.()}>New round</button>
+        {/if}
       </div>
-      {#if store.state.mode === "daily" && !viewport.isPhone}
-        <div class="end-stats"><StatsContent /></div>
-      {/if}
     {:else}
       <div class="input-row">
         <SearchBox id="guess" entries={availableEntries} onpick={(id) => store.guess(id)} placeholder="Guess a dinosaur…" />
@@ -139,23 +149,7 @@
   {/snippet}
 
   {#snippet placard(peek: boolean)}
-    <SpecimenPlacard view={specimenView(store.state, treeStore)} {peek}>
-      {#snippet action()}
-        {#if ended && viewport.isPhone && store.state.mode === "daily"}
-          <div class="end-stats"><StatsContent /></div>
-        {/if}
-        {#if ended && (onnew || onshare)}
-          <div class="actions">
-            {#if onshare}
-              <button type="button" class="btn-secondary" onclick={() => onshare?.()}>Share</button>
-            {/if}
-            {#if onnew}
-              <button type="button" class="btn-secondary" onclick={() => onnew?.()}>New round</button>
-            {/if}
-          </div>
-        {/if}
-      {/snippet}
-    </SpecimenPlacard>
+    <SpecimenPlacard view={specimenView(store.state, treeStore)} {peek} />
   {/snippet}
 
   {#snippet tree(rightInset)}
@@ -187,6 +181,8 @@
      body-color text, one uniform bold line. Same height footprint as the input row. */
   .result {
     display: flex; align-items: center;
+    /* takes the search field's place in the row, so it flexes and the end actions trail it */
+    flex: 1 1 auto; min-width: 0;
     /* padding + transparent 2px border == the SearchBox input's box, so this banner is exactly
        the same height as the input row it replaces (no vertical shift on end state). */
     padding: var(--space-3) 1.25rem; border: 2px solid transparent; border-radius: var(--radius-pill);
@@ -194,7 +190,6 @@
     box-shadow: var(--gem-glow);
   }
   .result-line { font-size: var(--type-body); font-weight: var(--fw-bold); color: var(--ink); }
-  .end-stats { margin-top: var(--space-4); }
 
   /* Phone: the search field takes its own full-width line and the controls wrap beneath it.
      Without this the row's incompressible content overflows a 390px cluster and, since the shell
@@ -202,6 +197,8 @@
   @media (max-width: 640px) {
     .input-row { flex-wrap: wrap; gap: var(--space-2); }
     .input-row :global(.searchbox) { flex: 1 0 100%; min-width: 0; }
+    /* the banner takes the field's line, so the end actions wrap onto their own row beneath it */
+    .result { flex: 1 0 100%; padding: var(--space-2) 1rem; }
     /* match the header's utility buttons (.btn-small) so every pill on screen shares one geometry */
     .input-row :global(.btn-secondary) { padding: 0.375rem 0.625rem; }
     /* The controls line holds Hint and Forfeit only conditionally, so without a floor it collapses

@@ -1,12 +1,12 @@
 <script lang="ts">
   import Modal from "./Modal.svelte";
   import StatsContent from "./StatsContent.svelte";
-  let open = $state(false);
+  import { statsModal } from "./statsModal.svelte";
 </script>
 
-<button type="button" class="stats-link btn-secondary btn-small" onclick={() => (open = true)}>Stats</button>
+<button type="button" class="stats-link btn-secondary btn-small" onclick={() => (statsModal.open = true)}>Stats</button>
 
-<Modal bind:open title="Your stats">
+<Modal bind:open={statsModal.open} title="Your stats">
   <StatsContent />
 </Modal>
 
