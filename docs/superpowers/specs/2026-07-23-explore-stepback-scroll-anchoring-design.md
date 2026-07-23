@@ -66,12 +66,23 @@ gated on `atDefaultZoom`, `:214` — so is everything here.)
 
 ## The principle to encode
 
-> **A step-back (new tip is an ancestor of the old tip) must never move a persisting node in the
-> forward direction. Hold the camera on both axes, collapse the branch in place, and leave the
-> right-side gap open until the user makes a deliberate recenter.** Forward/lateral navigation keeps
-> today's follow-the-tip recenter.
+> **A step-back (new tip is an ancestor of the old tip) must never slide the tree forward
+> (rightward) — but it must keep the newly-selected node on-screen. So: freeze the horizontal axis,
+> keep the vertical axis "keep-visible" (pan only enough to bring the new tip into view), collapse
+> the branch in place, and leave the right-side gap open until the user makes a deliberate
+> recenter.** Forward/lateral navigation keeps today's follow-the-tip recenter.
 
-Two pieces are needed because there are two piled-on effects.
+> **Revision note (2026-07-23, post-implementation live testing):** The originally-approved principle
+> said "hold the camera on **both** axes." Live browser testing (Task 6) showed that stranded the new
+> tip completely off-screen after a deep step-back — the collapsed tree re-splays its vertical fan
+> around a wholly different `layout.minY`, so a frozen `scrollTop` can leave the selected node scrolled
+> off the top. That is worse than the original bug (which at least kept *something* in view). Approved
+> correction: **freeze horizontal, keep-visible vertical.** The "both axes" text and its "known
+> tradeoff" paragraph below are superseded by §1a. See also §1b for a THIRD scroll mover found in the
+> same testing (`scrollFocusIntoView`) that the original two-effect analysis missed.
+
+Three pieces are needed because there are **three** scroll movers, not two (the third — the
+click-focus keep-visible pan — was found in live testing; see §1b).
 
 ---
 
@@ -87,27 +98,57 @@ In the tip-change effect (`:640`), classify the move when the tip changes:
 - **forward / lateral** — everything else (deeper tip, or a jump to a sibling/unrelated subtree):
   unchanged behavior, recenter as today.
 
-On a **step-back**:
+On a **step-back** (corrected mechanism — see §1a for why this replaces "both axes"):
 
-- Set `scrollTargetPx = null` so the FLIP scroll driver (`:234`) does not run.
+- Set `scrollTargetPx = null` so the FLIP scroll driver (`:234`) does not run (kills the ~200px
+  deliberate recenter slide — the big horizontal mover).
 - Skip the native `scrollToNode` / `resetZoom` recenter.
+- Freeze `scrollLeft` (do not touch it).
+- Apply a **vertical-only keep-visible** nudge to `scrollTop`: pan only if the new tip's row strays
+  near/off a viewport edge, using the same per-axis keep-visible math `scrollFocusIntoView` already
+  uses (§1c extracts it as a pure helper for reuse). This runs in the tip-change effect *after* the
+  layout has settled, so it reads the new tip's final `posOf` position.
 
-Result: `scrollLeft` **and** `scrollTop` both stay frozen while the existing node FLIP glides the
-persisting nodes — including the now-tip — to their collapsed positions around the fixed camera. The
-branch shrinks in place; nothing slides forward.
+Result: the tree does not slide forward; the branch collapses in place; the new tip stays on-screen
+vertically; and the right-side gap opens (via §2).
 
-**Vertical axis — resolved: hold both axes.** The recenter effect sets both `scrollLeft` and
-`scrollTop`, and a step-back re-splays the vertical fan around the new tip (spine nodes sit at
-grid-y 0, but their *pixel* y depends on `layout.minY`, which shifts as the subtree collapses). We
-freeze both axes for the cleanest statement of the principle ("persisting nodes don't move forward"
-applied uniformly).
+### §1a. Why "keep-visible vertical," not "hold both axes" (supersedes the original resolution)
 
-**Known tradeoff (named, not a surprise):** with both axes held, if the vertical fan re-splays hard
-the tip can drift up/down on screen as `minY` shifts — the camera is frozen, so a node whose pixel-y
-moves will appear to move. In practice Explore's spine is vertically shallow at any given depth, so
-this is expected to be minor. If it ever bites, the fallback is "hold horizontal, keep-visible
-vertical" (nudge `scrollTop` only when the tip strays near a viewport edge, reusing
-`scrollFocusIntoView`); we are NOT building that now.
+The originally-approved design froze both axes. Live testing (Task 6, `taxon=ankylosauria` → two
+step-backs at a 900px-wide viewport) showed **zero nodes left in the viewport**: the new tip
+(Genasauria) landed at screen `(-80, -90)`. Cause: a step-back collapses the subtree and re-splays
+the vertical fan around a different `layout.minY`, so the new tip's *pixel* y is nowhere near the old
+tip's. Freezing `scrollTop` therefore points the camera at empty canvas. Keeping the vertical axis on
+a keep-visible leash fixes this while still never sliding the tree forward horizontally — which is
+the part of the legibility contract the issue actually cares about ("jumps into Ankylosauria's
+place" is a *horizontal* forward slide).
+
+### §1b. The third scroll mover: `scrollFocusIntoView` (found in live testing)
+
+The original analysis modeled two movers (the recenter slide + the clamp yank). Live testing revealed
+a third: **clicking a node to step back also focuses it**, and focus fires the ARIA keep-visible pan
+`scrollFocusIntoView` (`onNodeClick → focusItem → onItemFocus → scrollFocusIntoView`, `:556`/`:531`).
+That path is independent of the tip-change effect, fires synchronously on click *before* the effect,
+and — because the clicked node sits near the left edge after a right-edge scroll — nudged the camera
+~82px forward horizontally (measured: Thyreophora x 64 → 146). It also would fight the effect's new
+vertical scroll.
+
+**Resolution:** on a step-back click, suppress the click-focus keep-visible scroll so exactly ONE
+path scrolls the viewport (the tip-change effect, computing against settled geometry). `onNodeClick`
+sets a transient `suppressFocusScroll` flag when the click is a step-back — detected from the *current*
+`tipId` (still the old tip at click time, before `onnodeselect` mutates the store) via `isStepBack`.
+`scrollFocusIntoView` reads and clears the flag, early-returning without scrolling. Focus itself
+(roving tabindex, the ring, keyboard readiness) is unaffected — only the scroll side-effect is
+suppressed.
+
+### §1c. Extract `keepVisible1D` (DRY)
+
+`scrollFocusIntoView` already computes, per axis: "given a node coordinate, the current scroll offset,
+the viewport length, a margin, and the max scroll — return the new scroll offset (unchanged if the
+node is comfortably inside)." The step-back vertical nudge needs exactly that for the Y axis. Extract
+the per-axis math into a pure `keepVisible1D` in `spine-layout.ts`, TDD-test it, and call it from both
+`scrollFocusIntoView` (X and Y) and the tip-change effect's vertical step-back nudge (Y only). This
+avoids a second copy of the edge math drifting from the first.
 
 ---
 
@@ -186,23 +227,26 @@ somewhere genuinely new, so the "hold where you were" contract does not apply.
 ## Data flow summary
 
 ```
-tip changes (Explore: explorer.highlightId)
-        │
-        ▼
-classify move by treeStore.pathToRoot(lastTipId).includes(newTipId)
-        │
-   ┌────┴─────────────────────────────┐
- step-back                       forward / lateral
-   │                                   │
-   ├─ scrollTargetPx = null            ├─ coyotePad = 0
-   ├─ skip native recenter             └─ recenter on tip (today's path)
-   │  (freeze scrollLeft + scrollTop)
-   └─ coyotePad += (oldWidth−newWidth)*X_GAP   ┌── resetZoom (⌂):
-                                                │     coyotePad = 0, then recenter
-                                                └── (independent of the classifier)
+click a node (Explore)                 tip changes (Explore: explorer.highlightId)
+   │                                            │
+   ▼                                            ▼
+onNodeClick: is this click a step-back?   classify move by isStepBack(store, lastTipId, newTipId)
+(isStepBack from CURRENT tipId,                 │
+ before onnodeselect mutates)              ┌────┴─────────────────────────────┐
+   │ yes → suppressFocusScroll = true    step-back                    forward / lateral
+   ▼                                       │                                  │
+onnodeselect → store mutates              ├─ scrollTargetPx = null            ├─ coyotePad = 0
+   │                                       ├─ skip native recenter            └─ recenter on tip
+focusItem → onItemFocus →                 ├─ FREEZE scrollLeft (untouched)       (today's path)
+scrollFocusIntoView:                       ├─ scrollTop = keepVisible1D(...)   ┌── resetZoom (⌂):
+   if suppressFocusScroll → clear & return │  (vertical-only, settled posOf)   │    coyotePad = 0,
+   else keepVisible1D on X and Y           └─ coyotePad += (oldW−newW)*X_GAP   │    then recenter
 ```
 
 `coyotePad` feeds `runway`/`scrollWidth`, which the browser clamp and `scrollFade` already depend on.
+`keepVisible1D` (§1c) is the shared per-axis edge math used by both `scrollFocusIntoView` and the
+step-back vertical nudge. `suppressFocusScroll` (§1b) guarantees exactly one path scrolls per
+step-back.
 
 ## Testing
 
@@ -216,14 +260,25 @@ agreement:
 - **Coyote-pad width math** — a small pure helper `coyotePadDelta(oldWidth, newWidth, xGap)` returning
   `Math.max(0, (oldWidth − newWidth) * xGap)` (clamp at 0 so a lateral/forward misclassification can
   never produce negative padding). Test the extend-accumulation contract at the call site.
+- **Keep-visible edge math (§1c)** — a pure `keepVisible1D(coord, scroll, viewportLen, margin, maxScroll):
+  number` returning the new scroll offset (unchanged when the node is comfortably inside the margins).
+  Cases: node comfortably inside → returns `scroll` unchanged; node past the near (low) margin → pans
+  so it sits at `margin`; node past the far (high) margin → pans so it sits at `viewportLen − margin`;
+  result clamped to `[0, maxScroll]` at both ends. This is the extraction of the current
+  `scrollFocusIntoView` per-axis arithmetic (`:513`–`:522`), so the refactor is behavior-preserving —
+  the existing X/Y calls must produce identical results after switching to the helper.
 
-SpineTree itself is validated by build + running (Svelte component). Manual verification, at default
-zoom in Explore:
+SpineTree itself is validated by build + running (Svelte component). Manual verification (done live in
+Task 6 via Playwright, measuring scroll offsets + node screen positions), at default zoom in Explore,
+narrow viewport (~900px) so the right-edge scroll case actually reproduces:
 
-1. `#/explore?taxon=ankylosauria`, step back to Thyreophora → tree collapses in place, camera holds,
-   right-side gap opens; nothing slides forward.
-2. Step back again (Thyreophora → Genasauria/Ornithischia) → hold extends, no yank.
-3. Press ⌂ → recenters, gap closes.
+1. `#/explore?taxon=ankylosauria`, step back to Thyreophora → tree collapses in place; `scrollLeft`
+   frozen (no forward slide — Thyreophora does NOT jump toward Ankylosauria's old column);
+   `scrollWidth` held (no clamp yank); right-side gap opens; the new tip stays on-screen.
+2. Step back again (Thyreophora → Genasauria) → `scrollLeft` hold extends, `scrollWidth` still held,
+   and the new tip remains visible (vertical keep-visible pans if needed — it must NOT be scrolled
+   off-screen; this is the §1a regression the "both axes" version failed).
+3. Press ⌂ → `coyotePad` zeroes (`scrollWidth` shrinks back), recenters on the tip, gap closes.
 4. From the held state, search-jump to an unrelated taxon → recenters cleanly, no stale gap.
 5. Confirm the short-tree (non-scrolled) case is unchanged.
 6. Confirm the game is unaffected (tip only deepens; classifier never reports step-back).
