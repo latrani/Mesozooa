@@ -78,7 +78,7 @@ function g(state: GameState, id: string): GameState {
 
 // Pick a few real playable genera at varying distances from the target for warmth spread.
 // These are stable ids from the committed tree.
-const FAR = "Q104471803"; // Abitusavis (some avialan) — adjust distance via MRCA naturally
+const FAR = "Q1084949"; // Enantiornis (an avialan) — adjust distance via MRCA naturally
 const MID = "Q14330"; // Diplodocus (sauropod) — far from a theropod target => cold
 const NEAR = "Q100196"; // Archaeopteryx itself is the target
 
