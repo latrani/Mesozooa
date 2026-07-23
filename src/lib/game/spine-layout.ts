@@ -242,3 +242,12 @@ export function isStepBack(store: TreeStore, oldTip: string | null, newTip: stri
   if (!oldTip || oldTip === newTip) return false;
   return store.pathToRoot(oldTip).includes(newTip);
 }
+
+/**
+ * Extra runway px a step-back must reserve so the scroll clamp can't yank the frozen view when the
+ * collapsing branch shrinks `contentWidth`. Clamped at 0 so a forward/lateral move (which grows or
+ * keeps the width) can never produce negative padding. See the "coyote time" note in the spec.
+ */
+export function coyotePadDelta(oldWidth: number, newWidth: number, xGap: number): number {
+  return Math.max(0, (oldWidth - newWidth) * xGap);
+}

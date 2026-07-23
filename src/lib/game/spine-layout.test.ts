@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { layoutSpine, centerOffsetFor, edgePathBetween, isStepBack } from "./spine-layout";
+import { layoutSpine, centerOffsetFor, edgePathBetween, isStepBack, coyotePadDelta } from "./spine-layout";
 import { createTreeStore } from "./treeStore";
 import { assembleTree, pruneSubtree } from "../tree/assemble";
 import { markPlayable } from "../tree/playable";
@@ -320,5 +320,16 @@ describe("isStepBack", () => {
     expect(isStepBack(store, "TF", "O")).toBe(false);   // sibling subtree (lateral)
     expect(isStepBack(store, "TF", "TF")).toBe(false);  // same node (pathToRoot includes self)
     expect(isStepBack(store, null, "TF")).toBe(false);  // first mount
+  });
+});
+
+describe("coyotePadDelta", () => {
+  it("reserves the collapsed columns' width", () => {
+    expect(coyotePadDelta(10, 9, 200)).toBe(200);  // one column lost
+    expect(coyotePadDelta(10, 7, 200)).toBe(600);  // three columns lost
+  });
+  it("clamps at 0 when width did not shrink (forward/lateral misclassification is harmless)", () => {
+    expect(coyotePadDelta(9, 10, 200)).toBe(0);    // grew
+    expect(coyotePadDelta(9, 9, 200)).toBe(0);     // unchanged
   });
 });
