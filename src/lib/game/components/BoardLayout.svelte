@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { viewport } from "../../viewport.svelte";
 
   let { cluster, placard, tree }: {
     cluster: Snippet;
@@ -7,21 +8,11 @@
     tree: Snippet<[number]>;
   } = $props();
 
-  // Measure the floating placard so the tree centers into the area LEFT of it; on narrow it stacks
-  // in flow, so no inset. (This logic previously lived — identically — in both GameBoard and Explorer.)
+  // Measure the floating placard so the tree centers into the area LEFT of it; on phone it stacks
+  // in flow, so no inset.
   let placardW = $state(0);
-  let isDesktop = $state(
-    typeof matchMedia !== "undefined" ? matchMedia("(min-width: 641px)").matches : true,
-  );
-  $effect(() => {
-    if (typeof matchMedia === "undefined") return;
-    const mq = matchMedia("(min-width: 641px)");
-    const on = () => (isDesktop = mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  });
   // inset = placard width + its right offset (--space-5 = 24px) + a breathing gap before the tree
-  let rightInset = $derived(isDesktop && placardW ? placardW + 24 + 24 : 0);
+  let rightInset = $derived(!viewport.isPhone && placardW ? placardW + 24 + 24 : 0);
 </script>
 
 <div class="board">
