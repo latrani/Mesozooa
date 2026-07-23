@@ -75,3 +75,42 @@ export function chipsFor(guesses: GuessResult[], store: TreeStore, opts: ChipOpt
 
   return chips;
 }
+
+export interface PhoneChipSelection {
+  /** render order: answer (if present), then latest, then warmest */
+  shown: Chip[];
+  /** identity-equal to a member of `shown`, so the renderer can ring exactly one chip */
+  warmestChip: Chip | null;
+  /** how many chips were omitted; 0 means render no overflow control */
+  hiddenCount: number;
+}
+
+// Phone truncation. NOT "the most recent N": the two chips that carry live meaning are the
+// LATEST (feedback for the turn just taken) and the WARMEST (the anchor of the search, and the
+// node the spine is centered on). Selecting by meaning is why the band can stay two rows tall
+// without hiding anything the player is actually using.
+//
+// Deliberately does NOT backfill a second chip when latest IS warmest: a backfilled slot would
+// silently redefine the pair as "top 2 guesses", a different and less honest claim.
+export function phoneChips(chips: Chip[], warmestNodeId: string | null): PhoneChipSelection {
+  const answer = chips.find((c) => c.kind === "answer") ?? null;
+  const rest = chips.filter((c) => c.kind !== "answer");
+
+  const latest = rest[0] ?? null;
+  // leafHint carries no sharedNodeId, so it can never be warmest — which is correct: it spends
+  // moves on the field clue and reveals no tree node.
+  const warmest =
+    warmestNodeId == null
+      ? null
+      : (rest.find(
+          (c) =>
+            (c.kind === "guess" || c.kind === "branchHint") && c.sharedNodeId === warmestNodeId,
+        ) ?? null);
+
+  const shown: Chip[] = [];
+  if (answer) shown.push(answer);
+  if (latest) shown.push(latest);
+  if (warmest && warmest !== latest) shown.push(warmest);
+
+  return { shown, warmestChip: warmest, hiddenCount: chips.length - shown.length };
+}

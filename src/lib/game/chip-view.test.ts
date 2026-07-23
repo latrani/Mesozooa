@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chipsFor } from "./chip-view";
+import { chipsFor, phoneChips } from "./chip-view";
 import { createTreeStore } from "./treeStore";
 import { assembleTree } from "../tree/assemble";
 import { FIXTURE_RAWS } from "../tree/fixture";
@@ -82,5 +82,85 @@ describe("chipsFor", () => {
     expect(chips[0].kind).toBe("answer");
     if (chips[0].kind !== "answer") throw new Error("kind");
     expect(chips[0].won).toBe(false);
+  });
+});
+
+describe("phoneChips", () => {
+  it("returns nothing for an empty log", () => {
+    const sel = phoneChips([], null);
+    expect(sel.shown).toEqual([]);
+    expect(sel.warmestChip).toBeNull();
+    expect(sel.hiddenCount).toBe(0);
+  });
+
+  it("shows one chip when latest IS warmest, without backfilling a second", () => {
+    const chips = chipsFor([row("guess", "TR", "TF")], store, {});
+    const sel = phoneChips(chips, "TF");
+    expect(sel.shown).toHaveLength(1);
+    expect(sel.warmestChip).toBe(sel.shown[0]);
+    expect(sel.hiddenCount).toBe(0);
+  });
+
+  it("shows latest then warmest when they differ", () => {
+    // chipsFor returns newest-first, so the LAST row given is chips[0].
+    const chips = chipsFor(
+      [row("guess", "TR", "TF"), row("guess", "TC", "Q430")],
+      store,
+      {},
+    );
+    const sel = phoneChips(chips, "TF");
+    expect(sel.shown).toHaveLength(2);
+    expect(sel.shown[0]).toBe(chips[0]); // latest = the Triceratops guess
+    expect(sel.warmestChip).toBe(sel.shown[1]);
+    if (sel.shown[1].kind !== "guess") throw new Error("kind");
+    expect(sel.shown[1].sharedNodeId).toBe("TF");
+    expect(sel.hiddenCount).toBe(0);
+  });
+
+  it("counts every chip it omits", () => {
+    const chips = chipsFor(
+      [row("guess", "TR", "TF"), row("guess", "TC", "Q430"), row("guess", "LO", "T")],
+      store,
+      {},
+    );
+    const sel = phoneChips(chips, "TF");
+    expect(sel.shown).toHaveLength(2);
+    expect(sel.hiddenCount).toBe(chips.length - 2);
+  });
+
+  it("never picks a leafHint as warmest (it references no node)", () => {
+    const chips = chipsFor([row("guess", "TR", "TF"), row("leafHint", "TR", "TF")], store, {});
+    const sel = phoneChips(chips, "TF");
+    expect(sel.shown[0].kind).toBe("leafHint"); // latest
+    expect(sel.warmestChip).not.toBeNull();
+    expect(sel.warmestChip!.kind).toBe("guess");
+  });
+
+  it("picks a branchHint as warmest when it revealed the warmest node", () => {
+    // branchHint first so it is NOT also the latest chip — this test is about the warmest slot.
+    const chips = chipsFor([row("branchHint", "TF", "TF"), row("guess", "TC", "Q430")], store, {});
+    const sel = phoneChips(chips, "TF");
+    expect(sel.shown).toHaveLength(2);
+    expect(sel.shown[0].kind).toBe("guess"); // latest
+    expect(sel.warmestChip).not.toBeNull();
+    expect(sel.warmestChip!.kind).toBe("branchHint");
+  });
+
+  it("pins the answer chip first at end state and still shows latest", () => {
+    const chips = chipsFor([row("guess", "TC", "Q430")], store, {
+      answerId: "TR",
+      won: false,
+      lastGuessFraction: 0.4,
+    });
+    const sel = phoneChips(chips, "Q430");
+    expect(sel.shown[0].kind).toBe("answer");
+    expect(sel.shown[1].kind).toBe("guess");
+  });
+
+  it("treats a null warmest node as no warmest chip", () => {
+    const chips = chipsFor([row("guess", "TR", "TF")], store, {});
+    const sel = phoneChips(chips, null);
+    expect(sel.warmestChip).toBeNull();
+    expect(sel.shown).toHaveLength(1);
   });
 });
