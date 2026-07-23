@@ -1,5 +1,6 @@
 <script lang="ts">
   import Modal from "./Modal.svelte";
+  import meta from "../../data/meta.json";
   let open = $state(false);
 </script>
 
@@ -12,6 +13,17 @@
     <p>You can spend moves on hints to move down the tree. As you get closer, the color of the guess tells you how close the common clade is to the target.</p>
     <p>When you're almost at the end of the tree, a single move will tell you more details about the dino, to help you sort through the genera.</p>
     <p>If you're stuck, or just want to learn more, check out Explore mode to see the whole tree. Not every dinosaur in Explore mode is playable, but every playable dinosaur is in Explore.</p>
+    <hr class="rule" />
+    <h3 class="about-head">About</h3>
+    <p>
+      Inspired by <a href="https://metazooa.com" target="_blank" rel="noopener noreferrer">Metazooa</a>.
+    </p>
+    <p>
+      Data from <a href="https://www.wikidata.org" target="_blank" rel="noopener noreferrer">Wikidata</a> (CC0),
+      the <a href="https://paleobiodb.org" target="_blank" rel="noopener noreferrer">Paleobiology Database</a>,
+      and <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer">Wikipedia</a>.
+      Updated {meta.dataPulledAt}.
+    </p>
   </div>
 </Modal>
 
@@ -33,6 +45,11 @@
   }
   .how-to-play-body {
     display: flex; flex-direction: column; gap: var(--space-3);
+  }
+  .rule { border: 0; border-top: 1px solid var(--hairline); width: 100%; margin: var(--space-2) 0 0; }
+  .about-head {
+    font-family: var(--font-head); font-size: var(--type-heading);
+    font-weight: var(--fw-bold); margin: 0;
   }
   /* Phone: the header row is at its width budget, so the label shortens to fit. */
   @media (max-width: 640px) {

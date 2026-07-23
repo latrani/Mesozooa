@@ -287,4 +287,10 @@
   }
   .app-footer a { color: var(--cream-dim); font-weight: var(--fw-semibold); }
   .app-footer a:hover { color: var(--cream); }
+  /* Phone: the attribution strip wraps to ~4 lines of --type-meta, roughly 10% of the tree's
+     height budget, for text nobody reads in a strip. It lives in How to play > About instead;
+     per-image CC credits stay on the specimen card, so the license obligation is met either way. */
+  @media (max-width: 640px) {
+    .app-footer { display: none; }
+  }
 </style>

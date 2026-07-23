@@ -57,12 +57,18 @@
     background: var(--bg-surface);
     color: var(--ink);
     max-width: min(32rem, 90vw);
+    /* Without a cap, tall content (How to play, now carrying attributions; Stats) overflows the
+       viewport on a phone with no way to reach the bottom. */
+    max-height: 85dvh;
+    overflow: hidden;
   }
   .modal::backdrop {
     background: rgba(51, 38, 26, 0.45);
   }
   .modal-inner {
     padding: var(--space-4);
+    max-height: 85dvh;
+    display: flex; flex-direction: column; min-height: 0;
   }
   .modal-head {
     display: flex;
@@ -89,5 +95,6 @@
   }
   .modal-body {
     font-size: var(--type-body);
+    overflow-y: auto; overscroll-behavior: contain; min-height: 0;
   }
 </style>
