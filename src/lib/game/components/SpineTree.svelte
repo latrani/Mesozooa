@@ -1,6 +1,6 @@
 <script lang="ts">
   import { treeStore } from "../treeData";
-  import { layoutSpine, centerOffsetFor, edgePathBetween } from "../spine-layout";
+  import { layoutSpine, centerOffsetFor, edgePathBetween, isStepBack, coyotePadDelta } from "../spine-layout";
   import { a11yTree, buildNav, resolveKey, a11yLabel } from "../a11y-tree";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
@@ -411,7 +411,15 @@
   // The specimen clearance is a FIXED-px runway (a spacer element after the SVG), NOT canvas baked
   // into the viewBox — so it stays a constant screen-px gutter at every zoom (issue #32). The SVG
   // draws the tree only (0..contentWidth); `runway` is the scroll distance past its right edge.
-  let runway = $derived(contentWidth ? rightInset : 0);
+  // "Coyote time" (issue #66): on a step-back the camera is frozen (see the tip-change effect) and
+  // the collapsing branch shrinks contentWidth — which would drop the scroll clamp ceiling and yank
+  // the frozen view leftward. `coyotePad` (unscaled content px) reserves the collapsed columns'
+  // width so scrollWidth doesn't shrink under the held scrollLeft. Named for platformer "coyote
+  // time": the ground stays under you a beat after you'd otherwise fall (Wile E. doesn't drop till
+  // he looks down). It zeroes on any deliberate recenter (forward/lateral tip, or ⌂). Default-zoom
+  // only, matching the FLIP scroll driver's atDefaultZoom gate.
+  let coyotePad = $state(0);
+  let runway = $derived(contentWidth ? rightInset + coyotePad : 0);
   // Total scrollable content width at zoom=1: scaled tree + fixed runway. centerOffsetFor and the
   // scroll-fade dependency read this.
   let scrollWidth = $derived(contentWidth ? contentWidth + runway : 0);
