@@ -14,8 +14,8 @@
 </main>
 
 <style>
-  .practice { padding-top: var(--space-2); }
+  .practice { padding-top: 0; }
   @media (min-width: 641px) {
-    .practice { padding-top: 0; display: flex; flex-direction: column; min-height: 0; }
+    .practice { display: flex; flex-direction: column; min-height: 0; }
   }
 </style>

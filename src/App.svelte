@@ -220,7 +220,7 @@
     .tagline { display: none; }
     .wordmark { display: none; }
     .app-header { gap: var(--space-3); padding: var(--space-2) var(--space-3); }
-    .modes { gap: var(--space-3); font-size: var(--type-body); }
+    .modes { gap: var(--space-3); font-size: var(--type-label); }
   }
   .modes {
     display: flex;

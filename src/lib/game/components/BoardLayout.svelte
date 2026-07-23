@@ -16,6 +16,13 @@
   // the placard is a bottom sheet in flow, so there is no inset.
   let placardW = $state(0);
   let rightInset = $derived(!viewport.isPhone && placardW ? placardW + 24 + 24 : 0);
+
+  // Crossing the breakpoint re-lays-out the board, so the sheet must return to its collapsed
+  // default rather than reappearing expanded. Rotating a phone crosses 640px twice.
+  $effect(() => {
+    void viewport.isPhone;
+    sheetExpanded = false;
+  });
 </script>
 
 <div class="board">
@@ -49,6 +56,8 @@
 
   @media (min-width: 641px) {
     .board { flex: 1 1 auto; min-height: 0; gap: 0; padding: 0; }
+    /* the cluster is a pegged top band; the placard floats over its top-right, sized to its own
+       content; the tree fills the whole body below and centers into the area LEFT of it. */
     .cluster {
       position: relative; flex: 0 0 auto;
       padding: var(--space-4);

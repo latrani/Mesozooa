@@ -11,19 +11,17 @@
     expanded = $bindable(false),
     peek,
     children,
-    label = "Specimen",
   }: {
     expanded?: boolean;
     peek: Snippet;
     children: Snippet;
-    label?: string;
   } = $props();
 
   const uid = $props.id();
   const bodyId = `sheet-body-${uid}`;
 </script>
 
-<aside class="sheet" class:expanded aria-label={label}>
+<div class="sheet" class:expanded>
   <button
     type="button"
     class="peek"
@@ -40,7 +38,7 @@
       {@render children()}
     </div>
   {/if}
-</aside>
+</div>
 
 <style>
   .sheet {
@@ -57,7 +55,7 @@
   /* the peek row IS the toggle: a full-width button carrying one line of specimen identity */
   .peek {
     display: flex; align-items: center; gap: var(--space-3);
-    width: 100%; padding: var(--space-2) var(--space-4);
+    width: 100%; padding: var(--space-2) var(--space-4) max(var(--space-2), env(safe-area-inset-bottom));
     background: none; border: 0; cursor: pointer;
     color: inherit; text-align: left;
   }

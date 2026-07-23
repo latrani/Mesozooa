@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { treeStore } from "../treeData";
   import type { GameState } from "../types";
   import SearchBox from "./SearchBox.svelte";
@@ -96,7 +97,8 @@
   // It stays dismissible for exactly that reason; the peek row re-opens it.
   let sheetExpanded = $state(false);
   $effect(() => {
-    if (ended && viewport.isPhone) sheetExpanded = true;
+    if (!ended) return;
+    if (untrack(() => viewport.isPhone)) sheetExpanded = true;
   });
 </script>
 
@@ -193,4 +195,13 @@
   }
   .result-line { font-size: var(--type-body); font-weight: var(--fw-bold); color: var(--ink); }
   .end-stats { margin-top: var(--space-4); }
+
+  /* Phone: the search field takes its own full-width line and the controls wrap beneath it.
+     Without this the row's incompressible content overflows a 390px cluster and, since the shell
+     is overflow:hidden, is clipped rather than scrollable. */
+  @media (max-width: 640px) {
+    .input-row { flex-wrap: wrap; gap: var(--space-2); }
+    .input-row :global(.searchbox) { flex: 1 0 100%; min-width: 0; }
+    .budget { margin-left: auto; font-size: var(--type-label); }
+  }
 </style>

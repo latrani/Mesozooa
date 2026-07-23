@@ -44,6 +44,10 @@
   $effect(() => {
     if (guesses.length === 0) expanded = false;
   });
+  $effect(() => {
+    void viewport.isPhone;
+    expanded = false;
+  });
 
   let collapsed = $derived(viewport.isPhone && !expanded);
   // Expanding renders the SAME chip objects in their true order. Because the keys below are

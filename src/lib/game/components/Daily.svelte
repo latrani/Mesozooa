@@ -42,9 +42,9 @@
 </Modal>
 
 <style>
-  .daily { padding-top: var(--space-2); }
+  .daily { padding-top: 0; }
   @media (min-width: 641px) {
-    .daily { padding-top: 0; display: flex; flex-direction: column; min-height: 0; }
+    .daily { display: flex; flex-direction: column; min-height: 0; }
   }
   /* Framed preview on a lighter sunk ground — the result reads as a lifted-out card, distinct
      from the modal body. Blocks are spaced as paragraphs (display-only; copied text is compact). */

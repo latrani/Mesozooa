@@ -4,7 +4,9 @@
   let open = $state(false);
 </script>
 
-<button type="button" class="how-to-play-link btn-secondary btn-small" onclick={() => (open = true)}>How to play</button>
+<button type="button" class="how-to-play-link btn-secondary btn-small" onclick={() => (open = true)} aria-label="How to play">
+  <span class="label-full">How to play</span><span class="label-short" aria-hidden="true">?</span>
+</button>
 
 <Modal bind:open title="How to play">
   <div class="how-to-play-body">
@@ -51,8 +53,12 @@
     font-family: var(--font-head); font-size: var(--type-heading);
     font-weight: var(--fw-bold); margin: 0;
   }
-  /* Phone: the header row is at its width budget, so the label shortens to fit. */
+  .label-short { display: none; }
+  /* Phone: the header row is at its width budget, so the label collapses to a question mark.
+     The button keeps an explicit aria-label so the accessible name never changes with viewport. */
   @media (max-width: 640px) {
-    .how-to-play-link { padding: .25rem .45rem; font-size: var(--type-label); }
+    .how-to-play-link { padding: .25rem .5rem; }
+    .label-full { display: none; }
+    .label-short { display: inline; font-weight: var(--fw-black); }
   }
 </style>

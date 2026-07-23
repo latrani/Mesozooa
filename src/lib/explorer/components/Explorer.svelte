@@ -93,5 +93,8 @@
      the overflow is simply clipped. No +N control; it has not earned a sheet of its own. */
   @media (max-width: 640px) {
     .recent { flex-wrap: nowrap; overflow: hidden; }
+    /* chips must fall off the edge, not squeeze: without this they all shrink toward min-content
+       and clip mid-word instead of the trailing ones simply running past the cut. */
+    .recent :global(.chip) { flex: none; }
   }
 </style>
