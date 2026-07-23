@@ -98,12 +98,17 @@ In the tip-change effect (`:640`), classify the move when the tip changes:
 - **forward / lateral** — everything else (deeper tip, or a jump to a sibling/unrelated subtree):
   unchanged behavior, recenter as today.
 
-On a **step-back** (corrected mechanism — see §1a for why this replaces "both axes"):
+On a **step-back** (corrected mechanism — see §1a for why this replaces "both axes", and §1d for the
+effect-ordering correction):
 
-- Set `scrollTargetPx = null` so the FLIP scroll driver (`:234`) does not run (kills the ~200px
-  deliberate recenter slide — the big horizontal mover).
-- Skip the native `scrollToNode` / `resetZoom` recenter.
-- Freeze `scrollLeft` (do not touch it).
+- **Do not arm the FLIP scroll animation.** The guard must live in the FLIP effect (`:200`), where
+  `scrollTargetPx`/`scrollFrom` are *set*, not in the tip-change effect where they are read — because
+  the scroll driver (`:234`) runs BETWEEN them and would already have animated (§1d). Concretely: the
+  arming condition at `:215` gains a `!isStepBack(treeStore, lastTipId, tip)` term, so on a step-back
+  it falls to the `else` (`scrollFrom = scrollTargetPx = null`) and the driver no-ops. This kills the
+  ~200px→82px deliberate recenter slide (the real big horizontal mover — see §1d).
+- In the tip-change effect, on a step-back: skip the native `scrollToNode` / `resetZoom` recenter,
+  freeze `scrollLeft` (do not touch it), and extend `coyotePad` (§2).
 - Apply a **vertical-only keep-visible** nudge to `scrollTop`: pan only if the new tip's row strays
   near/off a viewport edge, using the same per-axis keep-visible math `scrollFocusIntoView` already
   uses (§1c extracts it as a pure helper for reuse). This runs in the tip-change effect *after* the
@@ -123,15 +128,47 @@ a keep-visible leash fixes this while still never sliding the tree forward horiz
 the part of the legibility contract the issue actually cares about ("jumps into Ankylosauria's
 place" is a *horizontal* forward slide).
 
-### §1b. The third scroll mover: `scrollFocusIntoView` (found in live testing)
+### §1b. Defensive suppression of the click-focus scroll (`scrollFocusIntoView`)
 
-The original analysis modeled two movers (the recenter slide + the clamp yank). Live testing revealed
-a third: **clicking a node to step back also focuses it**, and focus fires the ARIA keep-visible pan
-`scrollFocusIntoView` (`onNodeClick → focusItem → onItemFocus → scrollFocusIntoView`, `:556`/`:531`).
-That path is independent of the tip-change effect, fires synchronously on click *before* the effect,
-and — because the clicked node sits near the left edge after a right-edge scroll — nudged the camera
-~82px forward horizontally (measured: Thyreophora x 64 → 146). It also would fight the effect's new
-vertical scroll.
+Clicking a node to step back also focuses it, and focus *can* fire the ARIA keep-visible pan
+`scrollFocusIntoView` (`onNodeClick → focusItem → onItemFocus → scrollFocusIntoView`, `:556`/`:531`) —
+an independent scroll path that would fight the tip-change effect's vertical nudge and could pan
+horizontally. We suppress it on a step-back click (the `suppressFocusScroll` one-shot flag) so exactly
+ONE path scrolls the viewport per step-back.
+
+**Correction (2026-07-23, second live-test round):** the first revision of this section blamed
+`scrollFocusIntoView` for the measured ~82px horizontal nudge. That was **wrong** — instrumenting the
+scroller's `scrollLeft` setter showed the single horizontal write came from the **FLIP scroll driver
+`$effect`** (`:234`), not `scrollFocusIntoView`. The real root cause is effect ordering (§1d). The
+`suppressFocusScroll` flag (Task 8) is still correct and worth keeping as defense-in-depth — it
+guarantees the focus path can't scroll during a step-back regardless — but it is NOT what fixes the
+horizontal slide. §1d is.
+
+### §1d. The effect-ordering bug — why the null must move to the FLIP effect
+
+The originally-shipped Task 4 set `scrollTargetPx = null` inside the **tip-change effect** to stop the
+scroll driver. Live instrumentation proved that too late. Svelte runs `$effect`s in creation order,
+and in this file that is:
+
+1. **FLIP effect** (`:200`) — on a relayout, *arms* the animation: `scrollFrom = current scroll`,
+   `scrollTargetPx = scrollTargetFor(tip)` (the recenter target), and restarts `flipProgressTween`
+   0→1.
+2. **Scroll driver** (`:234`) — reads `flipProgressTween.current` + the snapshot and writes
+   `scroller.scrollLeft/Top = lerp(from, target, t)`.
+3. **Tip-change effect** (`:640`) — where Task 4 nulled `scrollTargetPx`.
+
+On the step-back flush, the driver (step 2) runs and writes the recenter target *before* step 3 nulls
+it. Worse, on the first post-arm frame the tween's reset to 0 hasn't visibly propagated, so `t≈1` and
+the driver jumps `scrollLeft` straight toward the target in one write (measured 1018→936; it read as
+an ~82px slide rather than the full ~200px only because `coyotePad`/clamp interactions capped it).
+Nulling in step 3 can never prevent a write that already happened in step 2.
+
+**Fix:** move the decision to step 1. The FLIP effect must not *arm* the scroll on a step-back —
+add `!isStepBack(treeStore, lastTipId, tip)` to its arming condition (`:215`) so `scrollFrom`/
+`scrollTargetPx` are set null there and the driver no-ops from the start. `lastTipId` is still the old
+tip at FLIP-effect time (the tip-change effect updates it later in the same flush), so the
+classification is correct. The tip-change effect then only needs to *not recenter* and to do the
+vertical nudge + `coyotePad` — it no longer bears responsibility for stopping the driver.
 
 **Resolution:** on a step-back click, suppress the click-focus keep-visible scroll so exactly ONE
 path scrolls the viewport (the tip-change effect, computing against settled geometry). `onNodeClick`
