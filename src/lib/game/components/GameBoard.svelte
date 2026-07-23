@@ -9,6 +9,7 @@
   import StatsContent from "../../components/StatsContent.svelte";
   import { specimenView } from "../specimen-view";
   import type { WarmthProvider } from "../warmth";
+  import { viewport } from "../../viewport.svelte";
 
   let {
     store,
@@ -89,15 +90,23 @@
 
   // Component ref to the spine tree so trail crumbs can pan it (spec §3B).
   let spine = $state<ReturnType<typeof SpineTree>>();
+
+  // Phone end state: the reveal RISES rather than the cluster inflating, because end state is
+  // when the tree is most worth looking at (answer lineage revealed, every node an Explore link).
+  // It stays dismissible for exactly that reason; the peek row re-opens it.
+  let sheetExpanded = $state(false);
+  $effect(() => {
+    if (ended && viewport.isPhone) sheetExpanded = true;
+  });
 </script>
 
-<BoardLayout>
+<BoardLayout bind:sheetExpanded>
   {#snippet cluster()}
     {#if ended}
       <div class="result" class:won class:lost={!won} aria-live="polite">
         <span class="result-line">{#if won}Congratulations! {answerName} guessed in {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
       </div>
-      {#if store.state.mode === "daily"}
+      {#if store.state.mode === "daily" && !viewport.isPhone}
         <div class="end-stats"><StatsContent /></div>
       {/if}
     {:else}
@@ -130,6 +139,9 @@
   {#snippet placard(peek: boolean)}
     <SpecimenPlacard view={specimenView(store.state, treeStore)} {peek}>
       {#snippet action()}
+        {#if ended && viewport.isPhone && store.state.mode === "daily"}
+          <div class="end-stats"><StatsContent /></div>
+        {/if}
         {#if ended && (onnew || onshare)}
           <div class="actions">
             {#if onshare}
