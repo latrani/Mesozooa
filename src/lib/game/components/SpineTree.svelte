@@ -631,6 +631,7 @@
   // Return to the default view: 1:1, re-centered on the current tip.
   function resetZoom() {
     zoom = defaultZoomFor(viewport.isPhone);
+    coyotePad = 0; // ⌂ is the explicit "put me back": drop any held coyote-time gap, re-clamp normally
     requestAnimationFrame(() => { if (tipId) scrollToNode(tipId); });
   }
 
