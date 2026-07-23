@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { scrollFade } from "../actions/scrollFade";
+  import { untrack } from "svelte";
 
   // Phone-only chrome: the specimen plaque as a real drawer. PEEK is one row, always visible, so
   // the exhibit is never absent (the museum-fixture conceit the desktop spec established).
@@ -56,7 +57,13 @@
       height = null;
       return;
     }
-    const id = requestAnimationFrame(() => (height = openHeight()));
+    // Only size an open that has not already been sized. A drag that OPENS the drawer sets both
+    // `expanded` and `height` in the same gesture; without this guard the deferred measurement
+    // below would fire a frame later and yank the drawer to the cap mid-drag.
+    if (untrack(() => height) != null) return;
+    const id = requestAnimationFrame(() => {
+      if (untrack(() => height) == null) height = openHeight();
+    });
     return () => cancelAnimationFrame(id);
   });
 
@@ -128,6 +135,7 @@
     onpointercancel={onPointerUp}
     onkeydown={onKeydown}
   >
+    <span class="grabber" aria-hidden="true"></span>
     <span class="peek-content">{@render peek()}</span>
     <span class="chevron" aria-hidden="true">{expanded ? "▼" : "▲"}</span>
   </div>
@@ -155,10 +163,19 @@
      vertical drag resize the drawer instead of being claimed as a page scroll. */
   .peek {
     display: flex; align-items: center; gap: var(--space-3);
-    width: 100%; padding: var(--space-2) var(--space-4) max(var(--space-2), env(safe-area-inset-bottom));
+    position: relative;
+    width: 100%;
+    padding: var(--space-3) var(--space-4) max(var(--space-2), env(safe-area-inset-bottom));
     background: none; border: 0; cursor: grab;
     color: inherit; text-align: left;
     flex: 0 0 auto; touch-action: none; user-select: none;
+  }
+  /* The universal drawer affordance. Without it the heading reads as a plain bar and nobody
+     discovers the drag, which makes the drawer behave exactly like the fixed panel it replaced. */
+  .grabber {
+    position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+    width: 2.25rem; height: 4px; border-radius: 2px;
+    background: var(--cream); opacity: .35;
   }
   .peek-content { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 auto; min-width: 0; }
   .chevron { flex: none; opacity: .7; font-size: var(--type-label); }
