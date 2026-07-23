@@ -125,10 +125,11 @@ Selection is cheap: guesses are already newest-first and `store.warmestId` alrea
 already has in the tree, so the chip and the node read as the same object. Position carries Latest
 (newest-first, as on desktop).
 
-> **Provisional.** This is the one decision that hinges on whether a visual reads once built. If the
-> ring does not distinguish the Warmest chip clearly enough, the fallback is eyebrow labels
-> (`LATEST` / `WARMEST`), at a cost of roughly two extra lines in the band. Do not treat the ring as
-> settled before it has been seen.
+> **REVERSED BY PLAYTEST (2026-07-22).** The ring was built, looked at on a real 390px viewport,
+> and did not read. The fallback named here is now the design: **`LATEST` / `WARMEST` eyebrow labels**,
+> rendered only while the band is collapsed. Expanded, the list is plain reverse-chronological and
+> the labels would be false, so they are not shown. `Chip`'s `warmest` prop and the ring CSS were
+> removed rather than left dormant. This is the provisional call resolving exactly as intended.
 
 Rejected: free wrap (desktop's rule — late-game it eats half the screen), a single horizontally
 scrolling line (only ~1.3 chips fit, and it puts a horizontal swipe surface directly above the
@@ -143,7 +144,11 @@ not three cases.
 
 **On phone the plaque is a bottom sheet:**
 
-- **Peek** — one row, always visible: thumbnail + title + note, plus a raise affordance.
+- **Peek** — one row, always visible: the placard **title**, its note as quiet trailing context, and
+  an up/down arrow at the right. **Revised by playtest (2026-07-22):** the peek originally carried a
+  thumbnail too, which did not earn its width, and the expanded card restated the title directly
+  beneath it. The thumbnail is gone and the card's own heading is suppressed on phone, so the peek
+  row IS the sheet's title bar.
 - **Expanded** — the full card.
 
 Resting states: Daily and Practice rest at peek; Explore rests at peek and is raised on demand; end
@@ -171,9 +176,12 @@ page (the shell would change mode mid-round).
 
 ## Header
 
-**One row, brand drops to the claw.** The wordmark is hidden on phone; the claw carries the brand
-alone, which it is already shaped for (it is rotated 180° outside the tree specifically to read as
-an "M"). Utility controls become icons; the three tab labels keep their text.
+**Two rows. Revised by playtest (2026-07-22).** The original call was a single row with the wordmark
+hidden and the utilities iconified, chosen to protect ~40px of tree height. Measured in a browser,
+the tree cleared its budget with room to spare, so the height was available after all and the
+one-row header read as muddled. Now: **row 1** is claw + wordmark + How to play + Stats; **row 2** is
+the mode switcher, given the full width so the three tabs spread across it. The wordmark drops to
+`--type-title` on phone, which is what keeps row 1 from spilling the utilities onto a third row.
 
 Content at 390px would otherwise be ~410px wide before the progress suffix appears, so:
 
@@ -207,8 +215,10 @@ internal scrolling on `.modal-body`.
 
 ## Tree defaults on phone
 
-The phone needs a **fit-to-width default zoom** rather than desktop's default scale, so a round opens
-on something legible instead of mid-canvas. Follow-the-newest-node behavior carries the rest: since
+The phone opens at `ZOOM_PHONE_DEFAULT`, a hand-tuned dial. **Revised by playtest (2026-07-22):**
+this was first set to 0.6 on the theory that a small window onto a wide spine wants more context.
+At 390px that read as a diagram of the tree rather than the thing you play with, so it is now
+**1.0**, and may go higher. Follow-the-newest-node behavior carries the rest: since
 the viewport is a small window on a wide spine, the interesting node must be brought to the user
 rather than hunted for.
 
