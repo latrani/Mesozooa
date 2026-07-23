@@ -58,9 +58,9 @@
       {/if}
     {/snippet}
 
-    {#snippet placard()}
+    {#snippet placard(peek: boolean)}
       {#if treeStore.getNode(explorer.highlightId)}
-        <SpecimenPlacard view={nodeView(treeStore.getNode(explorer.highlightId)!)} />
+        <SpecimenPlacard view={nodeView(treeStore.getNode(explorer.highlightId)!)} {peek} />
       {/if}
     {/snippet}
 

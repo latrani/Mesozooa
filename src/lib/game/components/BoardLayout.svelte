@@ -1,17 +1,20 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { viewport } from "../../viewport.svelte";
+  import BottomSheet from "../../components/BottomSheet.svelte";
 
-  let { cluster, placard, tree }: {
+  let { cluster, placard, tree, sheetExpanded = $bindable(false) }: {
     cluster: Snippet;
-    placard: Snippet;
+    /** rendered twice on phone (peek row + expanded card) and once on desktop; the flag says which */
+    placard: Snippet<[boolean]>;
     tree: Snippet<[number]>;
+    /** phone only: lets a consumer force the sheet open, e.g. GameBoard on end state */
+    sheetExpanded?: boolean;
   } = $props();
 
-  // Measure the floating placard so the tree centers into the area LEFT of it; on phone it stacks
-  // in flow, so no inset.
+  // Desktop measures the floating placard so the tree centers into the area LEFT of it. On phone
+  // the placard is a bottom sheet in flow, so there is no inset.
   let placardW = $state(0);
-  // inset = placard width + its right offset (--space-5 = 24px) + a breathing gap before the tree
   let rightInset = $derived(!viewport.isPhone && placardW ? placardW + 24 + 24 : 0);
 </script>
 
@@ -20,25 +23,32 @@
     <div class="cluster-main">
       {@render cluster()}
     </div>
-    <div class="specimen-float" bind:clientWidth={placardW}>
-      {@render placard()}
-    </div>
+    {#if !viewport.isPhone}
+      <div class="specimen-float" bind:clientWidth={placardW}>
+        {@render placard(false)}
+      </div>
+    {/if}
   </div>
 
   <div class="tree-body">
     {@render tree(rightInset)}
   </div>
+
+  {#if viewport.isPhone}
+    <BottomSheet bind:expanded={sheetExpanded}>
+      {#snippet peek()}{@render placard(true)}{/snippet}
+      {@render placard(false)}
+    </BottomSheet>
+  {/if}
 </div>
 
 <style>
-  /* Shared board skeleton — top cluster (mode content + floating placard), tree owns the body.
-     Structural only; visual treatment of the cluster contents lives with each mode. */
+  /* Shared board skeleton. Desktop: top cluster with a floating placard, tree owns the body.
+     Phone: input band pegged top, tree owns the middle, plaque sheet pegged bottom. */
   .board { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
   @media (min-width: 641px) {
     .board { flex: 1 1 auto; min-height: 0; gap: 0; padding: 0; }
-    /* the cluster is a pegged top band; the placard floats over its top-right, sized to its own
-       content; the tree fills the whole body below and centers into the area LEFT of it. */
     .cluster {
       position: relative; flex: 0 0 auto;
       padding: var(--space-4);
@@ -58,14 +68,21 @@
     }
   }
 
-  /* Minimal narrow collapse: single column, cluster above the tree. NOT the real responsive pass
-     (#12) — just a correct fallback that doesn't reference the now-deleted .middle/.bottom classes. */
+  /* PHONE — three pegged bands. The cluster and the sheet are flex:0 0 auto so the tree body
+     absorbs every remaining pixel; nothing here scrolls the document (base.css locks the shell). */
   @media (max-width: 640px) {
-    .board { flex-direction: column; }
-    .cluster { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); }
-    .cluster-main { display: flex; flex-direction: column; gap: var(--space-3); }
-    .specimen-float { width: 100%; }
-    .tree-body :global(.tree-viewport) { width: 100%; }
-    .tree-body :global(.tree-scroll) { width: 100%; }
+    .cluster {
+      flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-surface); border-bottom: 1px solid var(--hairline);
+      box-shadow: 0 6px 16px -8px rgba(51, 38, 26, 0.35); z-index: 4;
+    }
+    .cluster-main { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+    .tree-body { position: relative; flex: 1 1 auto; min-height: 0; }
+    .tree-body :global(.tree-viewport) { position: absolute; inset: 0; width: 100%; }
+    .tree-body :global(.tree-scroll) {
+      position: absolute; inset: 0; display: flex;
+      align-items: safe center; justify-content: flex-start; overflow: auto;
+    }
   }
 </style>

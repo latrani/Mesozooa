@@ -127,8 +127,8 @@
     />
   {/snippet}
 
-  {#snippet placard()}
-    <SpecimenPlacard view={specimenView(store.state, treeStore)}>
+  {#snippet placard(peek: boolean)}
+    <SpecimenPlacard view={specimenView(store.state, treeStore)} {peek}>
       {#snippet action()}
         {#if ended && (onnew || onshare)}
           <div class="actions">
