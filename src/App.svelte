@@ -147,7 +147,7 @@
         bind:this={btns[i]}
         class:active={nav.tab === m.tab}
         aria-current={nav.tab === m.tab ? "page" : undefined}
-        onclick={() => nav.set(m.tab)}>{m.label}{#if m.progress}<span class="progress-dot" aria-label="in progress"></span>{/if}</button
+        onclick={() => nav.set(m.tab)}>{m.label}{#if m.progress}<span class="progress-dot" aria-hidden="true"></span><span class="sr-only"> in progress</span>{/if}</button
       >
     {/each}
     <!-- decorative: aria-current on the buttons already carries "which mode am I in" -->
@@ -250,6 +250,12 @@
   .progress-dot {
     display: inline-block; width: .4em; height: .4em; margin-left: .35em;
     border-radius: 50%; background: var(--accent); vertical-align: middle;
+  }
+  /* Visually-hidden but announced. The dot alone is decorative; the state has to survive as real
+     text in the button's accessible name, which is what the old " in progress" suffix did. */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
   /* One bar for all three tabs, driven by measured insets (see the script). Both edges are
      positioned, so animating them at different speeds stretches the bar mid-flight. */
