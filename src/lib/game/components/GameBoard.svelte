@@ -85,8 +85,12 @@
   let ended = $derived(store.state.status !== "playing");
   let won = $derived(store.state.status === "won");
   let answerName = $derived(treeStore.getNode(store.state.target)?.name ?? store.state.target);
-  // Turns = number of real guesses (includes the winning guess). Hints tracked separately.
+  // Real guesses only — gates the Forfeit button (nothing to forfeit before the first guess).
   let turnCount = $derived(store.state.guesses.filter((g) => g.kind === "guess").length);
+  // The result banner counts MOVES, the same currency the budget spends: guesses plus what each
+  // hint cost. Hints are still called out separately, so the count must include them, not sit
+  // beside them as a second unrelated number.
+  let moveCount = $derived(budget.used);
   let hintsUsed = $derived(store.state.hintsUsed ?? 0);
 
   // Component ref to the spine tree so trail crumbs can pan it (spec §3B).
@@ -109,7 +113,7 @@
            trailing it exactly where Hint/Forfeit sit during play (#63). -->
       <div class="input-row">
         <div class="result" class:won class:lost={!won} aria-live="polite">
-          <span class="result-line">{#if won}Congratulations! {answerName} guessed in {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
+          <span class="result-line">{#if won}Congratulations! {answerName} guessed in {moveCount} {moveCount === 1 ? "move" : "moves"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {moveCount} {moveCount === 1 ? "move" : "moves"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
         </div>
         {#if onshare}
           <button type="button" class="btn-secondary" onclick={() => onshare?.()}>Share</button>
