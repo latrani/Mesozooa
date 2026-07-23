@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { scrollFade } from "../actions/scrollFade";
 
   // Phone-only chrome: the specimen plaque at two heights. PEEK is one row, always visible, so
   // the exhibit is never absent (the museum-fixture conceit the desktop spec established).
@@ -34,7 +35,7 @@
   </button>
 
   {#if expanded}
-    <div class="body" id={bodyId}>
+    <div class="body" id={bodyId} use:scrollFade={expanded}>
       {@render children()}
     </div>
   {/if}
@@ -65,6 +66,6 @@
   .body {
     padding: 0 var(--space-4) var(--space-4);
     overflow-y: auto; overscroll-behavior: contain;
-    max-height: 55dvh;
+    max-height: 50dvh;
   }
 </style>

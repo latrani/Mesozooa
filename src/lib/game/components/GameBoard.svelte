@@ -202,6 +202,14 @@
   @media (max-width: 640px) {
     .input-row { flex-wrap: wrap; gap: var(--space-2); }
     .input-row :global(.searchbox) { flex: 1 0 100%; min-width: 0; }
-    .budget { margin-left: auto; font-size: var(--type-label); }
+    /* match the header's utility buttons (.btn-small) so every pill on screen shares one geometry */
+    .input-row :global(.btn-secondary) { padding: 0.375rem 0.625rem; }
+    /* The controls line holds Hint and Forfeit only conditionally, so without a floor it collapses
+       to bare text height and the whole cluster jumps as buttons appear and disappear. The budget
+       is the one element always present, so it carries the reservation. */
+    .budget {
+      margin-left: auto; font-size: var(--type-label);
+      min-height: 2.375rem; display: flex; align-items: center;
+    }
   }
 </style>

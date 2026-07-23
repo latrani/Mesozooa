@@ -308,9 +308,13 @@
     .brand { gap: var(--space-3); }
     .modes {
       flex: 0 0 100%; margin-left: 0;
-      justify-content: space-between; gap: var(--space-2);
+      gap: 0;
       font-size: var(--type-body);
     }
+    /* Equal thirds with the label centred in its own third, so the first and last tabs get real
+       breathing room instead of hugging the screen edges. The indicator measures offsetLeft and
+       offsetWidth, so it follows the third rather than the text - which reads as a proper tab bar. */
+    .modes button { flex: 1 1 0; text-align: center; }
     .app-footer { display: none; }
   }
 </style>
