@@ -6,6 +6,7 @@
   import SpineTree from "./SpineTree.svelte";
   import SpecimenPlacard from "./SpecimenPlacard.svelte";
   import BoardLayout from "./BoardLayout.svelte";
+  import StatsContent from "../../components/StatsContent.svelte";
   import { specimenView } from "../specimen-view";
   import type { WarmthProvider } from "../warmth";
 
@@ -96,6 +97,9 @@
       <div class="result" class:won class:lost={!won} aria-live="polite">
         <span class="result-line">{#if won}Congratulations! {answerName} guessed in {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {turnCount} {turnCount === 1 ? "turn" : "turns"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
       </div>
+      {#if store.state.mode === "daily"}
+        <div class="end-stats"><StatsContent /></div>
+      {/if}
     {:else}
       <div class="input-row">
         <SearchBox id="guess" entries={availableEntries} onpick={(id) => store.guess(id)} placeholder="Guess a dinosaur…" />
@@ -175,4 +179,5 @@
     box-shadow: var(--gem-glow);
   }
   .result-line { font-size: var(--type-body); font-weight: var(--fw-bold); color: var(--ink); }
+  .end-stats { margin-top: var(--space-4); }
 </style>

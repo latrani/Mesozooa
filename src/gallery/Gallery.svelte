@@ -11,6 +11,7 @@
   import { warmthRampColor } from "../lib/game/warmth-ramp";
   import { warmthForTarget } from "../lib/game/warmth";
   import HowToPlay from "../lib/components/HowToPlay.svelte";
+  import StatsContent from "../lib/components/StatsContent.svelte";
   import { buildShareText, buildShareParts } from "../lib/game/share";
   import {
     fixtureStore,
@@ -20,8 +21,19 @@
     stateDeep,
     stateSolvedWon,
     stateSolvedLost,
+    statsEmpty,
+    statsActive,
+    statsBrokenStreak,
+    STATS_NAMES,
   } from "./fixtures";
   import type { GameState } from "../lib/game/types";
+  import type { StatsView } from "../lib/game/statsStore.svelte";
+
+  const statsStates: Array<{ key: string; source: StatsView }> = [
+    { key: "empty", source: statsEmpty },
+    { key: "active", source: statsActive },
+    { key: "brokenStreak", source: statsBrokenStreak },
+  ];
 
   const specimenStates: Array<{ key: string; label: string; state: GameState }> = [
     { key: "empty", label: "empty", state: stateEmpty },
@@ -123,6 +135,21 @@
                 {/if}
               {/snippet}
             </SpecimenPlacard>
+          </div>
+        </div>
+      {/each}
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section>
+    <h2>Streak &amp; stats — all states</h2>
+    <div class="panel-row">
+      {#each statsStates as s (s.key)}
+        <div class="panel">
+          <span class="panel-label">{STATS_NAMES[s.key]}</span>
+          <div class="panel-body stats-slot">
+            <StatsContent source={s.source} />
           </div>
         </div>
       {/each}
@@ -252,6 +279,9 @@
   .panel-label { display: block; font-size: var(--type-meta); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: .1em; color: var(--ink-mute); padding: var(--space-2) var(--space-3); border-bottom: 1px dashed var(--hairline); }
   .panel-body { padding: var(--space-4); overflow: auto; }
   .specimen-slot { width: 20rem; }
+  /* Stats render inside the Modal, which sits on --bg-surface — match it so the dark --ink text
+     has the same contrast context it ships with. */
+  .stats-slot { width: 20rem; background: var(--bg-surface); border-radius: var(--radius-card); }
 
   .swatch-row { display: flex; flex-wrap: wrap; gap: var(--space-6); }
   .swatch-group { display: flex; flex-direction: column; gap: var(--space-2); }

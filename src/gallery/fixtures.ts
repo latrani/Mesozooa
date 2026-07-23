@@ -135,6 +135,87 @@ export const stateSolvedLost: GameState = (() => {
   return s;
 })();
 
+// ---- Stats fixtures: frozen StatsView objects built from real Stats via the pure selectors ----
+// StatsContent takes an optional `source: StatsView`; the app uses the live store, the gallery
+// feeds these so multiple stats states render at once. Windows use a fixed `now` so "last 7/30
+// days" is deterministic (no dependence on the current date).
+import type { Stats } from "../lib/game/stats";
+import { emptyStats, windowStats, avgMoves, currentStreak } from "../lib/game/stats";
+import type { StatsView } from "../lib/game/statsStore.svelte";
+
+// A fixed reference "now"/"today" so window math is stable across days. 2026-07-22.
+const STATS_NOW = Date.parse("2026-07-22T12:00:00Z");
+const STATS_TODAY = "2026-07-22";
+const DAY = 86_400_000;
+
+function statsView(s: Stats): StatsView {
+  const o = s.overall;
+  return {
+    get streak() {
+      return { ...s.streak, current: currentStreak(s.streak, STATS_TODAY) };
+    },
+    get week() {
+      return windowStats(s, STATS_NOW, 7);
+    },
+    get month() {
+      return windowStats(s, STATS_NOW, 30);
+    },
+    get dailyAvg() {
+      return avgMoves(s.daily);
+    },
+    get overallAvg() {
+      return avgMoves(s.overall);
+    },
+    get allTime() {
+      return { played: o.played, won: o.won, ratio: o.played === 0 ? null : o.won / o.played };
+    },
+    reset: () => {}, // frozen — no-op in the gallery
+  };
+}
+
+// EMPTY — nothing recorded yet (shows the empty-state copy).
+export const statsEmpty: StatsView = statsView(emptyStats());
+
+// ACTIVE — a healthy record: a 5-day streak (best 12), mixed recent play, real averages.
+export const statsActive: StatsView = statsView(
+  (() => {
+    const s = emptyStats();
+    s.streak = { current: 5, best: 12, lastWinDate: STATS_TODAY };
+    s.daily = { played: 40, won: 33, moveSum: 132 }; // avg 4.0 moves/win
+    s.overall = { played: 95, won: 71, moveSum: 355 }; // avg 5.0 moves/win
+    // A recent-window spread: 6 plays in the last 7 days (5 won), more across 30.
+    s.log = [
+      { t: STATS_NOW - 1 * DAY, mode: "daily", won: true, moves: 3 },
+      { t: STATS_NOW - 2 * DAY, mode: "practice", won: true, moves: 5 },
+      { t: STATS_NOW - 3 * DAY, mode: "daily", won: false, moves: 20 },
+      { t: STATS_NOW - 4 * DAY, mode: "practice", won: true, moves: 4 },
+      { t: STATS_NOW - 5 * DAY, mode: "daily", won: true, moves: 6 },
+      { t: STATS_NOW - 6 * DAY, mode: "daily", won: true, moves: 2 },
+      { t: STATS_NOW - 12 * DAY, mode: "practice", won: true, moves: 7 },
+      { t: STATS_NOW - 20 * DAY, mode: "daily", won: false, moves: 20 },
+    ];
+    return s;
+  })(),
+);
+
+// BROKEN STREAK — won days ago but missed since, so the DISPLAYED current is 0 (best preserved).
+export const statsBrokenStreak: StatsView = statsView(
+  (() => {
+    const s = emptyStats();
+    s.streak = { current: 7, best: 7, lastWinDate: "2026-07-19" }; // 3 days before STATS_TODAY
+    s.daily = { played: 10, won: 8, moveSum: 40 };
+    s.overall = { played: 10, won: 8, moveSum: 40 };
+    s.log = [{ t: STATS_NOW - 3 * DAY, mode: "daily", won: true, moves: 5 }];
+    return s;
+  })(),
+);
+
+export const STATS_NAMES: Record<string, string> = {
+  empty: "Empty (no plays yet)",
+  active: "Active — 5-day streak, mixed recent play",
+  brokenStreak: "Broken streak — missed a day (current shows 0, best kept)",
+};
+
 export const NAMES: Record<string, string> = {
   empty: "Empty (no guesses)",
   broad: "Broad (wrong guesses, large clade)",

@@ -16,6 +16,7 @@ import {
 import { dailyAnswer, todayString } from "./daily";
 import dailyCalendar from "../../data/daily-calendar.json";
 import { serializeGame, deserializeGame, dailyKey, staleDailyKeys } from "./persistence";
+import { statsStore } from "./statsStore.svelte";
 
 // Drop persisted state from earlier days so keys don't accumulate.
 function pruneStale(today: string): void {
@@ -83,8 +84,12 @@ function createDaily() {
       return nextHintRun(state, treeStore).length > 0;
     },
     guess(id: string) {
+      const was = state.status;
       state = applyGuess(state, id, treeStore, warmth);
       save();
+      if (was === "playing" && state.status !== "playing") {
+        statsStore.record({ mode: "daily", won: state.status === "won", moves: movesUsed(state) });
+      }
     },
     hint() {
       state = applyHint(state, treeStore, warmth);
