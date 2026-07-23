@@ -138,12 +138,22 @@ reproduce the sampled terracotta within rounding, and to re-cascade only when ed
 --trail-surface: var(--placard);   --trail-dp: color-mix(in srgb, var(--trail-surface), #000 20%);
                                     --trail-edge: color-mix(in srgb, var(--trail-surface), #000 40%);
 --specimen-surface: var(--placard); (+ -dp/-edge derived the same; NodeDetail shares this role)
---action-primary: var(--mahogany); --action-primary-hi: var(--mahogany-hi);
+--btn-primary-surface: var(--turq-dp); --btn-primary-hi: var(--turq);
+--btn-primary-ink: var(--cream); --btn-primary-edge: color-mix(--turq-dp,#000 30%);
+--btn-secondary-surface: var(--bg-page); --btn-secondary-ink: var(--mahogany);
 --spine: var(--turq);  --node-frontier: var(--turq-dp);  --node-context: var(--ink-mute);
 --leader: var(--hairline);  --accent: var(--turq);   /* active tab, focus ring */
 ```
 E.g. "make the trail dusty-teal" = change `--trail-surface` at `:root`; the gradient bottom and edge
 re-derive automatically. Full token list + rules live in the implementation plan's Task 1.
+
+**LOCKED — no ghost controls.** Buttons and button-like controls carry an **opaque `surface`** and
+an **`ink`** (border/text) as a token pair (`--btn-primary-*`, `--btn-secondary-*`). Adapt to a dark
+ground by *swapping the pair* (a `.btn-secondary-inverse` class), **never** by leaving the fill
+transparent and relying on the ground behind it. A control's legibility must not depend on what is
+painted behind it. `.btn-secondary` goes on real action elements only, never on a container. (This
+supersedes the earlier "surface-adaptive ghost" secondary; the ghost caused #64 — controls that
+went invisible on hover over the placard. See `specs/2026-07-23-button-token-system-design.md`.)
 
 ### 2.2 Type — warm humanist sans
 
@@ -311,7 +321,9 @@ land later, `TreeNode.imageUrl` is the likely source, but even that is out of sc
   `--placard-dp` text) after the name — clears a bucket-A item.
 - **Input row (flow):** the search input is the one always-present control — a generous
   `--bg-surface` pill with an inset well shadow. `[ Hint · N left ]` beside it (Daily) is a
-  `--mahogany`-outline button (not blue).
+  **filled** secondary button — an opaque light chip with a `--mahogany` border/ink (not blue, not
+  a transparent ghost; on dark grounds the same button uses `.btn-secondary-inverse`). See the
+  locked "no ghost controls" note in §2.5.
 - **Header (flow):** wordmark `--type-display` in `--ink`; the three modes as quiet text tabs, the
   active one marked with a `--turq` underline. Minimal furniture on the bare page.
 

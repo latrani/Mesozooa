@@ -66,16 +66,25 @@
   --specimen-text: var(--cream);
   --specimen-text-dim: var(--cream-dim);
 
-  /* Primary action — turquoise hero (user-directed; overrides the earlier
-     mahogany-CTA spec note). Gradient runs light turq -> deep turq. */
-  --action-primary: var(--turq-dp);
-  --action-primary-hi: var(--turq);
-  --action-primary-text: var(--cream);
-  --action-primary-edge: color-mix(in srgb, var(--turq-dp), #000 30%);
+  /* ── Button roles — opaque surface + ink PAIRS (never ghost) ──────────
+     Both button roles read --btn-*. Every control has an OPAQUE surface, so
+     its legibility never depends on the ground behind it (that dependency
+     was #64). `-ink` is always the foreground/text color; `-edge` exists
+     only where the border differs from the ink.
 
-  /* Secondary action — surface-adaptive ghost. Same form on every surface;
-     only the ink/outline color follows the surface. Defaults to mahogany for
-     the light ground; dark placards re-point this to cream. */
+     Primary — raised turquoise chip: hi->surface gradient, a 1px DARK-turq
+     rim (edge != ink; the dark rim under a lit gradient reads as beveled),
+     cream text. */
+  --btn-primary-surface: var(--turq-dp);
+  --btn-primary-hi: var(--turq);
+  --btn-primary-ink: var(--cream);
+  --btn-primary-edge: color-mix(in srgb, var(--turq-dp), #000 30%);
+
+  /* Secondary — filled ghost-killer: opaque light chip, mahogany ink, and a
+     border that EQUALS the ink (so no -edge token). Dark grounds swap the
+     PAIR via .btn-secondary-inverse (see base.css) rather than going
+     transparent. */
+  --btn-secondary-surface: var(--bg-page);
   --btn-secondary-ink: var(--mahogany);
 
   /* Spine (hero) + tree marks */

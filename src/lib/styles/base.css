@@ -36,10 +36,13 @@ ul { list-style: none; padding: 0; }
 a { color: var(--mahogany); }
 
 /* ── Shared action buttons ───────────────────────────────────────────
-   One source of truth for the two button roles. Primary = turquoise hero
-   fill. Secondary = surface-adaptive ghost: identical form everywhere, ink
-   follows --btn-secondary-ink (mahogany on light ground; dark placards
-   re-point it to cream). Both are pills with matched geometry. */
+   One source of truth for the two button roles. Every control has an OPAQUE
+   surface + an ink (border/text) as a token PAIR — its legibility never
+   depends on the ground behind it (ghost fills caused #64). Primary = raised
+   turquoise chip. Secondary = filled light chip with a mahogany border/ink;
+   on a dark ground, .btn-secondary-inverse SWAPS the pair rather than going
+   transparent. `-ink` is always the foreground; hover mixes ink into the
+   OPAQUE surface. Both are pills with matched geometry. */
 .btn-primary, .btn-secondary {
   font-size: var(--type-body); border-radius: var(--radius-pill);
   padding: .75rem 1.25rem; cursor: pointer; text-align: center;
@@ -49,18 +52,25 @@ a { color: var(--mahogany); }
   padding: 0.375rem 0.625rem;
 }
 .btn-primary {
-  font-weight: var(--fw-black); color: var(--action-primary-text);
-  background: linear-gradient(var(--action-primary-hi), var(--action-primary));
-  border: 1px solid var(--action-primary-edge);
+  font-weight: var(--fw-black); color: var(--btn-primary-ink);
+  background: linear-gradient(var(--btn-primary-hi), var(--btn-primary-surface));
+  border: 1px solid var(--btn-primary-edge);
   box-shadow: var(--shadow-lift), var(--inset-hi);
 }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
 .btn-secondary {
   font-weight: var(--fw-bold); color: var(--btn-secondary-ink);
-  background: transparent; border: 2px solid var(--btn-secondary-ink);
+  background: var(--btn-secondary-surface);
+  border: 2px solid var(--btn-secondary-ink);
+}
+/* Dark-ground pair-swap: opaque dark chip, cream border/ink. Same paint rules
+   as .btn-secondary — only the pair changes. */
+.btn-secondary-inverse {
+  --btn-secondary-surface: var(--placard-dp);
+  --btn-secondary-ink: var(--cream);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--btn-secondary-ink) 12%, transparent);
+  background: color-mix(in srgb, var(--btn-secondary-ink) 12%, var(--btn-secondary-surface));
 }
 .btn-primary:disabled, .btn-secondary:disabled { opacity: .5; cursor: default; }
 .eyebrow {

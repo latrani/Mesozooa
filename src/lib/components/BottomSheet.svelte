@@ -211,7 +211,6 @@
     touch-action: none; user-select: none; -webkit-user-drag: none;
     background: linear-gradient(var(--specimen-surface), var(--specimen-dp));
     color: var(--specimen-text);
-    --btn-secondary-ink: var(--cream);
     box-shadow: var(--shadow-placard, 0 -6px 16px -8px rgba(51, 38, 26, 0.35));
     display: flex; flex-direction: column; overflow: hidden;
     will-change: transform;
