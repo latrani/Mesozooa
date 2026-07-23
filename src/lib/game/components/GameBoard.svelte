@@ -122,6 +122,7 @@
       guesses={store.state.guesses}
       targetId={won ? store.state.target : null}
       revealId={ended && !won ? store.state.target : null}
+      warmestId={store.warmestId}
       onselect={(id) => { highlightId = id; spine?.panTo(id); }}
     />
   {/snippet}
