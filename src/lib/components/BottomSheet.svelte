@@ -166,7 +166,7 @@
       tabindex="0"
       bind:this={peekEl}
       aria-expanded={pull > 0}
-      aria-controls={bodyId}
+      aria-controls={pull > 0 ? bodyId : undefined}
       onkeydown={onKeydown}
     >
       <span class="grabber" aria-hidden="true"></span>

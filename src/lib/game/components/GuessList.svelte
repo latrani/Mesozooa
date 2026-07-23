@@ -38,6 +38,10 @@
   // full list. Selection is pure (chip-view), so this component stays a renderer.
   let selection = $derived(phoneChips(chips, warmestId));
 
+  // ties the +N more / Show fewer buttons to the chip list they grow (a11y)
+  const uid = $props.id();
+  const chipsId = `guess-chips-${uid}`;
+
   let expanded = $state(false);
   // A new round empties the guess log; the band must return to its collapsed default rather than
   // inheriting the previous round's expansion.
@@ -67,7 +71,7 @@
 </script>
 
 {#if visible.length}
-  <ul class="chips" class:expanded={viewport.isPhone && expanded}>
+  <ul id={chipsId} class="chips" class:expanded={viewport.isPhone && expanded}>
     {#each visible as c, i (keyOf(c, i))}
       <!-- Eyebrows label the two slots while collapsed. They are full-width list items, so in the
            wrapping flex row they force a line break and sit above their chip. Expanded, the list is
@@ -81,9 +85,9 @@
 {/if}
 
 {#if overflow > 0}
-  <button type="button" class="overflow" onclick={() => (expanded = true)}>+ {overflow} more</button>
+  <button type="button" class="overflow" aria-expanded="false" aria-controls={chipsId} onclick={() => (expanded = true)}>+ {overflow} more</button>
 {:else if viewport.isPhone && expanded && selection.hiddenCount > 0}
-  <button type="button" class="overflow" onclick={() => (expanded = false)}>Show fewer</button>
+  <button type="button" class="overflow" aria-expanded="true" aria-controls={chipsId} onclick={() => (expanded = false)}>Show fewer</button>
 {/if}
 
 <style>
