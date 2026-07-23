@@ -643,6 +643,7 @@
   // Center the tip whenever it changes, or when rightInset settles (it's 0 until the floating
   // overlay is measured post-mount). The game's tip only ever deepens, so "on change" doesn't
   // regress its forward-follow feel; Explore's tip jumps freely, giving click-to-center.
+  let lastWidth = 0; // layout.width at the previous tip resolution, for the coyote-pad delta
   let lastTipId: string | null = null;
   let lastInset = -1;
   $effect(() => {
@@ -650,20 +651,27 @@
     void scrollWidth; // re-run when the scrollable width changes too
     if (scroller && tipId && d >= 0) {
       if (tipId !== lastTipId) {
-        // If the FLIP's scroll driver is handling this re-center (shared-clock animation, set in the
-        // relayout effect above), don't ALSO fire the native scroll — that's the race we removed.
-        // Still reset zoom to default; just skip the competing scrollToNode.
-        // INVARIANT: `scrollTargetPx` is refreshed by the FLIP effect (declared earlier) on EVERY
-        // layout change before this reads it — and a tipId change always forces a layout change — so
-        // it's never stale here. Don't reorder these effects or read scrollTargetPx without that.
-        if (scrollTargetPx) zoom = defaultZoomFor(viewport.isPhone);
-        else resetZoom(); // zoomed / non-animated path: native re-center as before
+        if (isStepBack(treeStore, lastTipId, tipId)) {
+          // Step-back: HOLD both axes. Null the FLIP scroll target so the shared-clock scroll driver
+          // doesn't animate, and skip the native recenter — scrollLeft/Top stay frozen while the node
+          // FLIP collapses the branch in place. Extend the coyote pad by the collapsed columns' width
+          // (accumulates across consecutive step-backs) so the clamp can't yank the frozen view.
+          scrollTargetPx = null;
+          coyotePad += coyotePadDelta(lastWidth, layout.width, X_GAP);
+        } else {
+          // Forward / lateral (deeper tip, sibling, search jump, history chip): recenter as before,
+          // and drop any coyote pad — the tree re-extends / moves, so held dead space is stale.
+          coyotePad = 0;
+          if (scrollTargetPx) zoom = defaultZoomFor(viewport.isPhone);
+          else resetZoom();
+        }
       } else if (rightInset !== lastInset) {
         scrollToNode(tipId);
       }
     }
     lastTipId = tipId;
     lastInset = rightInset;
+    lastWidth = layout.width;
   });
 
   // Activating a node in Explore re-centers (rebuilds revealed -> the tree). Keep DOM focus on
