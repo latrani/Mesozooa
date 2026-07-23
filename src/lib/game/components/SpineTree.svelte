@@ -1010,7 +1010,9 @@
      rounded ends and the clip; each segment is its own .btn-secondary that covers its OWN hover.
      No :hover here — that container-hover was #64 (it stole the ground and blanked the buttons). */
   .zoom-controls {
-    position: absolute; z-index: 5; right: var(--space-4); bottom: var(--space-4);
+    position: absolute; z-index: 5;
+    right: calc(var(--space-4) + var(--placard-clearance, 0px)); bottom: var(--space-4);
+    transition: right var(--dur) var(--ease);
     display: flex; align-items: stretch; padding: 0;
     background: var(--btn-secondary-surface);
     border: 2px solid var(--btn-secondary-ink); border-radius: var(--radius-pill);
