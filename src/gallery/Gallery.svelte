@@ -6,7 +6,6 @@
   import { treeStore } from "../lib/game/treeData";
   import SpineTree from "../lib/game/components/SpineTree.svelte";
   import GuessList from "../lib/game/components/GuessList.svelte";
-  import GameBoard from "../lib/game/components/GameBoard.svelte";
   import { warmthRampColor } from "../lib/game/warmth-ramp";
   import { warmthForTarget } from "../lib/game/warmth";
   import HowToPlay from "../lib/components/HowToPlay.svelte";
@@ -226,22 +225,20 @@
     </div>
   </section>
 
-  <!-- FULL BOARD (desktop) -->
+  <!-- FULL BOARD (desktop via iframe — like the phone frames below. The desktop placard is now a
+       position:fixed layer (#65); an iframe gives each board its OWN viewport so the fixed placard
+       is contained in its panel instead of escaping to the gallery window and stacking. The iframe
+       width (>640px) fires the desktop layout; the short height exercises the scroll-when-tall. -->
   <section>
     <h2>Full board — desktop</h2>
-    {#each boardStates as s (s.key)}
-      <div class="panel wide">
-        <span class="panel-label">{s.label}</span>
-        <div class="panel-body">
-          <GameBoard
-            store={fixtureStore(s.state, { daily: s.key.startsWith("solved") ? false : false })}
-            disabled={s.state.status !== "playing"}
-            onexplore={() => {}}
-            onnew={() => {}}
-          />
+    <div class="frame-col">
+      {#each boardStates as s (s.key)}
+        <div class="frame-wrap">
+          <span class="panel-label">{s.label}</span>
+          <iframe title={"desktop-" + s.key} src={"/gallery.html?frame=" + s.key} width="1000" height="560"></iframe>
         </div>
-      </div>
-    {/each}
+      {/each}
+    </div>
   </section>
 
   <!-- FULL BOARD (phone via iframe — the iframe's own viewport makes media queries AND
@@ -313,6 +310,8 @@
   .ramp-pct { font-size: var(--type-meta); font-weight: var(--fw-bold); color: var(--cream); opacity: .8; padding-bottom: 2px; }
 
   .frame-row { display: flex; flex-wrap: wrap; gap: var(--space-5); }
+  /* desktop boards are wide, so they stack vertically rather than sitting side-by-side */
+  .frame-col { display: flex; flex-direction: column; gap: var(--space-5); }
   .frame-wrap { display: flex; flex-direction: column; gap: var(--space-2); }
   .frame-wrap iframe { border: 1px solid var(--hairline); border-radius: var(--radius-card); background: var(--bg-page); }
 </style>
