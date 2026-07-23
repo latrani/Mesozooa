@@ -88,4 +88,10 @@
   .recent {
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-2);
   }
+
+  /* Phone: recency here is a convenience trail, not game state, so it gets exactly one line and
+     the overflow is simply clipped. No +N control; it has not earned a sheet of its own. */
+  @media (max-width: 640px) {
+    .recent { flex-wrap: nowrap; overflow: hidden; }
+  }
 </style>
