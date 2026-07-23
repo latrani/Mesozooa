@@ -1,18 +1,20 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { scrollFade } from "../actions/scrollFade";
   import { untrack } from "svelte";
 
-  // Phone-only chrome: the specimen plaque as a real drawer. PEEK is one row, always visible, so
-  // the exhibit is never absent (the museum-fixture conceit the desktop spec established).
+  // Phone-only chrome: the specimen plaque as a real drawer.
   //
-  // The drawer's HEIGHT is the model, not an inner scroll box. Opening sets it to half the screen
-  // at most; dragging the heading row upward grows the whole drawer past that, heading and all,
-  // the way a physical drawer slides. The body only scrolls once the drawer is at its full extent
-  // and the card is still taller, which is the honest fallback rather than the primary mechanic.
+  // THE MODEL IS TRANSLATION, NOT HEIGHT. The drawer is one rigid block, always laid out at its
+  // full natural height, sitting in a layer ON TOP of the board. Closed, it is pushed down so only
+  // the heading row shows; pulling it up slides the WHOLE block — heading included — over the tree
+  // rather than growing a panel that displaces it. If the block is taller than the screen, its
+  // lower part stays hanging below the viewport edge, and pulling further carries the heading off
+  // the top, exactly the way a physical drawer comes out of a cabinet.
   //
-  // The drag lives ON the heading row, never on the tree above it, so it cannot collide with the
-  // tree's own pan gesture.
+  // That is why there is no inner scroll box and no mask-fade: the content does not END at the
+  // screen edge, it CONTINUES past it. A shadow pinned to the true bottom of the viewport says so.
+  //
+  // The drag lives on the heading row only, so it never competes with the tree's own pan gesture.
   let {
     expanded = $bindable(false),
     peek,
@@ -26,152 +28,184 @@
   const uid = $props.id();
   const bodyId = `sheet-body-${uid}`;
 
-  // Fractions of the viewport. OPEN_MAX is where a tap-open stops; DRAG_MAX is how far a drag can
-  // take it. Not full height: the tree must never be completely buried.
+  /** a tap-open reveals at most this fraction of the viewport; a drag can go the whole way */
   const OPEN_MAX = 0.5;
-  const DRAG_MAX = 0.9;
 
   let sheetEl = $state<HTMLElement>();
   let peekEl = $state<HTMLElement>();
-  let bodyEl = $state<HTMLElement>();
-  /** drawer height in px while expanded; null means "not yet sized" (use the open default) */
-  let height = $state<number | null>(null);
+
+  let drawerH = $state(0);
+  let peekH = $state(0);
+  /** px pulled out beyond the heading row. 0 = closed, maxPull = fully extended. */
+  let pull = $state(0);
+
+  let maxPull = $derived(Math.max(0, drawerH - peekH));
+  /** how far DOWN the block is pushed; 0 means fully out */
+  let offset = $derived(Math.max(0, maxPull - pull));
+  /** the block still runs past the bottom of the screen, so the shadow marks that it continues */
+  let moreBelow = $derived(offset > 1);
 
   const vh = () => (typeof window === "undefined" ? 0 : window.innerHeight);
-  const peekH = () => peekEl?.offsetHeight ?? 0;
-  /** natural height of peek + fully laid-out card, so the drawer never opens taller than its content */
-  function contentH(): number {
-    return peekH() + (bodyEl ? bodyEl.scrollHeight : 0);
-  }
-  function openHeight(): number {
-    return Math.min(contentH(), vh() * OPEN_MAX);
-  }
-  function clampH(h: number): number {
-    return Math.max(peekH(), Math.min(h, Math.min(contentH(), vh() * DRAG_MAX)));
-  }
+  const openPull = () => Math.min(maxPull, Math.max(0, vh() * OPEN_MAX - peekH));
 
-  // Opening sizes the drawer once, after the body has laid out so contentH() is real. Collapsing
-  // clears it so the next open re-measures rather than inheriting the last drag.
+  // Measure the block at its natural height. Both edges matter: the card's own content changes
+  // (photo loads, clue rows appear) and so does the heading's wrap.
   $effect(() => {
-    if (!expanded) {
-      height = null;
-      return;
+    const s = sheetEl;
+    const p = peekEl;
+    if (!s || !p) return;
+    const read = () => {
+      drawerH = s.offsetHeight;
+      peekH = p.offsetHeight;
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(s);
+    ro.observe(p);
+    return () => ro.disconnect();
+  });
+
+  // `expanded` is the outside world's handle (the game raises the drawer at end of round). Setting
+  // it drives `pull`; the drag writes `pull` and reports back. untrack keeps the two from looping.
+  $effect(() => {
+    if (expanded) {
+      if (untrack(() => pull) === 0) pull = openPull();
+    } else if (untrack(() => pull) !== 0) {
+      pull = 0;
     }
-    // Only size an open that has not already been sized. A drag that OPENS the drawer sets both
-    // `expanded` and `height` in the same gesture; without this guard the deferred measurement
-    // below would fire a frame later and yank the drawer to the cap mid-drag.
-    if (untrack(() => height) != null) return;
-    const id = requestAnimationFrame(() => {
-      if (untrack(() => height) == null) height = openHeight();
-    });
-    return () => cancelAnimationFrame(id);
   });
 
   // --- drag ---------------------------------------------------------------------------------
-  // A drag that never travels is a tap, so one pointer sequence serves both: below the slop
-  // threshold we toggle, above it we resize and swallow the click.
+  // One pointer sequence serves both gestures: under the slop threshold it is a tap and toggles,
+  // above it it slides the drawer.
   const SLOP = 6;
-  let dragging = false;
+  // $state because the template reads it (class:sliding suppresses the settle transition mid-drag)
+  let dragging = $state(false);
   let startY = 0;
-  let startH = 0;
+  let startPull = 0;
   let moved = false;
+
+  function setPull(next: number) {
+    pull = Math.max(0, Math.min(next, maxPull));
+    expanded = pull > 0;
+  }
 
   function onPointerDown(e: PointerEvent) {
     dragging = true;
     moved = false;
     startY = e.clientY;
-    startH = expanded ? (height ?? openHeight()) : peekH();
+    startPull = pull;
     peekEl?.setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: PointerEvent) {
     if (!dragging) return;
-    const dy = startY - e.clientY; // up is positive: dragging up opens further
+    const dy = startY - e.clientY; // up is positive: pulling the drawer out
     if (!moved && Math.abs(dy) < SLOP) return;
-    if (!moved) {
-      moved = true;
-      // The first real movement out of a collapsed drawer is what opens it.
-      if (!expanded && dy > 0) expanded = true;
-    }
-    height = clampH(startH + dy);
+    moved = true;
+    setPull(startPull + dy);
   }
 
   function onPointerUp(e: PointerEvent) {
     if (!dragging) return;
     dragging = false;
-    peekEl?.releasePointerCapture(e.pointerId);
+    try { peekEl?.releasePointerCapture(e.pointerId); } catch { /* already released */ }
     if (!moved) {
-      expanded = !expanded;
+      setPull(pull > 0 ? 0 : openPull());
       return;
     }
-    // Released near the bottom: treat it as a close rather than leaving a sliver open.
-    if (expanded && (height ?? 0) < peekH() + vh() * 0.08) expanded = false;
+    // Only a DELIBERATE release tidies a sliver away. pointercancel must not, or an interrupted
+    // gesture silently slams a drawer the user was still opening.
+    if (e.type === "pointerup" && pull > 0 && pull < peekH) setPull(0);
   }
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      expanded = !expanded;
+      setPull(pull > 0 ? 0 : openPull());
     }
   }
 </script>
 
-<div
-  class="sheet"
-  class:expanded
-  bind:this={sheetEl}
-  style={expanded && height != null ? `height: ${height}px` : ""}
->
+<!-- A layer over the board, not a band inside it: the drawer slides ACROSS the UI. The layer
+     itself is inert to pointers so the tree underneath stays fully interactive. -->
+<div class="drawer-layer">
   <div
-    class="peek"
-    role="button"
-    tabindex="0"
-    bind:this={peekEl}
-    aria-expanded={expanded}
-    aria-controls={expanded ? bodyId : undefined}
-    onpointerdown={onPointerDown}
-    onpointermove={onPointerMove}
-    onpointerup={onPointerUp}
-    onpointercancel={onPointerUp}
-    onkeydown={onKeydown}
+    class="sheet"
+    class:sliding={dragging}
+    bind:this={sheetEl}
+    style="transform: translateY({offset}px)"
   >
-    <span class="grabber" aria-hidden="true"></span>
-    <span class="peek-content">{@render peek()}</span>
-    <span class="chevron" aria-hidden="true">{expanded ? "▼" : "▲"}</span>
-  </div>
+    <div
+      class="peek"
+      role="button"
+      tabindex="0"
+      bind:this={peekEl}
+      aria-expanded={pull > 0}
+      aria-controls={bodyId}
+      onpointerdown={onPointerDown}
+      onpointermove={onPointerMove}
+      onpointerup={onPointerUp}
+      onpointercancel={onPointerUp}
+      onkeydown={onKeydown}
+      ondragstart={(e) => e.preventDefault()}
+      draggable="false" 
+    >
+      <span class="grabber" aria-hidden="true"></span>
+      <span class="peek-content">{@render peek()}</span>
+      <span class="chevron" aria-hidden="true">{pull > 0 ? "▼" : "▲"}</span>
+    </div>
 
-  {#if expanded}
-    <div class="body" id={bodyId} bind:this={bodyEl} use:scrollFade={[expanded, height]}>
+    <!-- Always rendered: the block must be laid out at full height for the translation to have
+         anything to reveal. `inert` keeps the off-screen part out of the tab order and the a11y
+         tree while it is stowed. -->
+    <div class="body" id={bodyId} inert={pull === 0}>
       {@render children()}
     </div>
+  </div>
+
+  {#if moreBelow}
+    <!-- Pinned to the TRUE bottom of the viewport, not to the drawer: it marks that the block
+         continues past the screen edge, which a fade on the drawer itself cannot say. -->
+    <div class="more-shadow" aria-hidden="true"></div>
   {/if}
 </div>
 
 <style>
+  .drawer-layer {
+    position: absolute; inset: 0; z-index: 6;
+    pointer-events: none; overflow: hidden;
+  }
   .sheet {
-    flex: 0 0 auto;
+    /* bottom-anchored and translated DOWN by `offset`: at offset 0 the block is fully out with its
+       base on the screen edge; at offset == maxPull only the heading shows. Height is never
+       constrained, so the stowed part simply hangs past the bottom and is clipped by the layer. */
+    position: absolute; left: 0; right: 0; bottom: 0;
+    pointer-events: auto;
     background: linear-gradient(var(--specimen-surface), var(--specimen-dp));
     border-top: 1px solid var(--specimen-edge);
     color: var(--specimen-text);
     --btn-secondary-ink: var(--cream);
-    /* lifts off the tree canvas, matching the header's downward shadow */
     box-shadow: 0 -6px 16px -8px rgba(51, 38, 26, 0.35);
-    z-index: 4;
-    display: flex; flex-direction: column; min-height: 0;
+    display: flex; flex-direction: column;
+    will-change: transform;
   }
-  /* the heading row is both the toggle and the drag handle. touch-action:none is what lets a
-     vertical drag resize the drawer instead of being claimed as a page scroll. */
+  /* settle smoothly on tap-open/close, but never lag the finger mid-drag */
+  .sheet:not(.sliding) { transition: transform var(--dur) var(--ease); }
+
+  /* the heading row is both the toggle and the drag handle */
   .peek {
     display: flex; align-items: center; gap: var(--space-3);
-    position: relative;
-    width: 100%;
-    padding: var(--space-3) var(--space-4) max(var(--space-2), env(safe-area-inset-bottom));
+    position: relative; width: 100%;
+    padding: var(--space-3) var(--space-4) var(--space-2);
     background: none; border: 0; cursor: grab;
     color: inherit; text-align: left;
     flex: 0 0 auto; touch-action: none; user-select: none;
+    /* Suppress the browser's native element/text drag. Without it the platform hijacks the
+       pointer stream one move in and the drawer freezes mid-pull. */
+    -webkit-user-drag: none;
   }
-  /* The universal drawer affordance. Without it the heading reads as a plain bar and nobody
-     discovers the drag, which makes the drawer behave exactly like the fixed panel it replaced. */
+  .peek:active { cursor: grabbing; }
   .grabber {
     position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
     width: 2.25rem; height: 4px; border-radius: 2px;
@@ -179,11 +213,16 @@
   }
   .peek-content { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 auto; min-width: 0; }
   .chevron { flex: none; opacity: .7; font-size: var(--type-label); }
-  /* The body fills whatever the drawer's height leaves. It only scrolls when the drawer is already
-     at full extent and the card is still taller; scrollFade then marks the hidden edge. */
   .body {
-    padding: 0 var(--space-4) var(--space-4);
-    flex: 1 1 auto; min-height: 0;
-    overflow-y: auto; overscroll-behavior: contain;
+    padding: 0 var(--space-4);
+    /* clears the home indicator when the drawer is pulled fully out */
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    flex: 0 0 auto;
+  }
+  /* Shadow, not a fade: the content is continuing past the screen edge, not dissolving. */
+  .more-shadow {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 1.75rem;
+    pointer-events: none;
+    background: linear-gradient(to top, rgba(51, 38, 26, 0.38), rgba(51, 38, 26, 0));
   }
 </style>

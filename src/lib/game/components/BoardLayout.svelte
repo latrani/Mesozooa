@@ -52,7 +52,7 @@
 <style>
   /* Shared board skeleton. Desktop: top cluster with a floating placard, tree owns the body.
      Phone: input band pegged top, tree owns the middle, plaque sheet pegged bottom. */
-  .board { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .board { display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative; }
 
   @media (min-width: 641px) {
     .board { flex: 1 1 auto; min-height: 0; gap: 0; padding: 0; }
