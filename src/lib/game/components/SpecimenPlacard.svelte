@@ -3,47 +3,65 @@
   import type { SpecimenView } from "../specimen-view";
   import PaperSlip from "./PaperSlip.svelte";
 
-  let { view, action }: { view: SpecimenView; action?: Snippet } = $props();
+  let { view, action, peek = false }: { view: SpecimenView; action?: Snippet; peek?: boolean } = $props();
 </script>
 
-<aside class="specimen-placard" aria-label="Specimen">
-  <h2 class="title">{view.title ?? "? ? ?"}</h2>
-
-  <figure class="figure">
-    <div class="shadowbox" class:empty={view.mount.kind !== "photo"}>
+{#if peek}
+  <!-- One deliberate single line: fixed-size thumbnail, then title and note as a text column.
+       This is what retires the #22 narrow-screen jitter — the old narrow layout was a grid
+       vertically centering rows of mismatched height, so `align-items: baseline` shifted as
+       content changed. A row with one fixed-height figure and one text column cannot jitter. -->
+  <span class="peek-row">
+    <span class="peek-thumb" class:empty={view.mount.kind !== "photo"}>
       {#if view.mount.kind === "photo"}
-        <img class="photo" src={view.mount.url} alt={view.mount.alt} />
-      {:else}
-        <PaperSlip text={view.mount.text} tilt={view.mount.tilt} />
+        <img class="photo" src={view.mount.url} alt="" />
       {/if}
-    </div>
-    {#if view.mount.kind === "photo" && view.mount.credit}
-      {@const credit = view.mount.credit}
-      <figcaption class="credit">
-        <span class="credit-author" title={credit.author ?? "Wikimedia Commons"}>{credit.author ?? "Wikimedia Commons"}</span>{#if credit.licenseShort}<span class="credit-license"> · {#if credit.licenseUrl}<a href={credit.licenseUrl} target="_blank" rel="noopener noreferrer">{credit.licenseShort}</a>{:else}{credit.licenseShort}{/if}</span>{/if}
-      </figcaption>
+    </span>
+    <span class="peek-text">
+      <span class="peek-title">{view.title ?? "? ? ?"}</span>
+      {#if view.note}<span class="peek-note">{view.note}</span>{/if}
+    </span>
+  </span>
+{:else}
+  <aside class="specimen-placard" aria-label="Specimen">
+    <h2 class="title">{view.title ?? "? ? ?"}</h2>
+
+    <figure class="figure">
+      <div class="shadowbox" class:empty={view.mount.kind !== "photo"}>
+        {#if view.mount.kind === "photo"}
+          <img class="photo" src={view.mount.url} alt={view.mount.alt} />
+        {:else}
+          <PaperSlip text={view.mount.text} tilt={view.mount.tilt} />
+        {/if}
+      </div>
+      {#if view.mount.kind === "photo" && view.mount.credit}
+        {@const credit = view.mount.credit}
+        <figcaption class="credit">
+          <span class="credit-author" title={credit.author ?? "Wikimedia Commons"}>{credit.author ?? "Wikimedia Commons"}</span>{#if credit.licenseShort}<span class="credit-license"> · {#if credit.licenseUrl}<a href={credit.licenseUrl} target="_blank" rel="noopener noreferrer">{credit.licenseShort}</a>{:else}{credit.licenseShort}{/if}</span>{/if}
+        </figcaption>
+      {/if}
+    </figure>
+
+    {#if view.fields.length}
+      <dl class="fields">
+        {#each view.fields as f (f.label)}
+          <div class="field">
+            <dt>{f.label}</dt>
+            <dd class:placeholder={f.value == null}>{f.value ?? "? ? ?"}{#if f.detail}<span class="detail">{f.detail}</span>{/if}</dd>
+          </div>
+        {/each}
+      </dl>
     {/if}
-  </figure>
 
-  {#if view.fields.length}
-    <dl class="fields">
-      {#each view.fields as f (f.label)}
-        <div class="field">
-          <dt>{f.label}</dt>
-          <dd class:placeholder={f.value == null}>{f.value ?? "? ? ?"}{#if f.detail}<span class="detail">{f.detail}</span>{/if}</dd>
-        </div>
-      {/each}
-    </dl>
-  {/if}
+    {#if view.note}<p class="note">{view.note}</p>{/if}
 
-  {#if view.note}<p class="note">{view.note}</p>{/if}
+    {#if view.link}
+      <a class="wiki" href={view.link.href} target="_blank" rel="noopener noreferrer">{view.link.label}</a>
+    {/if}
 
-  {#if view.link}
-    <a class="wiki" href={view.link.href} target="_blank" rel="noopener noreferrer">{view.link.label}</a>
-  {/if}
-
-  {@render action?.()}
-</aside>
+    {@render action?.()}
+  </aside>
+{/if}
 
 <style>
   .specimen-placard {
@@ -85,15 +103,33 @@
   .credit a { color: inherit; text-decoration: underline; }
   :global(.specimen-placard .actions) { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-1); }
 
+  /* PEEK — the sheet's always-visible row. Fixed-height thumbnail + a text column; no grid,
+     no vertical centering of mismatched rows, so there is nothing for the old #22 jitter to
+     act on. */
+  .peek-row { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+  .peek-thumb {
+    flex: none; width: 56px; height: 42px; border-radius: 4px; overflow: hidden;
+    background: radial-gradient(120% 120% at 50% 30%, #f3e6cf 0%, #e3cba6 100%);
+    box-shadow: inset 0 2px 6px rgba(95,44,30,.45);
+    border: 2px solid var(--specimen-edge);
+  }
+  .peek-thumb .photo { width: 100%; height: 100%; object-fit: cover; }
+  .peek-text { display: flex; flex-direction: column; min-width: 0; }
+  .peek-title {
+    font-family: var(--font-head); font-size: var(--type-heading); font-weight: var(--fw-bold);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .peek-note {
+    font-size: var(--type-label); color: var(--specimen-text-dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* Inside the sheet the card is already on the specimen ground and full-bleed, so it drops its
+     own frame, fixed width and shadow. */
   @media (max-width: 640px) {
-    /* compact horizontal placard: fixed shadow-box left, everything else stacked right. */
     .specimen-placard {
-      width: 100%; display: grid; grid-template-columns: auto 1fr;
-      gap: 0 var(--space-3); align-items: center; padding: .6rem .7rem;
+      width: 100%; flex: 1 1 auto;
+      background: none; border: 0; box-shadow: none; padding: 0;
     }
-    .figure { grid-column: 1; grid-row: 1 / span 4; align-self: center; margin: 0; }
-    .shadowbox { width: 84px; height: 64px; }
-    .specimen-placard > :not(.figure) { grid-column: 2; align-self: center; }
-    :global(.specimen-placard .actions) { grid-column: 1 / -1; }
   }
 </style>
