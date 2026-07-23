@@ -943,8 +943,13 @@
      it. In the base flex layout it takes the role .tree-scroll had. */
   .tree-viewport { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
   .tree-viewport .tree-scroll { flex: 1 1 auto; min-width: 0; }
-  /* one-finger drag stays native scroll; two-finger goes to the pinch handler */
-  .tree-scroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; touch-action: pan-x pan-y; }
+  /* overscroll-behavior: panning to the tree's edge must not scroll-chain to the page or trigger
+     pull-to-refresh. touch-action stays pan-x pan-y: the browser handles one-finger panning
+     natively while pinch goes through the gesturechange/wheel handlers below. */
+  .tree-scroll {
+    overflow-x: auto; overflow-y: hidden; max-width: 100%;
+    touch-action: pan-x pan-y; overscroll-behavior: contain;
+  }
   /* flex:none so the SVG's width attribute is always its used width — it neither grows nor
      shrinks to the flex container. Without this the SVG (a flex item) shrinks to fit: at rest
      that's masked, but a zoomed-IN tree wider than the viewport would collapse to container

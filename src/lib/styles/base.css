@@ -8,15 +8,19 @@ html, body { height: 100%; background-color: var(--placard); }
 /* The cream board floats on the terracotta ground; min-height keeps it filling the viewport on
    narrow, so terracotta shows only in overscroll, never as a gap below the footer. */
 #app { min-height: 100dvh; background: var(--bg-page); }
-/* Desktop: lock the app to the viewport and scroll WITHIN regions (tree, guess list),
-   so the page itself never scrolls and interactive elements stay put. Narrow keeps normal
-   document flow (the game's own narrow layout pegs its own input). */
-@media (min-width: 641px) {
-  #app { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-  #app > .app-header { flex: 0 0 auto; }
-  #app > main { flex: 1 1 auto; min-height: 0; }
-  #app > .app-footer { flex: 0 0 auto; }
+/* Lock the app to the viewport at EVERY width and scroll WITHIN regions (tree, sheet), so the
+   page itself never scrolls and interactive elements stay put. On phone this is what makes the
+   input band and the plaque sheet stay pegged; the viewport meta's interactive-widget=resizes-content
+   shrinks this shell when the soft keyboard opens rather than scrolling it out from under us. */
+#app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+#app > .app-header { flex: 0 0 auto; }
+#app > main { flex: 1 1 auto; min-height: 0; }
+#app > .app-footer { flex: 0 0 auto; }
 body {
   margin: 0;
   color: var(--ink);
