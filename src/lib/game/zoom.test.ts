@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { ZOOM_MIN, ZOOM_MAX, clampZoom, zoomStep, scrollForZoom } from "./zoom";
+import {
+  ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, ZOOM_PHONE_DEFAULT, clampZoom, zoomStep, scrollForZoom, defaultZoomFor,
+} from "./zoom";
 
 describe("clampZoom", () => {
   it("clamps below, above, and passes through within", () => {
@@ -105,5 +107,21 @@ describe("scrollForZoom under many-event pinch (the WebKit anchor drift)", () =>
       prevZoom = z;
     }
     expect(Math.abs(scroll.left - direct.left)).toBeGreaterThan(1); // drifted off target
+  });
+});
+
+describe("defaultZoomFor", () => {
+  it("opens at the normal default on desktop", () => {
+    expect(defaultZoomFor(false)).toBe(ZOOM_DEFAULT);
+  });
+
+  it("opens zoomed out on phone so more of the spine is on screen", () => {
+    expect(defaultZoomFor(true)).toBe(ZOOM_PHONE_DEFAULT);
+    expect(ZOOM_PHONE_DEFAULT).toBeLessThan(ZOOM_DEFAULT);
+  });
+
+  it("keeps the phone default inside the zoom bounds", () => {
+    expect(ZOOM_PHONE_DEFAULT).toBeGreaterThanOrEqual(ZOOM_MIN);
+    expect(ZOOM_PHONE_DEFAULT).toBeLessThanOrEqual(ZOOM_MAX);
   });
 });

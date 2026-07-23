@@ -12,9 +12,10 @@
   import { Tween } from "svelte/motion";
   import { untrack } from "svelte";
   import {
-    ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, clampZoom, zoomStep, scrollForZoom,
+    ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, clampZoom, zoomStep, scrollForZoom, defaultZoomFor,
   } from "../zoom";
   import { PinchGesture } from "@use-gesture/vanilla";
+  import { viewport } from "../../viewport.svelte";
   // The node glyphs stay authored in src/assets/*.svg (edit them in a vector tool, re-export,
   // and this picks the change up on rebuild/HMR). ?raw gives the file text; we lift out its
   // viewBox + inner markup to build a recolorable <symbol> below.
@@ -417,7 +418,7 @@
   let vbH = $derived((layout.maxY - layout.minY) * Y_GAP + PAD * 2 + LABEL_PAD);
 
   let scroller = $state<HTMLDivElement | null>(null);
-  let zoom = $state(ZOOM_DEFAULT);
+  let zoom = $state(defaultZoomFor(viewport.isPhone));
   const px = (x: number) => STEM + PAD + x * X_GAP;
   const py = (y: number) => PAD + LABEL_PAD + (y - layout.minY) * Y_GAP;
 
@@ -580,7 +581,7 @@
   // Exposed for the trail scrubber (Plan 2).
   export function panTo(id: string) {
     if (zoom !== ZOOM_DEFAULT) {
-      zoom = ZOOM_DEFAULT;
+      zoom = defaultZoomFor(viewport.isPhone);
       // wait for the SVG to resize back to 1:1 before centering on the target
       requestAnimationFrame(() => scrollToNode(id));
       return;
@@ -621,7 +622,7 @@
 
   // Return to the default view: 1:1, re-centered on the current tip.
   function resetZoom() {
-    zoom = ZOOM_DEFAULT;
+    zoom = defaultZoomFor(viewport.isPhone);
     requestAnimationFrame(() => { if (tipId) scrollToNode(tipId); });
   }
 
@@ -647,7 +648,7 @@
         // INVARIANT: `scrollTargetPx` is refreshed by the FLIP effect (declared earlier) on EVERY
         // layout change before this reads it — and a tipId change always forces a layout change — so
         // it's never stale here. Don't reorder these effects or read scrollTargetPx without that.
-        if (scrollTargetPx) zoom = ZOOM_DEFAULT;
+        if (scrollTargetPx) zoom = defaultZoomFor(viewport.isPhone);
         else resetZoom(); // zoomed / non-animated path: native re-center as before
       } else if (rightInset !== lastInset) {
         scrollToNode(tipId);
