@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Breakpoint is 640px, and there is only one.** Phone rules use `@media (max-width: 640px)`; desktop rules use `@media (min-width: 641px)`. Do not introduce a third tier.
-- **Desktop behavior and appearance must not change.** Any diff that alters the ≥641px rendering is a defect.
+- **No UNINTENDED desktop changes.** Any diff that alters the ≥641px rendering is a defect *except* for two deliberate all-width changes: the nav progress dot replacing the " – in progress" suffix (Task 10) and the About section added to How to play (Task 11). Both are improvements everywhere, and the dot additionally stabilises the nav indicator's re-measure by keeping tab labels a fixed width.
 - **`verbatimModuleSyntax` is ON.** Type-only imports MUST use `import type`. Vitest does NOT catch violations.
 - **Before every commit run:** `npx tsc --noEmit`, `npx svelte-check`, and `npm test`. All three must be clean.
 - **No em-dashes in user-facing UI copy.** (Fine in code comments and docs. En-dash ranges are always fine.)
@@ -381,7 +381,9 @@ git commit -m "feat(chips): phoneChips selects latest + warmest with an overflow
 
 ### Task 4: Phone chip band rendering
 
-Render the selection, ring the warmest, and put the overflow behind a Modal (reusing the existing modal rather than inventing a second sheet).
+Render the selection, ring the warmest, and let the band **expand in place** to reveal the rest.
+
+**No second surface.** The overflow control does not open a modal or a sheet — it grows the chip band itself. The two selected chips settle into their rightful chronological slots and the remaining chips fade in between and below them. This falls out of the existing keyed `{#each}`: the visible chips already carry stable keys (`guess-<nodeId>`), so on expand Svelte reuses their DOM nodes and only *new* chips mount, which means the existing `in:fly` transition animates exactly the newcomers and nothing else. Do not add `animate:flip` — `animate:` cannot be applied to a component, and it is not needed here.
 
 **Files:**
 - Modify: `src/lib/game/components/Chip.svelte`
@@ -389,7 +391,7 @@ Render the selection, ring the warmest, and put the overflow behind a Modal (reu
 - Modify: `src/lib/game/components/GameBoard.svelte:121-126`
 
 **Interfaces:**
-- Consumes: `phoneChips` and `PhoneChipSelection` (Task 3); `viewport.isPhone` (Task 1); `Modal` from `src/lib/components/Modal.svelte`.
+- Consumes: `phoneChips` and `PhoneChipSelection` (Task 3); `viewport.isPhone` (Task 1).
 - Produces: `GuessList` gains a `warmestId?: string | null` prop. `Chip` gains a `warmest?: boolean` prop.
 
 **Note on what a chip actually looks like:** despite the desktop spec's "warmth dot" language, the shipped chip is a pill *flooded* with its warmth color (`Chip.svelte`, `.chip.flood`), reading `Name shares Clade`. There is no dot. So the warmest marking must be a ring on the pill, and it must not be confusable with `.chip.answer`, which already uses a warmth-colored outer glow. Use a hard turquoise ring instead — turquoise is the app's interactive accent and reads as "this one", not "this is hot".
@@ -460,7 +462,6 @@ Replace the whole of `src/lib/game/components/GuessList.svelte` with:
   import { chipsFor, phoneChips } from "../chip-view";
   import type { GuessResult } from "../types";
   import Chip from "./Chip.svelte";
-  import Modal from "../../components/Modal.svelte";
   import { viewport } from "../../viewport.svelte";
 
   let {
@@ -492,13 +493,19 @@ Replace the whole of `src/lib/game/components/GuessList.svelte` with:
     }),
   );
 
-  // Phone shows latest + warmest + a count; desktop shows the full list. Selection is pure
-  // (chip-view), so this component stays a renderer.
+  // Phone shows latest + warmest + a count until the band is expanded; desktop always shows the
+  // full list. Selection is pure (chip-view), so this component stays a renderer.
   let selection = $derived(phoneChips(chips, warmestId));
-  let visible = $derived(viewport.isPhone ? selection.shown : chips);
-  let overflow = $derived(viewport.isPhone ? selection.hiddenCount : 0);
 
-  let showAll = $state(false);
+  let expanded = $state(false);
+  let collapsed = $derived(viewport.isPhone && !expanded);
+  // Expanding renders the SAME chip objects in their true order. Because the keys below are
+  // stable, Svelte reuses the two already-visible chips' DOM nodes and mounts only the newcomers
+  // — so in:fly animates exactly the chips that appeared, and the two you had settle into their
+  // rightful slots. No animate:flip: `animate:` cannot be applied to a component, and the keyed
+  // reuse already gives the effect.
+  let visible = $derived(collapsed ? selection.shown : chips);
+  let overflow = $derived(collapsed ? selection.hiddenCount : 0);
 
   // stable key per chip for the flex list / transitions
   function keyOf(c: ReturnType<typeof chipsFor>[number], i: number): string {
@@ -509,7 +516,7 @@ Replace the whole of `src/lib/game/components/GuessList.svelte` with:
 </script>
 
 {#if visible.length}
-  <ul class="chips">
+  <ul class="chips" class:expanded={viewport.isPhone && expanded}>
     {#each visible as c, i (keyOf(c, i))}
       <Chip chip={c} {onselect} animateIn warmest={viewport.isPhone && c === selection.warmestChip} />
     {/each}
@@ -517,30 +524,22 @@ Replace the whole of `src/lib/game/components/GuessList.svelte` with:
 {/if}
 
 {#if overflow > 0}
-  <button type="button" class="overflow" onclick={() => (showAll = true)}>
-    + {overflow} more
-  </button>
+  <button type="button" class="overflow" onclick={() => (expanded = true)}>+ {overflow} more</button>
+{:else if viewport.isPhone && expanded && selection.hiddenCount > 0}
+  <button type="button" class="overflow" onclick={() => (expanded = false)}>Show fewer</button>
 {/if}
-
-<Modal bind:open={showAll} title="Your guesses">
-  <ul class="chips all-chips">
-    {#each chips as c, i (keyOf(c, i))}
-      <Chip
-        chip={c}
-        onselect={(id) => { showAll = false; onselect(id); }}
-        warmest={c === selection.warmestChip}
-      />
-    {/each}
-  </ul>
-</Modal>
 
 <style>
   .chips {
     display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-2);
     align-items: center; min-width: 0;
   }
-  /* the overflow list reads as a column so long chips don't wrap into an unreadable brick */
-  .all-chips { flex-direction: column; align-items: flex-start; }
+  /* Expanded on phone: the band grows in place, but it must never eat the tree whole, so it caps
+     and scrolls internally. */
+  .chips.expanded {
+    max-height: 38dvh; overflow-y: auto; overscroll-behavior: contain;
+    align-items: flex-start; align-content: flex-start;
+  }
   .overflow {
     background: none; border: 0; padding: 0; cursor: pointer;
     font-size: var(--type-label); font-weight: var(--fw-semibold);
@@ -550,7 +549,7 @@ Replace the whole of `src/lib/game/components/GuessList.svelte` with:
 </style>
 ```
 
-Note the copy is `+ 3 more`, not `+ 3 more —` anything. No em-dashes in UI copy.
+UI copy is `+ 3 more` and `Show fewer`. No em-dashes.
 
 - [ ] **Step 4: Pass the warmest node in from GameBoard**
 
@@ -577,7 +576,7 @@ Run: `npm run dev`. At desktop width, play four Practice guesses.
 Expected: all four chips render, no ring, no `+ N more` control — identical to before.
 
 Resize to 390px.
-Expected: two chips (or one if latest is warmest), the warmest wearing a turquoise ring, and a `+ N more` control that opens a modal listing every chip. Tapping a chip in the modal closes it and pans the tree.
+Expected: two chips (or one if latest is warmest), the warmest wearing a turquoise ring, and a `+ N more` control. Tapping it grows the band in place: the two chips you already had stay put in their rightful order and the rest fade in between and below them, with no modal and nothing jumping. The control becomes `Show fewer`, which collapses back. With many guesses the expanded band caps at 38dvh and scrolls inside itself rather than swallowing the tree.
 
 - [ ] **Step 7: Commit**
 
