@@ -294,10 +294,23 @@
      the header and clipped the "Explore" tab off the right edge. */
   @media (max-width: 640px) {
     .tagline { display: none; }
-    /* the claw is already rotated 180deg to read as an "M", so it carries the brand alone here */
-    .wordmark { display: none; }
-    .app-header { gap: var(--space-3); padding: var(--space-2) var(--space-3); }
-    .modes { gap: var(--space-3); font-size: var(--type-label); }
+    /* Two rows. Row 1 is identity plus utilities; row 2 is the mode switcher, given the full width
+       so the three tabs spread across it instead of huddling at the right edge. The vertical cost
+       is affordable: measured at 390x844 the tree still clears its budget. */
+    .app-header {
+      flex-wrap: wrap; align-items: center;
+      gap: var(--space-2) var(--space-3);
+      padding: var(--space-2) var(--space-3);
+    }
+    /* 32px is a desktop signage size; at 390px it alone pushes the utilities onto a third row.
+       --type-title keeps the wordmark clearly dominant while leaving room for both buttons. */
+    .wordmark { font-size: var(--type-title); }
+    .brand { gap: var(--space-3); }
+    .modes {
+      flex: 0 0 100%; margin-left: 0;
+      justify-content: space-between; gap: var(--space-2);
+      font-size: var(--type-body);
+    }
     .app-footer { display: none; }
   }
 </style>

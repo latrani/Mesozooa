@@ -54,11 +54,6 @@
     font-weight: var(--fw-bold); margin: 0;
   }
   .label-short { display: none; }
-  /* Phone: the header row is at its width budget, so the label collapses to a question mark.
-     The button keeps an explicit aria-label so the accessible name never changes with viewport. */
-  @media (max-width: 640px) {
-    .how-to-play-link { padding: .25rem .5rem; }
-    .label-full { display: none; }
-    .label-short { display: inline; font-weight: var(--fw-black); }
-  }
+  /* The two-row phone header gives row 1 enough width for the real label, so the "?" fallback is
+     not needed. Kept in the markup (hidden) in case the row tightens again. */
 </style>

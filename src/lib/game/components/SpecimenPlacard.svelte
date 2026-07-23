@@ -7,20 +7,13 @@
 </script>
 
 {#if peek}
-  <!-- One deliberate single line: fixed-size thumbnail, then title and note as a text column.
-       This is what retires the #22 narrow-screen jitter — the old narrow layout was a grid
-       vertically centering rows of mismatched height, so `align-items: baseline` shifted as
-       content changed. A row with one fixed-height figure and one text column cannot jitter. -->
+  <!-- The sheet's title bar: the placard's own title leads, with its note as quiet trailing
+       context. Deliberately one flat flex line of text — the old narrow layout was a grid
+       vertically centering rows of mismatched height, which is what caused the #22 jitter, and a
+       row that holds only text cannot reproduce it. -->
   <span class="peek-row">
-    <span class="peek-thumb" class:empty={view.mount.kind !== "photo"}>
-      {#if view.mount.kind === "photo"}
-        <img class="photo" src={view.mount.url} alt="" />
-      {/if}
-    </span>
-    <span class="peek-text">
-      <span class="peek-title">{view.title ?? "? ? ?"}</span>
-      {#if view.note}<span class="peek-note">{view.note}</span>{/if}
-    </span>
+    <span class="peek-title">{view.title ?? "? ? ?"}</span>
+    {#if view.note}<span class="peek-note">{view.note}</span>{/if}
   </span>
 {:else}
   <aside class="specimen-placard" aria-label="Specimen">
@@ -106,15 +99,7 @@
   /* PEEK — the sheet's always-visible row. Fixed-height thumbnail + a text column; no grid,
      no vertical centering of mismatched rows, so there is nothing for the old #22 jitter to
      act on. */
-  .peek-row { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-  .peek-thumb {
-    flex: none; width: 56px; height: 42px; border-radius: 4px; overflow: hidden;
-    background: radial-gradient(120% 120% at 50% 30%, #f3e6cf 0%, #e3cba6 100%);
-    box-shadow: inset 0 2px 6px rgba(95,44,30,.45);
-    border: 2px solid var(--specimen-edge);
-  }
-  .peek-thumb .photo { width: 100%; height: 100%; object-fit: cover; }
-  .peek-text { display: flex; flex-direction: column; min-width: 0; }
+  .peek-row { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
   .peek-title {
     font-family: var(--font-head); font-size: var(--type-heading); font-weight: var(--fw-bold);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -127,6 +112,8 @@
   /* Inside the sheet the card is already on the specimen ground and full-bleed, so it drops its
      own frame, fixed width and shadow. */
   @media (max-width: 640px) {
+    /* the sheet's peek row is the title bar, so the card must not repeat the title below it */
+    .title { display: none; }
     .specimen-placard {
       width: 100%; flex: 1 1 auto;
       background: none; border: 0; box-shadow: none; padding: 0;

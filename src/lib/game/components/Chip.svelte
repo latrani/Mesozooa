@@ -17,14 +17,11 @@
     chip,
     onselect,
     animateIn = false,
-    warmest = false,
   }: {
     chip: Chip;
     onselect: (nodeId: string) => void;
     /** guess list: fly each chip in as it lands. Static lists (recents) leave it off. */
     animateIn?: boolean;
-    /** phone only: this chip is the warmest shared node, i.e. the node the spine is centered on. */
-    warmest?: boolean;
   } = $props();
 
   // Guess + answer flood the pill with a warmth color (inline bg). Everything else stays cream-dim.
@@ -37,7 +34,6 @@
   class="chip chip-{chip.kind}"
   class:flood={floodColor != null}
   class:answer={chip.kind === "answer"}
-  class:warmest
   style={floodColor != null ? `background: ${floodColor}; --glow: ${floodColor}` : ""}
   in:fly={{ y: -10, duration: animateIn ? 200 : 0 }}
 >
@@ -96,15 +92,4 @@
                 0 0 5px 3px color-mix(in srgb, var(--glow) 75%, transparent);
   }
 
-  /* Phone: the warmest chip wears the same ring vocabulary as the spine tip, so the chip and the
-     tree node read as ONE object rather than two things that happen to agree. Turquoise (the
-     interactive accent), NOT a warmth color — .chip.answer already owns the warmth-colored glow
-     and the two must not be confusable. */
-  .chip.warmest {
-    box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--turq);
-  }
-  .chip.warmest.flood {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 14%, transparent),
-                0 0 0 2px var(--bg-surface), 0 0 0 4px var(--turq);
-  }
 </style>

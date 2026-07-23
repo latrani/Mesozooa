@@ -69,7 +69,13 @@
 {#if visible.length}
   <ul class="chips" class:expanded={viewport.isPhone && expanded}>
     {#each visible as c, i (keyOf(c, i))}
-      <Chip chip={c} {onselect} animateIn warmest={viewport.isPhone && c === selection.warmestChip} />
+      <!-- Eyebrows label the two slots while collapsed. They are full-width list items, so in the
+           wrapping flex row they force a line break and sit above their chip. Expanded, the list is
+           plain reverse-chronological and the labels would be wrong, so they are not rendered. -->
+      {#if collapsed && c.kind !== "answer"}
+        <li class="eyebrow-row">{c === selection.warmestChip ? "Warmest" : "Latest"}</li>
+      {/if}
+      <Chip chip={c} {onselect} animateIn />
     {/each}
   </ul>
 {/if}
@@ -90,6 +96,12 @@
   .chips.expanded {
     max-height: 38dvh; overflow-y: auto; overscroll-behavior: contain;
     align-items: flex-start; align-content: flex-start;
+  }
+  /* full-width so it breaks the flex line and captions the chip beneath it */
+  .eyebrow-row {
+    flex: 0 0 100%; margin-bottom: calc(var(--space-2) * -0.5);
+    font-size: var(--type-meta); font-weight: var(--fw-bold);
+    letter-spacing: .16em; text-transform: uppercase; color: var(--ink-mute);
   }
   .overflow {
     background: none; border: 0; padding: 0; cursor: pointer;

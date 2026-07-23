@@ -30,7 +30,7 @@
     onclick={() => (expanded = !expanded)}
   >
     <span class="peek-content">{@render peek()}</span>
-    <span class="chevron" aria-hidden="true">{expanded ? "▾" : "▴"}</span>
+    <span class="chevron" aria-hidden="true">{expanded ? "▼" : "▲"}</span>
   </button>
 
   {#if expanded}

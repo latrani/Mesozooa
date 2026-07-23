@@ -42,13 +42,14 @@ export function scrollForZoom(p: ScrollForZoomInput): { left: number; top: numbe
   };
 }
 
-// A phone is a small window onto a wide spine, so opening at 1.0 lands you mid-canvas with two
-// nodes visible. Opening zoomed out trades label size for orientation, then panTo/follow brings
-// the interesting node to you.
+// The phone's resting zoom. Playtested at 390x844: 0.6 was tried first, on the theory that a
+// small window onto a wide spine wants more context, and it read as far too small — the tree
+// looked like a diagram of itself rather than the thing you play with. 1.0 is the current
+// setting and may go HIGHER.
 //
 // This is a DIAL, not a derived value: a true fit-to-width would collapse a deep tree to an
 // illegible 0.15. Tune it by looking at 390px, not by computing it.
-export const ZOOM_PHONE_DEFAULT = 0.6;
+export const ZOOM_PHONE_DEFAULT = 1.0;
 
 export function defaultZoomFor(isPhone: boolean): number {
   return isPhone ? ZOOM_PHONE_DEFAULT : ZOOM_DEFAULT;

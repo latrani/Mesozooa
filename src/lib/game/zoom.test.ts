@@ -115,9 +115,8 @@ describe("defaultZoomFor", () => {
     expect(defaultZoomFor(false)).toBe(ZOOM_DEFAULT);
   });
 
-  it("opens zoomed out on phone so more of the spine is on screen", () => {
+  it("opens at the phone dial on phone", () => {
     expect(defaultZoomFor(true)).toBe(ZOOM_PHONE_DEFAULT);
-    expect(ZOOM_PHONE_DEFAULT).toBeLessThan(ZOOM_DEFAULT);
   });
 
   it("keeps the phone default inside the zoom bounds", () => {
