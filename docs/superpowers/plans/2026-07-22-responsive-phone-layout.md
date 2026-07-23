@@ -585,7 +585,7 @@ Expected: two chips (or one if latest is warmest), the warmest wearing a turquoi
 
 ```bash
 git add src/lib/game/components/Chip.svelte src/lib/game/components/GuessList.svelte src/lib/game/components/GameBoard.svelte
-git commit -m "feat(chips): phone chip band with warmest ring and overflow modal (#12)"
+git commit -m "feat(chips): phone chip band with warmest ring and in-place overflow (#12)"
 ```
 
 ---
