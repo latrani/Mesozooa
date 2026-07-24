@@ -639,6 +639,50 @@ Task 4's step-back branch still carries `scrollTargetPx = null` with a comment c
 
 ---
 
+> **CORRECTION 3 — Task 11 (root cause) + Task 12 (auto-release), done as direct controller edits
+> after live Playwright debugging.** The residual ~82px slide that survived Tasks 8 & 10 was traced
+> (systematic-debugging, instrumented `scrollLeft` setter → empty writer log → native clamp) to a
+> **transient `scrollWidth` dip**: the effect-set `coyotePad` grew a render pass AFTER `contentWidth`
+> shrank. Fix: derive `coyotePad` off a synchronously-captured `heldWidth` (spec §1e). Then, on live
+> review, added auto-release of the gap after the collapse settles (spec §1f). Both landed in commit
+> `1966968` (with the spec update); recorded here for the plan trail. Tasks 8 & 10 are retained as
+> defense-in-depth (they address real secondary movers, just not the primary one).
+
+### Task 11: Root-cause fix — `coyotePad` as `$derived` off `heldWidth` (DONE, commit 1966968)
+
+**What changed in `SpineTree.svelte`:**
+- Replaced `let coyotePad = $state(0)` (effect-incremented in Task 4) with:
+  `let heldWidth = $state<number | null>(null)` and
+  `let coyotePad = $derived(heldWidth != null ? coyotePadDelta(heldWidth, layout.width, X_GAP) : 0)`.
+- Added `commitStepBack(next)` — called from `onNodeClick` and the `onTreeKey` Enter path BEFORE
+  `onnodeselect` — which, when `isStepBack(treeStore, tipId, next)`, sets
+  `heldWidth = heldWidth == null ? layout.width : Math.max(heldWidth, layout.width)` and arms
+  `suppressFocusScroll`. Synchronous capture is the crux: `coyotePad` then recomputes in the same
+  reactive pass `contentWidth` shrinks, so `scrollWidth` never dips.
+- Removed the effect-based `coyotePad += …` and the `lastWidth` snapshot from Task 4's step-back
+  branch; the branch keeps `scrollTargetPx = null` + the vertical `keepVisible1D` nudge.
+- `resetZoom` and the forward/lateral branch clear `heldWidth = null` (was `coyotePad = 0`).
+
+**Verification:** `npx tsc --noEmit` + `npx svelte-check` clean; live trace shows `scrollLeft` held at
+1018 through the collapse (no dip), then recenter.
+
+### Task 12: Auto-release the coyote-time gap after settle (DONE, commit 1966968)
+
+**What changed in `SpineTree.svelte`:**
+- `scheduleCoyoteRelease()` — called from the step-back branch — sets a `setTimeout(GLIDE_MS + 40)`
+  that clears `heldWidth` and calls `scrollToNode(tipId)` (native smooth recenter). Rescheduled on
+  each consecutive step-back (fires once stepping-back stops). Reduced-motion path releases
+  immediately with no animated pan.
+- `cancelCoyoteRelease()` — called from `resetZoom` and the forward/lateral branch — clears the timer
+  so it can't double-fire or fire stale.
+
+**Verification:** live trace — collapse holds to ~200ms, then release drops `scrollWidth` 2036→1836 and
+smooth-scrolls the tip to center (x=264) by ~500ms. A tuning harness (`window.__coyote`, custom pan
+speed / settle-to-fill) was built to explore alternatives, reviewed, and removed in favor of the
+native-smooth-scroll recenter.
+
+---
+
 ### Task 9: Full verification sweep + issue close
 
 **Files:** none (verification only).
