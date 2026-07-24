@@ -423,7 +423,14 @@
   // time": the ground stays under you a beat after you'd otherwise fall (Wile E. doesn't drop till
   // he looks down). It zeroes on any deliberate recenter (forward/lateral tip, or ⌂). Default-zoom
   // only, matching the FLIP scroll driver's atDefaultZoom gate.
-  let coyotePad = $state(0);
+  //
+  // CRITICAL (root cause, spec §1e): coyotePad MUST be a $derived off layout.width, NOT an $effect —
+  // so the runway grows in the SAME reactive/render pass that contentWidth shrinks. An $effect runs a
+  // pass later, leaving a sub-frame where scrollWidth dips and the browser natively clamps scrollLeft
+  // (the ~82px slide). `heldWidth` snapshots the pre-collapse width synchronously at the step-back
+  // commit (onNodeClick / onTreeKey Enter), before the store mutates; null = no hold.
+  let heldWidth = $state<number | null>(null);
+  let coyotePad = $derived(heldWidth != null ? coyotePadDelta(heldWidth, layout.width, X_GAP) : 0);
   let runway = $derived(contentWidth ? rightInset + coyotePad : 0);
   // Total scrollable content width at zoom=1: scaled tree + fixed runway. centerOffsetFor and the
   // scroll-fade dependency read this.
@@ -555,10 +562,19 @@
   // effect is the ONLY thing that moves the viewport (spec §1b — otherwise the click's focus pans the
   // camera forward horizontally before the effect freezes it). Cleared on read in scrollFocusIntoView.
   let suppressFocusScroll = false;
+  // A step-back COMMIT (mouse or keyboard), evaluated BEFORE onnodeselect mutates the store, so `tipId`
+  // is still the old tip. Captures the width-hold floor SYNCHRONOUSLY (root cause §1e): coyotePad
+  // derives off heldWidth, so setting it here — in the same task that triggers the relayout — means the
+  // runway is already grown when contentWidth shrinks in the render pass, with no scrollWidth dip.
+  // Consecutive step-backs keep the max (the original pre-collapse floor). Also arms suppressFocusScroll.
+  function commitStepBack(next: string): void {
+    if (!(tipId && isStepBack(treeStore, tipId, next))) return;
+    heldWidth = heldWidth == null ? layout.width : Math.max(heldWidth, layout.width);
+    suppressFocusScroll = true;
+  }
   function onNodeClick(id: string) {
     if (!onnodeselect) return;
-    // Detect step-back BEFORE onnodeselect mutates the store: tipId is still the old tip here.
-    if (tipId && isStepBack(treeStore, tipId, id)) suppressFocusScroll = true;
+    commitStepBack(id);
     onnodeselect(id);
     focusItem(id);
   }
@@ -568,6 +584,7 @@
     if (!cur) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
+      commitStepBack(cur);
       onnodeselect?.(cur); // identical to a mouse click (undefined during game play = no-op)
       return;
     }
@@ -635,7 +652,8 @@
   // Return to the default view: 1:1, re-centered on the current tip.
   function resetZoom() {
     zoom = defaultZoomFor(viewport.isPhone);
-    coyotePad = 0; // ⌂ is the explicit "put me back": drop any held coyote-time gap, re-clamp normally
+    cancelCoyoteRelease(); // ⌂ recenters now; drop any pending auto-release so it can't double-fire
+    heldWidth = null; // ⌂ is the explicit "put me back": drop the coyote-time width-hold, re-clamp normally
     requestAnimationFrame(() => { if (tipId) scrollToNode(tipId); });
   }
 
@@ -648,9 +666,28 @@
   // Center the tip whenever it changes, or when rightInset settles (it's 0 until the floating
   // overlay is measured post-mount). The game's tip only ever deepens, so "on change" doesn't
   // regress its forward-follow feel; Explore's tip jumps freely, giving click-to-center.
-  let lastWidth = 0; // layout.width at the previous tip resolution, for the coyote-pad delta
   let lastTipId: string | null = null;
   let lastInset = -1;
+  // "Coyote time" release: after a step-back's collapse-in-place settles, we drop the width-hold and
+  // recenter on the tip so the reserved dead space doesn't linger. Two beats, deliberately separated
+  // in time (spec §1f): retract-in-place first (frozen camera), THEN — a grace beat later — pan to
+  // center. Rescheduled on every consecutive step-back, so the release fires once stepping-back STOPS,
+  // not between rapid steps. Cleared on any other navigation / recenter so it can't fire stale.
+  let coyoteReleaseTimer: ReturnType<typeof setTimeout> | null = null;
+  function cancelCoyoteRelease() {
+    if (coyoteReleaseTimer) { clearTimeout(coyoteReleaseTimer); coyoteReleaseTimer = null; }
+  }
+  function scheduleCoyoteRelease() {
+    cancelCoyoteRelease();
+    if (reduceMotion) { heldWidth = null; if (tipId) scrollToNode(tipId); return; } // no grace beat: settle at once
+    // Wait for the collapse FLIP (GLIDE_MS) to finish + a short grace beat, then release the width-hold
+    // and recenter on the tip via the native smooth scroll (scrollToNode) — a distinct second motion.
+    coyoteReleaseTimer = setTimeout(() => {
+      coyoteReleaseTimer = null;
+      heldWidth = null; // drops coyotePad → scrollWidth shrinks; scrollToNode then pans to the valid center
+      if (tipId) scrollToNode(tipId);
+    }, GLIDE_MS + 40);
+  }
   $effect(() => {
     const d = tipId ? (posOf.get(tipId)?.depth ?? -1) : -1;
     void scrollWidth; // re-run when the scrollable width changes too
@@ -660,19 +697,22 @@
           // Step-back: freeze scrollLeft (no forward slide) but keep the new tip VISIBLE vertically —
           // the collapse re-splays the fan around a new minY, so a frozen scrollTop can strand the tip
           // off-screen (spec §1a). Null the FLIP scroll target so the shared-clock driver doesn't
-          // animate; extend the coyote pad so the clamp can't yank the frozen scrollLeft.
+          // animate. The horizontal width-hold is coyotePad, a $derived off heldWidth captured
+          // synchronously in the commit handler (root cause §1e) — NOT set here (an effect-set pad
+          // races the render and lets scrollWidth dip → native clamp → the ~82px slide).
           scrollTargetPx = null;
-          coyotePad += coyotePadDelta(lastWidth, layout.width, X_GAP);
           const n = posOf.get(tipId);
           if (n) {
             const maxTop = Math.max(0, vbH * zoom - scroller.clientHeight);
             const top = keepVisible1D(py(n.y) * zoom, scroller.scrollTop, scroller.clientHeight, KEEP_VISIBLE_MARGIN_Y, maxTop);
             if (top !== scroller.scrollTop) scroller.scrollTo({ left: scroller.scrollLeft, top, behavior: reduceMotion ? "auto" : "smooth" });
           }
+          scheduleCoyoteRelease(); // auto-release the gap a grace beat after the collapse settles
         } else {
           // Forward / lateral (deeper tip, sibling, search jump, history chip): recenter as before,
-          // and drop any coyote pad — the tree re-extends / moves, so held dead space is stale.
-          coyotePad = 0;
+          // and drop the width-hold — the tree re-extends / moves, so held dead space is stale.
+          cancelCoyoteRelease();
+          heldWidth = null;
           if (scrollTargetPx) zoom = defaultZoomFor(viewport.isPhone);
           else resetZoom();
         }
@@ -682,7 +722,6 @@
     }
     lastTipId = tipId;
     lastInset = rightInset;
-    lastWidth = layout.width;
   });
 
   // Activating a node in Explore re-centers (rebuilds revealed -> the tree). Keep DOM focus on

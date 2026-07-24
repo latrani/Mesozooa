@@ -144,7 +144,48 @@ scroller's `scrollLeft` setter showed the single horizontal write came from the 
 guarantees the focus path can't scroll during a step-back regardless — but it is NOT what fixes the
 horizontal slide. §1d is.
 
-### §1d. The effect-ordering bug — why the null must move to the FLIP effect
+### §1e. ROOT CAUSE (confirmed) — a transient `scrollWidth` dip during the render pass
+
+**This supersedes the mechanism guesses in §1b and §1d.** Definitive instrumentation (patching the
+scroller's `scrollLeft`/`scrollTop` setters + `scrollTo`, plus per-frame sampling) proved the residual
+~82px horizontal move (measured 1018→936) has **NO JavaScript writer** — the setter log was empty. It
+is the **browser's native scroll clamp** reacting to a sub-frame `scrollWidth` dip:
+
+- `contentWidth` (hence the SVG's `width`) is a `$derived` of `layout.width`. On a step-back it shrinks
+  *during* Svelte's render pass (one column, ~200px).
+- `coyotePad` (as originally built in Tasks 3–4) was set in a **`$effect`**, which runs one pass
+  *after* that render. So for a sub-frame, `scrollWidth` = (shrunken SVG) + (not-yet-grown runway),
+  the browser clamps `scrollLeft` to the smaller max, and the clamp is not undone when the pad catches
+  up.
+
+**Proof:** pinning a permanent oversized spacer so `scrollWidth` physically cannot dip → `scrollLeft`
+held at 1018 (move gone). The arithmetic closes exactly: 1436 (collapsed SVG) + 400 (`rightInset`) −
+900 (viewport) = 936. The dip is between the microtask flush and paint, so every rAF sample read the
+already-restored 2036 — which is why earlier investigation (and §1b/§1d) misattributed the cause.
+
+**Fix (Task 11): make the compensation a `$derived`, not an `$effect`,** so it recomputes in the SAME
+reactive pass as `contentWidth` and the runway grows in the same DOM flush the SVG shrinks:
+
+```
+let heldWidth = $state<number | null>(null); // set synchronously at the step-back commit; null otherwise
+let coyotePad = $derived(heldWidth != null ? coyotePadDelta(heldWidth, layout.width, X_GAP) : 0);
+```
+
+`heldWidth` captures `layout.width` synchronously in the commit handlers (`onNodeClick` mouse path +
+`onTreeKey` Enter path), *before* `onnodeselect` mutates the store — so it records the pre-collapse
+(larger) width. Consecutive step-backs keep the max (`heldWidth = heldWidth == null ? layout.width :
+Math.max(heldWidth, layout.width)`), holding the original floor. Reset `heldWidth = null` on
+forward/lateral tips (tip-change effect `else`) and in `resetZoom`. This reuses `coyotePadDelta`
+(Task 2) and removes the effect-based increment + the `lastWidth` snapshot from Task 4.
+
+**Record correction:** §1b (blamed `scrollFocusIntoView`) and §1d (blamed effect ordering / the FLIP
+driver) were both **wrong about the ~82px** — instrumentation shows no JS writer. Their fixes (Task 8
+`suppressFocusScroll`, Task 10 FLIP-arming guard) are nonetheless **retained as load-bearing**: Task 10
+genuinely prevents the FLIP driver from animating a recenter on step-back (the large ~200px slide, a
+real JS writer before Task 10), and Task 8 prevents the focus keep-visible pan from fighting the
+tip-change effect's vertical nudge. They address real *secondary* movers; §1e is the *primary* one.
+
+### §1d. The effect-ordering theory (SUPERSEDED by §1e — kept for the record)
 
 The originally-shipped Task 4 set `scrollTargetPx = null` inside the **tip-change effect** to stop the
 scroll driver. Live instrumentation proved that too late. Svelte runs `$effect`s in creation order,
@@ -187,6 +228,31 @@ the per-axis math into a pure `keepVisible1D` in `spine-layout.ts`, TDD-test it,
 `scrollFocusIntoView` (X and Y) and the tip-change effect's vertical step-back nudge (Y only). This
 avoids a second copy of the edge math drifting from the first.
 
+### §1f. Auto-release of the coyote-time gap (added after live review)
+
+The originally-specced behavior held the gap open until the user made a deliberate recenter (⌂ /
+forward nav). Live review found that even a *single* step-back left the reserved dead space lingering
+indefinitely, which read as unfinished. Approved change: **auto-release the gap a grace beat after the
+collapse settles.**
+
+Mechanism — because the width-hold (`coyotePad`) and the frozen `scrollLeft` are one coin (shrinking
+the pad forces the browser to clamp/scroll), the visible gap *cannot* close without the view moving.
+So the release is a deliberate **second motion, separated in time** from the collapse:
+
+1. **t=0:** step-back commits → collapse-in-place, camera frozen (the readable retract).
+2. **t = GLIDE_MS + 40ms:** a `setTimeout` fires → drop `heldWidth` (releases `coyotePad`) and
+   `scrollToNode(tipId)` — the native smooth scroll recenters the tip. Two clean beats: retract, then
+   settle. (This is close in spirit to #58's "retract-then-extend," but far simpler — just a delayed
+   recenter, no topology envelopes.)
+
+The timer is **rescheduled on every consecutive step-back**, so backing out several levels quickly
+holds the gap the whole time and the release fires once stepping-back *stops*. It is **cancelled** on
+any forward/lateral tip change and in `resetZoom` (⌂), so it can never double-fire or fire stale.
+Under reduced motion the release is immediate (no grace beat, no animated pan). The recenter uses the
+existing `scrollToNode` (native `behavior: "smooth"`) — no custom easing; a tuning harness that
+explored custom pan speed / a minimal "settle-to-fill" motion was built and then removed in favor of
+this default, which read best on review.
+
 ---
 
 ## §2. Coyote-time runway padding (the anti-yank)
@@ -198,16 +264,21 @@ Mechanism — extend the existing runway. There is already a fixed-px runway spa
 specimen clearance) that pads `scrollWidth` past the tree's right edge. Add a second, transient
 contribution:
 
-- New state `coyotePad` (px in **unscaled content space**, like `runway`/`contentWidth`), default 0.
-- The scrollable-width computation (`runway`/`scrollWidth`, `:414`–`:417`) includes `coyotePad` (as
-  an addend to `runway`, or a sibling spacer — implementation detail for the plan).
-- On a **step-back**, set `coyotePad` to exactly the width lost this collapse:
-  `(oldWidth − newWidth) * X_GAP`, where `oldWidth`/`newWidth` are `layout.width` before/after. This
-  keeps `scrollWidth` ≥ its pre-collapse value, so the frozen `scrollLeft` remains inside the clamp
-  and the browser does not yank it.
-- **Consecutive step-backs EXTEND the hold (resolved):** a second step-back *adds* the newly-collapsed
-  width to `coyotePad` rather than resetting it, so backing out multiple levels reads as one
-  continuous camera hold.
+- The scrollable-width computation (`runway`/`scrollWidth`) includes `coyotePad` as an addend to
+  `runway`.
+- **`coyotePad` MUST be a `$derived`, not an `$effect`-set `$state`** (root cause §1e — this is the
+  load-bearing correction to the original design): `coyotePad = heldWidth != null ? coyotePadDelta(
+  heldWidth, layout.width, X_GAP) : 0`. `heldWidth` is the pre-collapse `layout.width`, captured
+  **synchronously in the commit handler** (`onNodeClick` / `onTreeKey` Enter) *before* `onnodeselect`
+  mutates the store. Deriving off `layout.width` means the runway grows in the **same reactive/render
+  pass** that `contentWidth` shrinks — no sub-frame `scrollWidth` dip, so the browser never clamps.
+  An `$effect`-set pad (the originally-shipped Task 3/4 approach) runs a pass later and reintroduces
+  the ~82px slide.
+- **Consecutive step-backs EXTEND the hold (resolved):** `heldWidth = heldWidth == null ? layout.width
+  : Math.max(heldWidth, layout.width)` keeps the original (largest) pre-collapse floor, so backing out
+  multiple levels reads as one continuous camera hold.
+- `heldWidth` resets to `null` on any forward/lateral tip (tip-change effect `else`) and in
+  `resetZoom` (⌂), and is dropped by the §1f auto-release timer.
 
 The resulting gap is honest dead space to the right — exactly the "empty space, coyote time" the
 issue asks for. It reads as "there's room here where the branch was," not as broken layout.
@@ -229,34 +300,34 @@ The analogy is exact here, which is why the name is load-bearing rather than dec
 - The right-side space **should** collapse the instant the branch does (gravity = the scroll clamp
   yanking it away).
 - Instead we let it **hang there** — the runway pad holds the ground under the frozen camera.
-- It only falls when the user **"looks down"** — makes a deliberate recenter/forward move, at which
-  point `coyotePad` zeroes and the layout re-clamps normally (§3).
+- It only falls when the user **"looks down"** — or, per §1f, a grace beat after the collapse settles,
+  at which point `heldWidth` clears (dropping `coyotePad`) and the view recenters (§3).
 
 The state is named `coyotePad` (not `stepBackScrollPad`), and the code comment carries this
 etymology so the intent survives future refactors.
 
 ---
 
-## §3. Resetting the coyote pad
+## §3. Resetting the width-hold (`heldWidth`)
 
-`coyotePad` snaps back to 0 (letting scroll re-clamp normally) on any deliberate recenter. The four
-approved triggers collapse to essentially one rule plus the zoom-home button:
+The hold clears (`heldWidth = null`, dropping the derived `coyotePad` so scroll re-clamps normally) on
+any deliberate recenter, plus the §1f auto-release:
 
-- **Manual recenter (⌂)** — `resetZoom()` zeroes `coyotePad`, then recenters on the tip. The explicit
-  "put me back."
+- **Manual recenter (⌂)** — `resetZoom()` cancels a pending auto-release timer, clears `heldWidth`,
+  then recenters on the tip. The explicit "put me back."
 - **Forward navigation (deeper tip)** — the forward/lateral branch of the §1 classifier (the `else`
-  of the ancestor test) zeroes `coyotePad` before recentering; the tree re-extends, so stale padding
-  would strand dead space.
-- **Search jump / history chip** — `jumpTo()` lands on an arbitrary taxon. By the ancestor test the
-  target is not an ancestor of the old tip, so it flows through the same forward/lateral branch that
-  zeroes the pad. No separate wiring — it falls out of the classifier.
-- **Consecutive step-back** — the ONE case that does not reset; it extends `coyotePad` (§2).
-
-So the reset rule is: **any non-step-back tip resolution zeroes `coyotePad`; `resetZoom` also zeroes
-it.** Three of the four triggers are the same code path.
+  of the ancestor test) cancels any pending auto-release and clears `heldWidth` before recentering;
+  the tree re-extends, so a stale hold would strand dead space.
+- **Search jump / history chip** — `jumpTo()` lands on an arbitrary taxon; by the ancestor test the
+  target is not an ancestor of the old tip, so it flows through the same forward/lateral branch. No
+  separate wiring — it falls out of the classifier.
+- **Auto-release (§1f)** — a grace beat after the collapse settles, the timer clears `heldWidth` and
+  recenters, even with no further user action.
+- **Consecutive step-back** — does NOT reset; it extends the hold (keeps the max `heldWidth`, §2) and
+  reschedules the auto-release timer.
 
 **Lateral-move edge (named):** a jump to a *sibling*/unrelated subtree (not ancestor, not descendant)
-counts as non-step-back → zeroes the pad + recenters. That is correct: the user is navigating
+counts as non-step-back → clears the hold + recenters. That is correct: the user is navigating
 somewhere genuinely new, so the "hold where you were" contract does not apply.
 
 ---
