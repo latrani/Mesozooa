@@ -3,11 +3,15 @@
   import { viewport } from "../../viewport.svelte";
   import BottomSheet from "../../components/BottomSheet.svelte";
 
-  let { cluster, placard, tree, sheetExpanded = $bindable(false) }: {
+  let { cluster, placard, tree, extraPanel, sheetExpanded = $bindable(false) }: {
     cluster: Snippet;
     /** rendered twice on phone (peek row + expanded card) and once on desktop; the flag says which */
     placard: Snippet<[boolean]>;
     tree: Snippet<[number]>;
+    /** optional card stacked --space-4 below the specimen, scrolling with it. Rendered in the
+        desktop float and the phone drawer body. GameBoard passes it for the selected-node info
+        panel (#69); Explorer never does. */
+    extraPanel?: Snippet;
     /** phone only: lets a consumer force the sheet open, e.g. GameBoard on end state */
     sheetExpanded?: boolean;
   } = $props();
@@ -81,6 +85,9 @@
     {#if !viewport.isPhone}
       <div class="specimen-float" bind:this={placardEl} bind:clientWidth={placardW}>
         {@render placard(false)}
+        {#if extraPanel}
+          <div class="extra-panel">{@render extraPanel()}</div>
+        {/if}
       </div>
     {/if}
   </div>
@@ -93,6 +100,9 @@
     <BottomSheet bind:expanded={sheetExpanded}>
       {#snippet peek()}{@render placard(true)}{/snippet}
       {@render placard(false)}
+      {#if extraPanel}
+        <div class="extra-panel">{@render extraPanel()}</div>
+      {/if}
     </BottomSheet>
   {/if}
 </div>
@@ -101,6 +111,10 @@
   /* Shared board skeleton. Desktop: top cluster with a floating placard, tree owns the body.
      Phone: input band pegged top, tree owns the middle, plaque sheet pegged bottom. */
   .board { display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative; }
+
+  /* The optional second panel (selected-node info, #69) sits --space-4 below the specimen and
+     scrolls with it — inside the fixed float on desktop, inside the drawer body on phone. */
+  .extra-panel { margin-top: var(--space-4); }
 
   @media (min-width: 641px) {
     .board { flex: 1 1 auto; min-height: 0; gap: 0; padding: 0; }
