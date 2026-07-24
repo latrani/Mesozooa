@@ -8,7 +8,7 @@
   import SpecimenPlacard from "./SpecimenPlacard.svelte";
   import BoardLayout from "./BoardLayout.svelte";
   import { statsModal } from "../../components/statsModal.svelte";
-  import { specimenView } from "../specimen-view";
+  import { specimenView, nodeView } from "../specimen-view";
   import type { WarmthProvider } from "../warmth";
   import { viewport } from "../../viewport.svelte";
 
@@ -47,10 +47,23 @@
   );
   let availableEntries = $derived(playableEntries.filter((e) => !guessedIds.has(e.id)));
 
-  let highlightId = $state<string | null>(null);
+  // The single selection: a revealed node whose info panel is shown (below the specimen). Set by
+  // tree clicks and guess-chip clicks; drives the tree ring (highlightId), a pan, and the panel.
+  let selectedId = $state<string | null>(null);
+  // Any new guess clears the selection (#69: "when I make a new guess, unselect/hide the other
+  // one"). Tracking the count means this fires on each guess, not only when the list empties.
   $effect(() => {
-    if (store.state.guesses.length === 0) highlightId = null;
+    void store.state.guesses.length;
+    selectedId = null;
   });
+
+  // Toggle a node's selection: clicking the already-selected node clears it, else selects it.
+  // Play-mode only — does NOT touch tipId, so the warmth-anchored spine stays put; it only rings,
+  // pans, and opens the panel.
+  function selectNode(id: string) {
+    selectedId = selectedId === id ? null : id;
+    if (selectedId) spine?.panTo(id);
+  }
 
   // guessId -> warmth fraction, so each guessed genus dot in the tree matches its bar color.
   let guessWarmth = $derived.by(() => {
@@ -117,7 +130,7 @@
   });
 </script>
 
-<BoardLayout bind:sheetExpanded>
+<BoardLayout bind:sheetExpanded hasExtraPanel={selectedId != null && treeStore.getNode(selectedId) != null}>
   {#snippet cluster()}
     {#if ended}
       <!-- End state reuses the input row's geometry: banner in the field's place, end actions
@@ -159,7 +172,7 @@
       targetId={won ? store.state.target : null}
       revealId={ended && !won ? store.state.target : null}
       warmestId={store.warmestId}
-      onselect={(id) => { highlightId = id; spine?.panTo(id); }}
+      onselect={(id) => { selectedId = id; spine?.panTo(id); }}
     />
   {/snippet}
 
@@ -173,14 +186,21 @@
       revealed={treeRevealed}
       tipId={treeTipId}
       {guessWarmth}
-      {highlightId}
+      highlightId={selectedId}
       {rightInset}
       showCounts={false}
       speakShared
       warmthProvider={store.warmthProvider}
-      onnodeselect={ended && onexplore ? (id) => onexplore(id) : undefined}
+      onnodeselect={ended ? (onexplore ? (id) => onexplore(id) : undefined) : selectNode}
       linkLabels={ended}
+      focusOnClick={false}
     />
+  {/snippet}
+
+  {#snippet extraPanel(peek: boolean)}
+    {#if selectedId && treeStore.getNode(selectedId)}
+      <SpecimenPlacard view={nodeView(treeStore.getNode(selectedId)!)} {peek} />
+    {/if}
   {/snippet}
 </BoardLayout>
 

@@ -3,14 +3,31 @@
   import { viewport } from "../../viewport.svelte";
   import BottomSheet from "../../components/BottomSheet.svelte";
 
-  let { cluster, placard, tree, sheetExpanded = $bindable(false) }: {
+  let { cluster, placard, tree, extraPanel, hasExtraPanel = false, sheetExpanded = $bindable(false) }: {
     cluster: Snippet;
     /** rendered twice on phone (peek row + expanded card) and once on desktop; the flag says which */
     placard: Snippet<[boolean]>;
     tree: Snippet<[number]>;
+    /** optional card stacked --space-4 below the specimen, scrolling with it. On desktop it sits in
+        the floating block; on phone it becomes a second peer card in the drawer (so it takes the
+        same peek/full flag placard does — peek = its header row). GameBoard passes it for the
+        selected-node info panel (#69); Explorer never does. */
+    extraPanel?: Snippet<[boolean]>;
+    /** whether extraPanel currently has content to show. Gates the desktop wrapper and the phone
+        second card, so an unselected state renders exactly one card (no empty peer). */
+    hasExtraPanel?: boolean;
     /** phone only: lets a consumer force the sheet open, e.g. GameBoard on end state */
     sheetExpanded?: boolean;
   } = $props();
+
+  // Phone drawer cards: the specimen always; the selected-node panel as a second peer card only
+  // when it has content. Built here so the snippet refs (defined at the end of the markup) are the
+  // single source for both the desktop float and the phone drawer.
+  let sheetCards = $derived(
+    hasExtraPanel && extraPanel
+      ? [{ head: specimenHead, body: specimenBody }, { head: extraHead, body: extraBody }]
+      : [{ head: specimenHead, body: specimenBody }],
+  );
 
   // Desktop measures the floating placard so the tree centers into the area LEFT of it. On phone
   // the placard is a bottom sheet in flow, so there is no inset.
@@ -81,6 +98,9 @@
     {#if !viewport.isPhone}
       <div class="specimen-float" bind:this={placardEl} bind:clientWidth={placardW}>
         {@render placard(false)}
+        {#if hasExtraPanel && extraPanel}
+          <div class="extra-panel">{@render extraPanel(false)}</div>
+        {/if}
       </div>
     {/if}
   </div>
@@ -90,17 +110,25 @@
   </div>
 
   {#if viewport.isPhone}
-    <BottomSheet bind:expanded={sheetExpanded}>
-      {#snippet peek()}{@render placard(true)}{/snippet}
-      {@render placard(false)}
-    </BottomSheet>
+    <BottomSheet bind:expanded={sheetExpanded} cards={sheetCards} />
   {/if}
 </div>
+
+<!-- Phone drawer cards: the specimen always, then the selected-node panel when present. Each card
+     is {head, body} — head is the placard's peek row (title + note), body its full content. -->
+{#snippet specimenHead()}{@render placard(true)}{/snippet}
+{#snippet specimenBody()}{@render placard(false)}{/snippet}
+{#snippet extraHead()}{@render extraPanel?.(true)}{/snippet}
+{#snippet extraBody()}{@render extraPanel?.(false)}{/snippet}
 
 <style>
   /* Shared board skeleton. Desktop: top cluster with a floating placard, tree owns the body.
      Phone: input band pegged top, tree owns the middle, plaque sheet pegged bottom. */
   .board { display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative; }
+
+  /* The optional second panel (selected-node info, #69) sits --space-4 below the specimen and
+     scrolls with it — inside the fixed float on desktop, inside the drawer body on phone. */
+  .extra-panel { margin-top: var(--space-4); }
 
   @media (min-width: 641px) {
     .board { flex: 1 1 auto; min-height: 0; gap: 0; padding: 0; }
