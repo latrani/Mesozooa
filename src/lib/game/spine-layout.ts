@@ -231,3 +231,42 @@ export function centerOffsetFor(depth: number, m: ViewMetrics): number {
   const max = Math.max(0, m.contentWidth - m.viewportWidth);
   return Math.min(Math.max(0, raw), max);
 }
+
+/**
+ * A "step-back" move: the new tip is a PROPER ancestor of the old tip (navigating shallower in the
+ * same lineage). `pathToRoot(id)` includes `id` itself, so the `newTip !== oldTip` guard is required
+ * — without it, a same-node no-op would report as a step-back. Returns false on first mount
+ * (oldTip null) and for forward/lateral moves.
+ */
+export function isStepBack(store: TreeStore, oldTip: string | null, newTip: string): boolean {
+  if (!oldTip || oldTip === newTip) return false;
+  return store.pathToRoot(oldTip).includes(newTip);
+}
+
+/**
+ * Extra runway px a step-back must reserve so the scroll clamp can't yank the frozen view when the
+ * collapsing branch shrinks `contentWidth`. Clamped at 0 so a forward/lateral move (which grows or
+ * keeps the width) can never produce negative padding. See the "coyote time" note in the spec.
+ */
+export function coyotePadDelta(oldWidth: number, newWidth: number, xGap: number): number {
+  return Math.max(0, (oldWidth - newWidth) * xGap);
+}
+
+/**
+ * Keep-visible pan for ONE axis: given a node coordinate (in scaled content px), the current scroll
+ * offset, the viewport length, an edge margin, and the max scroll, return the new scroll offset that
+ * keeps the coord at least `margin` inside both edges — unchanged when it already is. Result clamped
+ * to [0, maxScroll]. Extracted from scrollFocusIntoView so the step-back vertical nudge can reuse it.
+ */
+export function keepVisible1D(
+  coord: number,
+  scroll: number,
+  viewportLen: number,
+  margin: number,
+  maxScroll: number,
+): number {
+  let next = scroll;
+  if (coord < scroll + margin) next = coord - margin;
+  else if (coord > scroll + viewportLen - margin) next = coord - viewportLen + margin;
+  return Math.min(Math.max(0, next), maxScroll);
+}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { treeStore } from "../treeData";
-  import { layoutSpine, centerOffsetFor, edgePathBetween } from "../spine-layout";
+  import { layoutSpine, centerOffsetFor, edgePathBetween, isStepBack, coyotePadDelta, keepVisible1D } from "../spine-layout";
   import { a11yTree, buildNav, resolveKey, a11yLabel } from "../a11y-tree";
   import { displayName } from "../displayName";
   import { scrollFade } from "../../actions/scrollFade";
@@ -212,12 +212,17 @@
     // is what triggered this layout, so it's already fresh.
     const tip = untrack(() => tipId);
     const atDefaultZoom = untrack(() => zoom === defaultZoomFor(viewport.isPhone));
-    if (!reduceMotion && fromPos.size > 0 && atDefaultZoom && scroller && tip) {
+    // On a step-back, do NOT arm the scroll animation: the driver (next effect) would otherwise glide
+    // scrollLeft to the recenter target before the tip-change effect can stop it (effect-ordering bug,
+    // spec §1d). lastTipId is still the old tip here (the tip-change effect updates it later this
+    // flush), so isStepBack classifies the pending move correctly.
+    const steppingBack = !!tip && isStepBack(treeStore, untrack(() => lastTipId), tip);
+    if (!reduceMotion && fromPos.size > 0 && atDefaultZoom && scroller && tip && !steppingBack) {
       scrollFrom = { left: scroller.scrollLeft, top: scroller.scrollTop };
       scrollTargetPx = untrack(() => scrollTargetFor(tip));
     } else {
       scrollFrom = null;
-      scrollTargetPx = null; // let the tip-change effect scroll natively (or instant)
+      scrollTargetPx = null; // step-back OR non-animated path: let the tip-change effect handle scroll
     }
 
     if (reduceMotion || fromPos.size === 0) {
@@ -411,7 +416,22 @@
   // The specimen clearance is a FIXED-px runway (a spacer element after the SVG), NOT canvas baked
   // into the viewBox — so it stays a constant screen-px gutter at every zoom (issue #32). The SVG
   // draws the tree only (0..contentWidth); `runway` is the scroll distance past its right edge.
-  let runway = $derived(contentWidth ? rightInset : 0);
+  // "Coyote time" (issue #66): on a step-back the camera is frozen (see the tip-change effect) and
+  // the collapsing branch shrinks contentWidth — which would drop the scroll clamp ceiling and yank
+  // the frozen view leftward. `coyotePad` (unscaled content px) reserves the collapsed columns'
+  // width so scrollWidth doesn't shrink under the held scrollLeft. Named for platformer "coyote
+  // time": the ground stays under you a beat after you'd otherwise fall (Wile E. doesn't drop till
+  // he looks down). It zeroes on any deliberate recenter (forward/lateral tip, or ⌂). Default-zoom
+  // only, matching the FLIP scroll driver's atDefaultZoom gate.
+  //
+  // CRITICAL (root cause, spec §1e): coyotePad MUST be a $derived off layout.width, NOT an $effect —
+  // so the runway grows in the SAME reactive/render pass that contentWidth shrinks. An $effect runs a
+  // pass later, leaving a sub-frame where scrollWidth dips and the browser natively clamps scrollLeft
+  // (the ~82px slide). `heldWidth` snapshots the pre-collapse width synchronously at the step-back
+  // commit (onNodeClick / onTreeKey Enter), before the store mutates; null = no hold.
+  let heldWidth = $state<number | null>(null);
+  let coyotePad = $derived(heldWidth != null ? coyotePadDelta(heldWidth, layout.width, X_GAP) : 0);
+  let runway = $derived(contentWidth ? rightInset + coyotePad : 0);
   // Total scrollable content width at zoom=1: scaled tree + fixed runway. centerOffsetFor and the
   // scroll-fade dependency read this.
   let scrollWidth = $derived(contentWidth ? contentWidth + runway : 0);
@@ -494,6 +514,7 @@
   const KEEP_VISIBLE_MARGIN_Y = 60;
   function scrollFocusIntoView(id: string) {
     if (!scroller) return;
+    if (suppressFocusScroll) { suppressFocusScroll = false; return; }
     const n = posOf.get(id);
     if (!n) return;
     const nodeX = px(n.x) * zoom;
@@ -502,16 +523,8 @@
     const maxLeft = Math.max(0, contentWidth * zoom + runway - scroller.clientWidth);
     const maxTop = Math.max(0, vbH * zoom - scroller.clientHeight);
 
-    let left = scroller.scrollLeft;
-    if (nodeX < left + KEEP_VISIBLE_MARGIN_X) left = nodeX - KEEP_VISIBLE_MARGIN_X;
-    else if (nodeX > left + viewW - KEEP_VISIBLE_MARGIN_X) left = nodeX - viewW + KEEP_VISIBLE_MARGIN_X;
-
-    let top = scroller.scrollTop;
-    if (nodeY < top + KEEP_VISIBLE_MARGIN_Y) top = nodeY - KEEP_VISIBLE_MARGIN_Y;
-    else if (nodeY > top + scroller.clientHeight - KEEP_VISIBLE_MARGIN_Y) top = nodeY - scroller.clientHeight + KEEP_VISIBLE_MARGIN_Y;
-
-    left = Math.min(Math.max(0, left), maxLeft);
-    top = Math.min(Math.max(0, top), maxTop);
+    const left = keepVisible1D(nodeX, scroller.scrollLeft, viewW, KEEP_VISIBLE_MARGIN_X, maxLeft);
+    const top = keepVisible1D(nodeY, scroller.scrollTop, scroller.clientHeight, KEEP_VISIBLE_MARGIN_Y, maxTop);
     if (left !== scroller.scrollLeft || top !== scroller.scrollTop) {
       scroller.scrollTo({ left, top, behavior: reduceMotion ? "auto" : "smooth" });
     }
@@ -545,8 +558,26 @@
   // clicking IS navigation, grabs focus. The click may relayout (Explore re-center) and rebuild the
   // <li>s; focusItem sets focusId + treeFocused (via onItemFocus), and the focus-restore effect
   // re-focuses the rebuilt item, so keyboard position survives the rebuild.
+  // Set for one step-back click: suppresses the focus-driven keep-visible scroll so the tip-change
+  // effect is the ONLY thing that moves the viewport (spec §1b — otherwise the click's focus pans the
+  // camera forward horizontally before the effect freezes it). Cleared on read in scrollFocusIntoView.
+  let suppressFocusScroll = false;
+  // A step-back COMMIT, evaluated BEFORE the store mutates, so `tipId` is still the old tip. Captures
+  // the width-hold floor SYNCHRONOUSLY (root cause §1e): coyotePad derives off heldWidth, so setting it
+  // here — in the same task that triggers the relayout — means the runway is already grown when
+  // contentWidth shrinks in the render pass, with no scrollWidth dip. Consecutive step-backs keep the
+  // max (the original pre-collapse floor). Also arms suppressFocusScroll. `next` is the resolved NEXT
+  // tip id. Exported so store-driven jumps (recent-trail chip / search) can capture the hold too — they
+  // bypass onNodeClick but still reach the step-back branch via the tip-change classifier, so without
+  // this they'd take the branch with heldWidth==null → the scrollWidth dip returns (final-review #1).
+  export function commitStepBack(next: string): void {
+    if (!(tipId && isStepBack(treeStore, tipId, next))) return;
+    heldWidth = heldWidth == null ? layout.width : Math.max(heldWidth, layout.width);
+    suppressFocusScroll = true;
+  }
   function onNodeClick(id: string) {
     if (!onnodeselect) return;
+    commitStepBack(id);
     onnodeselect(id);
     focusItem(id);
   }
@@ -556,6 +587,7 @@
     if (!cur) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
+      if (onnodeselect) commitStepBack(cur); // gate on onnodeselect, matching onNodeClick (no game side-effects)
       onnodeselect?.(cur); // identical to a mouse click (undefined during game play = no-op)
       return;
     }
@@ -623,6 +655,8 @@
   // Return to the default view: 1:1, re-centered on the current tip.
   function resetZoom() {
     zoom = defaultZoomFor(viewport.isPhone);
+    cancelCoyoteRelease(); // ⌂ recenters now; drop any pending auto-release so it can't double-fire
+    heldWidth = null; // ⌂ is the explicit "put me back": drop the coyote-time width-hold, re-clamp normally
     requestAnimationFrame(() => { if (tipId) scrollToNode(tipId); });
   }
 
@@ -637,19 +671,58 @@
   // regress its forward-follow feel; Explore's tip jumps freely, giving click-to-center.
   let lastTipId: string | null = null;
   let lastInset = -1;
+  // "Coyote time" release: after a step-back's collapse-in-place settles, we drop the width-hold and
+  // recenter on the tip so the reserved dead space doesn't linger. Two beats, deliberately separated
+  // in time (spec §1f): retract-in-place first (frozen camera), THEN — a grace beat later — pan to
+  // center. Rescheduled on every consecutive step-back, so the release fires once stepping-back STOPS,
+  // not between rapid steps. Cleared on any other navigation / recenter so it can't fire stale.
+  let coyoteReleaseTimer: ReturnType<typeof setTimeout> | null = null;
+  function cancelCoyoteRelease() {
+    if (coyoteReleaseTimer) { clearTimeout(coyoteReleaseTimer); coyoteReleaseTimer = null; }
+  }
+  // Clear a pending release on unmount (tab switch within the grace beat destroys this component).
+  // Safe even without this — scrollToNode guards on !scroller and the heldWidth write is inert
+  // post-destroy — but explicit teardown beats relying on downstream guards.
+  $effect(() => () => cancelCoyoteRelease());
+  function scheduleCoyoteRelease() {
+    cancelCoyoteRelease();
+    if (reduceMotion) { heldWidth = null; if (tipId) scrollToNode(tipId); return; } // no grace beat: settle at once
+    // Wait for the collapse FLIP (GLIDE_MS) to finish + a short grace beat, then release the width-hold
+    // and recenter on the tip via the native smooth scroll (scrollToNode) — a distinct second motion.
+    coyoteReleaseTimer = setTimeout(() => {
+      coyoteReleaseTimer = null;
+      heldWidth = null; // drops coyotePad → scrollWidth shrinks; scrollToNode then pans to the valid center
+      if (tipId) scrollToNode(tipId);
+    }, GLIDE_MS + 40);
+  }
   $effect(() => {
     const d = tipId ? (posOf.get(tipId)?.depth ?? -1) : -1;
     void scrollWidth; // re-run when the scrollable width changes too
     if (scroller && tipId && d >= 0) {
       if (tipId !== lastTipId) {
-        // If the FLIP's scroll driver is handling this re-center (shared-clock animation, set in the
-        // relayout effect above), don't ALSO fire the native scroll — that's the race we removed.
-        // Still reset zoom to default; just skip the competing scrollToNode.
-        // INVARIANT: `scrollTargetPx` is refreshed by the FLIP effect (declared earlier) on EVERY
-        // layout change before this reads it — and a tipId change always forces a layout change — so
-        // it's never stale here. Don't reorder these effects or read scrollTargetPx without that.
-        if (scrollTargetPx) zoom = defaultZoomFor(viewport.isPhone);
-        else resetZoom(); // zoomed / non-animated path: native re-center as before
+        if (isStepBack(treeStore, lastTipId, tipId)) {
+          // Step-back: freeze scrollLeft (no forward slide) but keep the new tip VISIBLE vertically —
+          // the collapse re-splays the fan around a new minY, so a frozen scrollTop can strand the tip
+          // off-screen (spec §1a). Null the FLIP scroll target so the shared-clock driver doesn't
+          // animate. The horizontal width-hold is coyotePad, a $derived off heldWidth captured
+          // synchronously in the commit handler (root cause §1e) — NOT set here (an effect-set pad
+          // races the render and lets scrollWidth dip → native clamp → the ~82px slide).
+          scrollTargetPx = null;
+          const n = posOf.get(tipId);
+          if (n) {
+            const maxTop = Math.max(0, vbH * zoom - scroller.clientHeight);
+            const top = keepVisible1D(py(n.y) * zoom, scroller.scrollTop, scroller.clientHeight, KEEP_VISIBLE_MARGIN_Y, maxTop);
+            if (top !== scroller.scrollTop) scroller.scrollTo({ left: scroller.scrollLeft, top, behavior: reduceMotion ? "auto" : "smooth" });
+          }
+          scheduleCoyoteRelease(); // auto-release the gap a grace beat after the collapse settles
+        } else {
+          // Forward / lateral (deeper tip, sibling, search jump, history chip): recenter as before,
+          // and drop the width-hold — the tree re-extends / moves, so held dead space is stale.
+          cancelCoyoteRelease();
+          heldWidth = null;
+          if (scrollTargetPx) zoom = defaultZoomFor(viewport.isPhone);
+          else resetZoom();
+        }
       } else if (rightInset !== lastInset) {
         scrollToNode(tipId);
       }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { layoutSpine, centerOffsetFor, edgePathBetween } from "./spine-layout";
+import { layoutSpine, centerOffsetFor, edgePathBetween, isStepBack, coyotePadDelta, keepVisible1D } from "./spine-layout";
 import { createTreeStore } from "./treeStore";
 import { assembleTree, pruneSubtree } from "../tree/assemble";
 import { markPlayable } from "../tree/playable";
@@ -306,5 +306,50 @@ describe("centerOffsetFor", () => {
     // max scroll is governed by the whole scroller (contentWidth - viewportWidth = 1400),
     // not the inset window — a deep node must not scroll past the content end.
     expect(centerOffsetFor(50, { ...m, rightInset: 200 })).toBe(1400);
+  });
+});
+
+describe("isStepBack", () => {
+  it("is true when the new tip is a proper ancestor of the old tip", () => {
+    expect(isStepBack(store, "TF", "T")).toBe(true);   // parent
+    expect(isStepBack(store, "TR", "T")).toBe(true);    // grandparent
+    expect(isStepBack(store, "TF", "Q430")).toBe(true); // the root
+  });
+  it("is false for forward, lateral, same-node, and first-mount moves", () => {
+    expect(isStepBack(store, "T", "TF")).toBe(false);   // deeper (forward)
+    expect(isStepBack(store, "TF", "O")).toBe(false);   // sibling subtree (lateral)
+    expect(isStepBack(store, "TF", "TF")).toBe(false);  // same node (pathToRoot includes self)
+    expect(isStepBack(store, null, "TF")).toBe(false);  // first mount
+  });
+});
+
+describe("coyotePadDelta", () => {
+  it("reserves the collapsed columns' width", () => {
+    expect(coyotePadDelta(10, 9, 200)).toBe(200);  // one column lost
+    expect(coyotePadDelta(10, 7, 200)).toBe(600);  // three columns lost
+  });
+  it("clamps at 0 when width did not shrink (forward/lateral misclassification is harmless)", () => {
+    expect(coyotePadDelta(9, 10, 200)).toBe(0);    // grew
+    expect(coyotePadDelta(9, 9, 200)).toBe(0);     // unchanged
+  });
+});
+
+describe("keepVisible1D", () => {
+  // viewportLen 1000, margin 100, maxScroll 5000
+  it("leaves scroll unchanged when the coord is comfortably inside the margins", () => {
+    // coord 600, scroll 200 → visible pos 400, within [100, 900] → unchanged
+    expect(keepVisible1D(600, 200, 1000, 100, 5000)).toBe(200);
+  });
+  it("pans so a coord past the near margin sits at the margin", () => {
+    // coord 150, scroll 200 → visible pos -50 (< 100) → new scroll = 150 - 100 = 50
+    expect(keepVisible1D(150, 200, 1000, 100, 5000)).toBe(50);
+  });
+  it("pans so a coord past the far margin sits at viewportLen - margin", () => {
+    // coord 1150, scroll 200 → visible pos 950 (> 900) → new scroll = 1150 - 1000 + 100 = 250
+    expect(keepVisible1D(1150, 200, 1000, 100, 5000)).toBe(250);
+  });
+  it("clamps the result to [0, maxScroll]", () => {
+    expect(keepVisible1D(20, 200, 1000, 100, 5000)).toBe(0);      // would be -80 → 0
+    expect(keepVisible1D(9999, 200, 1000, 100, 5000)).toBe(5000); // far past → clamp to maxScroll
   });
 });
