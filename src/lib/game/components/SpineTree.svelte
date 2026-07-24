@@ -566,18 +566,24 @@
   // the width-hold floor SYNCHRONOUSLY (root cause §1e): coyotePad derives off heldWidth, so setting it
   // here — in the same task that triggers the relayout — means the runway is already grown when
   // contentWidth shrinks in the render pass, with no scrollWidth dip. Consecutive step-backs keep the
-  // max (the original pre-collapse floor). Also arms suppressFocusScroll. `next` is the resolved NEXT
-  // tip id. Exported so store-driven jumps (recent-trail chip / search) can capture the hold too — they
-  // bypass onNodeClick but still reach the step-back branch via the tip-change classifier, so without
-  // this they'd take the branch with heldWidth==null → the scrollWidth dip returns (final-review #1).
-  export function commitStepBack(next: string): void {
+  // max (the original pre-collapse floor). `next` is the resolved NEXT tip id. Exported so store-driven
+  // jumps (recent-trail chip / search) can capture the hold too — they bypass onNodeClick but still
+  // reach the step-back branch via the tip-change classifier, so without this they'd take the branch
+  // with heldWidth==null → the scrollWidth dip returns (final-review #1).
+  //
+  // `suppressFocus` arms the one-shot suppressFocusScroll flag, which no-ops the NEXT focus-driven
+  // scrollFocusIntoView so it can't fight the step-back's own scroll handling. It's a separate concern
+  // from the width-hold: pass true ONLY when a focus scroll will actually follow this commit (click,
+  // Enter's focus-restore, chip's focusNode). A bare search jump does NOT focus a node, so arming there
+  // would leave the flag dangling to swallow a later unrelated pan (issue #68) — pass false.
+  export function commitStepBack(next: string, suppressFocus: boolean): void {
     if (!(tipId && isStepBack(treeStore, tipId, next))) return;
     heldWidth = heldWidth == null ? layout.width : Math.max(heldWidth, layout.width);
-    suppressFocusScroll = true;
+    if (suppressFocus) suppressFocusScroll = true;
   }
   function onNodeClick(id: string) {
     if (!onnodeselect) return;
-    commitStepBack(id);
+    commitStepBack(id, true); // focusItem below fires the focus scroll to suppress
     onnodeselect(id);
     focusItem(id);
   }
@@ -587,7 +593,9 @@
     if (!cur) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      if (onnodeselect) commitStepBack(cur); // gate on onnodeselect, matching onNodeClick (no game side-effects)
+      // gate on onnodeselect, matching onNodeClick (no game side-effects). suppressFocus=true: the
+      // relayout's focus-restore effect re-focuses the rebuilt li → a focus scroll follows.
+      if (onnodeselect) commitStepBack(cur, true);
       onnodeselect?.(cur); // identical to a mouse click (undefined during game play = no-op)
       return;
     }
