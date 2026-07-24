@@ -130,7 +130,7 @@
   });
 </script>
 
-<BoardLayout bind:sheetExpanded>
+<BoardLayout bind:sheetExpanded hasExtraPanel={selectedId != null && treeStore.getNode(selectedId) != null}>
   {#snippet cluster()}
     {#if ended}
       <!-- End state reuses the input row's geometry: banner in the field's place, end actions
@@ -197,9 +197,9 @@
     />
   {/snippet}
 
-  {#snippet extraPanel()}
+  {#snippet extraPanel(peek: boolean)}
     {#if selectedId && treeStore.getNode(selectedId)}
-      <SpecimenPlacard view={nodeView(treeStore.getNode(selectedId)!)} />
+      <SpecimenPlacard view={nodeView(treeStore.getNode(selectedId)!)} {peek} />
     {/if}
   {/snippet}
 </BoardLayout>
