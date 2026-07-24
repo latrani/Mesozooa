@@ -318,9 +318,17 @@ any deliberate recenter, plus the §1f auto-release:
 - **Forward navigation (deeper tip)** — the forward/lateral branch of the §1 classifier (the `else`
   of the ancestor test) cancels any pending auto-release and clears `heldWidth` before recentering;
   the tree re-extends, so a stale hold would strand dead space.
-- **Search jump / history chip** — `jumpTo()` lands on an arbitrary taxon; by the ancestor test the
-  target is not an ancestor of the old tip, so it flows through the same forward/lateral branch. No
-  separate wiring — it falls out of the classifier.
+- **Search jump / history chip** — `jumpTo()` lands on an arbitrary taxon. **Correction (final review
+  #1):** an earlier draft claimed such a target "is not an ancestor of the old tip" and so always flows
+  through forward/lateral. That is FALSE — the recent trail records nodes you drilled *through*, so its
+  chips are frequently ancestors of the current tip, and jumping back up the trail is its main use. A
+  chip/search jump to an ancestor DOES hit the step-back branch via the classifier. Therefore the jump
+  paths must ALSO capture the width-hold: `Explorer.svelte`'s `jumpTo`/search `onpick` call
+  `spine.commitStepBack(resolvedNextTip)` (SpineTree exposes it) BEFORE `explorer.jumpTo`, resolving the
+  next tip via `resolveSearchPick` (= `selectedGenusId ?? focusId`, matching `highlightId`). Without
+  this, a trail/search step-back takes the branch with `heldWidth == null` → the §1e scrollWidth dip
+  returns. A non-ancestor jump is a no-op (the `isStepBack` guard inside `commitStepBack`), so
+  forward/lateral jumps still just recenter.
 - **Auto-release (§1f)** — a grace beat after the collapse settles, the timer clears `heldWidth` and
   recenters, even with no further user action.
 - **Consecutive step-back** — does NOT reset; it extends the hold (keeps the max `heldWidth`, §2) and

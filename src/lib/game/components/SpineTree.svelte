@@ -562,12 +562,15 @@
   // effect is the ONLY thing that moves the viewport (spec §1b — otherwise the click's focus pans the
   // camera forward horizontally before the effect freezes it). Cleared on read in scrollFocusIntoView.
   let suppressFocusScroll = false;
-  // A step-back COMMIT (mouse or keyboard), evaluated BEFORE onnodeselect mutates the store, so `tipId`
-  // is still the old tip. Captures the width-hold floor SYNCHRONOUSLY (root cause §1e): coyotePad
-  // derives off heldWidth, so setting it here — in the same task that triggers the relayout — means the
-  // runway is already grown when contentWidth shrinks in the render pass, with no scrollWidth dip.
-  // Consecutive step-backs keep the max (the original pre-collapse floor). Also arms suppressFocusScroll.
-  function commitStepBack(next: string): void {
+  // A step-back COMMIT, evaluated BEFORE the store mutates, so `tipId` is still the old tip. Captures
+  // the width-hold floor SYNCHRONOUSLY (root cause §1e): coyotePad derives off heldWidth, so setting it
+  // here — in the same task that triggers the relayout — means the runway is already grown when
+  // contentWidth shrinks in the render pass, with no scrollWidth dip. Consecutive step-backs keep the
+  // max (the original pre-collapse floor). Also arms suppressFocusScroll. `next` is the resolved NEXT
+  // tip id. Exported so store-driven jumps (recent-trail chip / search) can capture the hold too — they
+  // bypass onNodeClick but still reach the step-back branch via the tip-change classifier, so without
+  // this they'd take the branch with heldWidth==null → the scrollWidth dip returns (final-review #1).
+  export function commitStepBack(next: string): void {
     if (!(tipId && isStepBack(treeStore, tipId, next))) return;
     heldWidth = heldWidth == null ? layout.width : Math.max(heldWidth, layout.width);
     suppressFocusScroll = true;
@@ -584,7 +587,7 @@
     if (!cur) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      commitStepBack(cur);
+      if (onnodeselect) commitStepBack(cur); // gate on onnodeselect, matching onNodeClick (no game side-effects)
       onnodeselect?.(cur); // identical to a mouse click (undefined during game play = no-op)
       return;
     }
@@ -677,6 +680,10 @@
   function cancelCoyoteRelease() {
     if (coyoteReleaseTimer) { clearTimeout(coyoteReleaseTimer); coyoteReleaseTimer = null; }
   }
+  // Clear a pending release on unmount (tab switch within the grace beat destroys this component).
+  // Safe even without this — scrollToNode guards on !scroller and the heldWidth write is inert
+  // post-destroy — but explicit teardown beats relying on downstream guards.
+  $effect(() => () => cancelCoyoteRelease());
   function scheduleCoyoteRelease() {
     cancelCoyoteRelease();
     if (reduceMotion) { heldWidth = null; if (tipId) scrollToNode(tipId); return; } // no grace beat: settle at once

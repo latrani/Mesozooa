@@ -1,7 +1,7 @@
 <script lang="ts">
   import { treeStore } from "../../game/treeData";
   import { explorer } from "../explorerStore.svelte";
-  import { searchSource, pathPositions } from "../explorer-core";
+  import { searchSource, pathPositions, resolveSearchPick } from "../explorer-core";
   import SpineTree from "../../game/components/SpineTree.svelte";
   import { displayName } from "../../game/displayName";
   import { warmthRampColor } from "../../game/warmth-ramp";
@@ -35,8 +35,17 @@
   // jumps to — same as clicking the node in the tree. Selecting from the trail is just another way
   // to select a node, so it should leave focus ready for arrow navigation.
   let spine = $state<SpineTree>();
-  function jumpAndFocus(id: string) {
+  // Resolve the tip a jump will land on (matches explorer.highlightId = selectedGenusId ?? focusId),
+  // so a store-driven jump BACK UP the tree (recent chip / search to an ancestor) captures the
+  // coyote-time width-hold synchronously — same as a tree-click step-back (final-review #1). Must run
+  // BEFORE the jump mutates the store, since commitStepBack reads the still-old tipId.
+  function jumpTo(id: string) {
+    const pick = resolveSearchPick(treeStore, id);
+    spine?.commitStepBack(pick.selectedGenusId ?? pick.focusId);
     explorer.jumpTo(id);
+  }
+  function jumpAndFocus(id: string) {
+    jumpTo(id);
     spine?.focusNode(id);
   }
 
@@ -72,7 +81,7 @@
 <main class="explorer">
   <BoardLayout>
     {#snippet cluster()}
-      <SearchBox id="explore" entries={taxa} onpick={(id) => explorer.jumpTo(id)} placeholder="Find any taxon…" />
+      <SearchBox id="explore" entries={taxa} onpick={jumpTo} placeholder="Find any taxon…" />
       {#if recent.length}
         <ul
           class="recent"
