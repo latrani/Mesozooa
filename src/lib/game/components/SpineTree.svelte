@@ -59,6 +59,7 @@
     speakShared = false,
     gradeByPlayable = false,
     linkLabels = false,
+    focusOnClick = true,
     warmthProvider,
   }: {
     revealed: Set<string>;
@@ -88,6 +89,12 @@
         clicks become portals into Explore — a new affordance appearing mid-session, so it has
         to announce itself. Off in Explore, where clicking the tree IS the mode. */
     linkLabels?: boolean;
+    /** a mouse click on a node moves keyboard focus INTO the tree (the ARIA "clicked treeitem
+        takes focus" pattern). On in Explore, where clicking IS navigation. Off in the game, where
+        a click only INSPECTS (opens the info panel) and must not steal focus from the search flow
+        — so the selection ring follows the committed highlight (selectedId) alone and clears on
+        toggle-off (#69). Keyboard nav is unaffected: it drives treeFocused via real focus events. */
+    focusOnClick?: boolean;
     /** drives on-spine node warmth colors; built per-game (target-aware). Absent in Explore,
         which injects nodeColor instead and never reaches ownWarmthColor. */
     warmthProvider?: import("../warmth").WarmthProvider;
@@ -583,9 +590,12 @@
   }
   function onNodeClick(id: string) {
     if (!onnodeselect) return;
-    commitStepBack(id, true); // focusItem below fires the focus scroll to suppress
+    // Pass focusOnClick as suppressFocus: only arm suppressFocusScroll when a focus scroll will
+    // actually follow (focusItem below). When focusOnClick is false (game inspect), skip both —
+    // arming the flag with no following scroll would leave it dangling (the #68 class of bug).
+    commitStepBack(id, focusOnClick);
     onnodeselect(id);
-    focusItem(id);
+    if (focusOnClick) focusItem(id);
   }
 
   function onTreeKey(e: KeyboardEvent) {

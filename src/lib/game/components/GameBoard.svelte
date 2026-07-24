@@ -193,6 +193,7 @@
       warmthProvider={store.warmthProvider}
       onnodeselect={ended ? (onexplore ? (id) => onexplore(id) : undefined) : selectNode}
       linkLabels={ended}
+      focusOnClick={false}
     />
   {/snippet}
 
