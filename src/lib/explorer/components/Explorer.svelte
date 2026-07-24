@@ -39,13 +39,16 @@
   // so a store-driven jump BACK UP the tree (recent chip / search to an ancestor) captures the
   // coyote-time width-hold synchronously — same as a tree-click step-back (final-review #1). Must run
   // BEFORE the jump mutates the store, since commitStepBack reads the still-old tipId.
-  function jumpTo(id: string) {
+  // suppressFocus: pass true only when a focus scroll follows (jumpAndFocus → focusNode). A bare
+  // search pick does NOT focus a node, so passing true would leave suppressFocusScroll dangling to
+  // swallow a later unrelated keep-visible pan (issue #68).
+  function jumpTo(id: string, suppressFocus = false) {
     const pick = resolveSearchPick(treeStore, id);
-    spine?.commitStepBack(pick.selectedGenusId ?? pick.focusId);
+    spine?.commitStepBack(pick.selectedGenusId ?? pick.focusId, suppressFocus);
     explorer.jumpTo(id);
   }
   function jumpAndFocus(id: string) {
-    jumpTo(id);
+    jumpTo(id, true); // focusNode below fires the focus scroll to suppress
     spine?.focusNode(id);
   }
 
