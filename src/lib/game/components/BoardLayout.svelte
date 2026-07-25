@@ -34,10 +34,10 @@
     const key = extraPanelKey;
     if (!viewport.isPhone || key == null) return;
     const n = untrack(() => sheetCards.length);
-    // tick() flushes the DOM patch (the card exists); a following rAF waits for layout to settle so
-    // revealCard measures the card's FINAL height, not a mid-add value — otherwise it under-pulls
-    // and the card lands partway. revealCard itself re-fires on late photo load (see BottomSheet).
-    tick().then(() => requestAnimationFrame(() => sheet?.revealCard(n - 1)));
+    // tick() flushes the DOM patch so the card exists to measure. revealCard uses transform-immune
+    // layout metrics (offsetTop/offsetHeight), so it lands correctly without waiting for the settle
+    // transition, and re-fires itself on late photo load (see BottomSheet).
+    tick().then(() => sheet?.revealCard(n - 1));
   });
 
   // Phone drawer cards: the specimen always; the selected-node panel as a second peer card only

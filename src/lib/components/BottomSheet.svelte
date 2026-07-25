@@ -54,27 +54,34 @@
 
   const offsetFor = (h: number, ph: number, p: number) => Math.max(0, (h - ph) - p);
 
-  // Reveal card `i` (#71): pull the drawer so that card is in full view if it fits, else top-align
-  // its top at PAD_TOP. Measurement-based and delta-driven: increasing `pull` by Δ slides the whole
-  // sheet UP by Δ px on screen (pull↑ → offset↓ → translateY↓), so we measure where the card is now
-  // and how far up it must move. `naturalBottom` = the sheet's resting bottom edge (undo the current
-  // translate: the on-screen bottom minus the current offset). A card FITS when, bottom-aligned to
-  // that edge, its top still clears PAD_TOP; then we move its bottom to naturalBottom. Otherwise it's
-  // taller than the window, so we move its top to PAD_TOP instead. setPull clamps to [0, maxPull].
+  // Reveal card `i` (#71): pull the drawer so that card is fully in view if it fits, else top-align
+  // its top at PAD_TOP. Solves for the TARGET pull directly from TRANSFORM-IMMUNE layout metrics —
+  // offsetTop/offsetHeight ignore the (possibly mid-animation) translate, so this lands correctly
+  // whether called at rest or during a settle transition (why it needs no rAF and can't misland on a
+  // re-entrant call). Geometry: the sheet is bottom-anchored inside the fixed inset:0 layer, so
+  //   restingBottom = s.offsetTop + s.offsetHeight   (viewport y of the drawer's resting bottom edge)
+  // and a card at `pull` sits at screen-y = naturalTop + (maxPull − pull). Setting the card's bottom
+  // to restingBottom gives targetPull = cardBottom − headerH; setting its top to PAD_TOP (too-tall
+  // case) gives targetPull = restingBottom + cardTop − headerH − PAD_TOP. The two agree at the fit
+  // boundary. setPull clamps to [0, maxPull].
   export function revealCard(i: number): void {
     const s = sheetEl;
     const card = s?.children[i] as HTMLElement | undefined;
     if (!s || !card) return;
-    const naturalBottom = s.getBoundingClientRect().bottom - offset;
-    const r = card.getBoundingClientRect();
-    const fits = naturalBottom - r.height >= PAD_TOP;
-    const deltaUp = fits ? r.bottom - naturalBottom : r.top - PAD_TOP;
-    setPull(pull + deltaUp);
-    // A card's photo may still be loading, so `r.height` under-measures and we under-pull. Re-reveal
-    // once each pending image finishes and the card has grown (same async-growth class as #74). One-
-    // shot per image; harmless if the drawer moved meanwhile (revealCard just re-measures live).
+    const headerH = s.querySelector<HTMLElement>(".card-head")?.offsetHeight ?? 0;
+    const restingBottom = s.offsetTop + s.offsetHeight;
+    const cardTop = card.offsetTop;
+    const fits = card.offsetHeight <= restingBottom - PAD_TOP;
+    setPull(fits ? cardTop + card.offsetHeight - headerH : restingBottom + cardTop - headerH - PAD_TOP);
+    // A card's photo may still be loading, so offsetHeight under-measures and we under-pull. Re-reveal
+    // once each pending image finishes AND only if the drawer is still open (pull>0) — otherwise a
+    // late load would yank open a drawer the user just retracted. AbortController removes BOTH
+    // listeners on either outcome, so a load OR an error (image 404) leaves nothing dangling.
     for (const img of card.querySelectorAll("img")) {
-      if (!img.complete) img.addEventListener("load", () => revealCard(i), { once: true });
+      if (img.complete) continue;
+      const ac = new AbortController();
+      img.addEventListener("load", () => { ac.abort(); if (pull > 0) revealCard(i); }, { signal: ac.signal });
+      img.addEventListener("error", () => ac.abort(), { signal: ac.signal });
     }
   }
   /** the card index of the header a pointer/key event is on, else -1 */
