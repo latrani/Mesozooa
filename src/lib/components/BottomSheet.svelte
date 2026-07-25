@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { untrack } from "svelte";
+  import { untrack, tick } from "svelte";
 
   // Phone-only chrome: the specimen plaque(s) as a real drawer.
   //
@@ -35,8 +35,8 @@
 
   const uid = $props.id();
 
-  /** a tap-open reveals at most this fraction of the viewport; a drag can go the whole way */
-  const OPEN_MAX = 0.5;
+  /** padding kept above a top-aligned card that's too tall to fit — 4 units (#71) */
+  const PAD_TOP = 16;
 
   let sheetEl = $state<HTMLElement>();
 
@@ -52,9 +52,36 @@
   /** the block still runs past the bottom of the screen, so the shadow marks that it continues */
   let moreBelow = $derived(offset > 1);
 
-  const vh = () => (typeof window === "undefined" ? 0 : window.innerHeight);
   const offsetFor = (h: number, ph: number, p: number) => Math.max(0, (h - ph) - p);
-  const openPull = () => Math.min(maxPull, Math.max(0, vh() * OPEN_MAX - peekH));
+
+  // Reveal card `i` (#71): pull the drawer so that card is in full view if it fits, else top-align
+  // its top at PAD_TOP. Measurement-based and delta-driven: increasing `pull` by Δ slides the whole
+  // sheet UP by Δ px on screen (pull↑ → offset↓ → translateY↓), so we measure where the card is now
+  // and how far up it must move. `naturalBottom` = the sheet's resting bottom edge (undo the current
+  // translate: the on-screen bottom minus the current offset). A card FITS when, bottom-aligned to
+  // that edge, its top still clears PAD_TOP; then we move its bottom to naturalBottom. Otherwise it's
+  // taller than the window, so we move its top to PAD_TOP instead. setPull clamps to [0, maxPull].
+  export function revealCard(i: number): void {
+    const s = sheetEl;
+    const card = s?.children[i] as HTMLElement | undefined;
+    if (!s || !card) return;
+    const naturalBottom = s.getBoundingClientRect().bottom - offset;
+    const r = card.getBoundingClientRect();
+    const fits = naturalBottom - r.height >= PAD_TOP;
+    const deltaUp = fits ? r.bottom - naturalBottom : r.top - PAD_TOP;
+    setPull(pull + deltaUp);
+    // A card's photo may still be loading, so `r.height` under-measures and we under-pull. Re-reveal
+    // once each pending image finishes and the card has grown (same async-growth class as #74). One-
+    // shot per image; harmless if the drawer moved meanwhile (revealCard just re-measures live).
+    for (const img of card.querySelectorAll("img")) {
+      if (!img.complete) img.addEventListener("load", () => revealCard(i), { once: true });
+    }
+  }
+  /** the card index of the header a pointer/key event is on, else -1 */
+  function cardIndexOf(el: HTMLElement | null): number {
+    const card = el?.closest(".card");
+    return card && sheetEl ? [...sheetEl.children].indexOf(card) : -1;
+  }
 
   // Suppresses the settle transition for the frame(s) where the drawer's measured size changes.
   // The sheet is bottom-anchored, so growing it (adding the 2nd card, a photo loading) shifts its
@@ -126,10 +153,12 @@
   });
 
   // `expanded` is the outside world's handle (the game raises the drawer at end of round). Setting
-  // it drives `pull`; the drag writes `pull` and reports back. untrack keeps the two from looping.
+  // it reveals the top card (#71); clearing it retracts. The drag writes `pull` and reports back via
+  // setPull. untrack keeps the two from looping. tick() defers the reveal until after any pending
+  // card add has laid out, so revealCard measures the final DOM (e.g. end state adding a card).
   $effect(() => {
     if (expanded) {
-      if (untrack(() => pull) === 0) pull = openPull();
+      if (untrack(() => pull) === 0) tick().then(() => revealCard(0));
     } else if (untrack(() => pull) !== 0) {
       pull = 0;
     }
@@ -178,8 +207,12 @@
     try { sheetEl?.releasePointerCapture(e.pointerId); } catch { /* already released */ }
     if (!moved) {
       // Only a HEADER toggles on a tap. Tapping a card body should do nothing, or reading it would
-      // keep snapping the drawer shut.
-      if (fromHead) setPull(pull > 0 ? 0 : openPull());
+      // keep snapping the drawer shut. Expanding reveals THAT card in full view (#71); tapping any
+      // header while open retracts the whole stack (#69).
+      if (fromHead) {
+        if (pull > 0) setPull(0);
+        else revealCard(Math.max(0, cardIndexOf(e.target as HTMLElement | null)));
+      }
       return;
     }
     // Only a DELIBERATE release tidies a sliver away. pointercancel must not, or an interrupted
@@ -190,7 +223,8 @@
   function onKeydown(e: KeyboardEvent) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      setPull(pull > 0 ? 0 : openPull());
+      if (pull > 0) setPull(0);
+      else revealCard(Math.max(0, cardIndexOf(e.currentTarget as HTMLElement | null)));
     }
   }
 </script>

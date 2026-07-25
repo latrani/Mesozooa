@@ -130,7 +130,11 @@
   });
 </script>
 
-<BoardLayout bind:sheetExpanded hasExtraPanel={selectedId != null && treeStore.getNode(selectedId) != null}>
+<BoardLayout
+  bind:sheetExpanded
+  hasExtraPanel={selectedId != null && treeStore.getNode(selectedId) != null}
+  extraPanelKey={selectedId != null && treeStore.getNode(selectedId) != null ? selectedId : null}
+>
   {#snippet cluster()}
     {#if ended}
       <!-- End state reuses the input row's geometry: banner in the field's place, end actions

@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { untrack, tick } from "svelte";
   import { viewport } from "../../viewport.svelte";
   import BottomSheet from "../../components/BottomSheet.svelte";
 
-  let { cluster, placard, tree, extraPanel, hasExtraPanel = false, sheetExpanded = $bindable(false) }: {
+  let { cluster, placard, tree, extraPanel, hasExtraPanel = false, extraPanelKey = null, sheetExpanded = $bindable(false) }: {
     cluster: Snippet;
     /** rendered twice on phone (peek row + expanded card) and once on desktop; the flag says which */
     placard: Snippet<[boolean]>;
@@ -16,9 +17,28 @@
     /** whether extraPanel currently has content to show. Gates the desktop wrapper and the phone
         second card, so an unselected state renders exactly one card (no empty peer). */
     hasExtraPanel?: boolean;
+    /** identity of the current extra-panel content (the selected node id). When it changes to a
+        non-null value, the phone drawer pops that detail card into view (#71). null = nothing
+        selected. Distinct from hasExtraPanel so switching from node A to node B (both truthy) still
+        fires the reveal. */
+    extraPanelKey?: string | null;
     /** phone only: lets a consumer force the sheet open, e.g. GameBoard on end state */
     sheetExpanded?: boolean;
   } = $props();
+
+  let sheet = $state<ReturnType<typeof BottomSheet>>();
+  // Selecting a node on phone pops its detail card (the last card) into view (#71). Keyed on
+  // extraPanelKey so it fires on every select AND on A→B switches; tick() waits for the added card
+  // to lay out before revealCard measures it. Guarded on phone (desktop has no drawer) and non-null.
+  $effect(() => {
+    const key = extraPanelKey;
+    if (!viewport.isPhone || key == null) return;
+    const n = untrack(() => sheetCards.length);
+    // tick() flushes the DOM patch (the card exists); a following rAF waits for layout to settle so
+    // revealCard measures the card's FINAL height, not a mid-add value — otherwise it under-pulls
+    // and the card lands partway. revealCard itself re-fires on late photo load (see BottomSheet).
+    tick().then(() => requestAnimationFrame(() => sheet?.revealCard(n - 1)));
+  });
 
   // Phone drawer cards: the specimen always; the selected-node panel as a second peer card only
   // when it has content. Built here so the snippet refs (defined at the end of the markup) are the
@@ -110,7 +130,7 @@
   </div>
 
   {#if viewport.isPhone}
-    <BottomSheet bind:expanded={sheetExpanded} cards={sheetCards} />
+    <BottomSheet bind:this={sheet} bind:expanded={sheetExpanded} cards={sheetCards} />
   {/if}
 </div>
 
