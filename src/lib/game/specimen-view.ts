@@ -64,7 +64,7 @@ export function nodeView(node: TreeNode): SpecimenView {
   };
 }
 
-const COMING_SLIP: SpecimenMount = { kind: "slip", text: "Coming soon...", tilt: -4 };
+const COMING_SLIP: SpecimenMount = { kind: "slip", text: "New exhibit coming soon!", tilt: -4 };
 
 // The two "? ? ?" clue rows shown before the specimen is identified.
 function placeholderFields(): SpecimenField[] {

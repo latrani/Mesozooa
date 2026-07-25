@@ -81,7 +81,7 @@ describe("specimenView", () => {
   it("empty -> unidentified placeholder", () => {
     const v = specimenView(practice("TC"), store);
     expect(v.title).toBeNull();
-    expect(v.mount).toEqual({ kind: "slip", text: "Coming soon...", tilt: -4 });
+    expect(v.mount).toEqual({ kind: "slip", text: "New exhibit coming soon!", tilt: -4 });
     expect(v.fields).toEqual([
       { label: "Lived", value: null },
       { label: "Found in", value: null },

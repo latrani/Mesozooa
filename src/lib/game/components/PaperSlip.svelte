@@ -12,11 +12,14 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) rotate(var(--slip-tilt));
-    padding: 0.7rem 1.4rem;
-    background: #faf6fc; /* lighter than the tan mount, so it reads as a slip laid on top */
-    color: #6a5947; /* pen-ink brown */
+    padding: 0.6rem 1.1rem;
+    background: linear-gradient(183deg,
+      color-mix(in hsl, #000 10%, #fff),
+      color-mix(in hsl, #fff 60%, var(--bg-page)) 
+    );
+    color: var(--ink);
     font-family: var(--font-hand);
-    font-size: var(--type-title);
+    font-size: var(--type-heading);
     line-height: 1.1;
     white-space: nowrap;
     border-radius: 2px;
