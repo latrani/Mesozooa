@@ -214,10 +214,36 @@ that to the visual/IA pass.
 
 ## Deferred / noted
 
-- **Wastebasket terminal clades in Hard.** Genera hanging directly off Theropoda get a terminal
-  clade of 513 pool members — the endgame is unwinnable by deduction there. Present in Medium
-  today too (max 357), so difficulty exposes it rather than causing it. A per-tier ceiling on
-  terminal-clade size is the obvious gate. File as tech-debt.
+- **Wastebasket terminal clades in Hard — measured, and it's a recall problem, not an
+  information one.** Genera hanging directly off Theropoda get a terminal clade of 513 pool
+  members, which looked unwinnable. It isn't: the clue is very nearly a unique key. Counting
+  pool members that share a target's *full* clue inside its own terminal clade:
+
+  | | median | mean | target is the only match | >5 left |
+  |---|---|---|---|---|
+  | Medium, all targets | 1 | 1.2 | 86% | 0% |
+  | Hard, all targets | 1 | 1.4 | 79% | 0% |
+  | Hard, terminal clade 2–10 | 1 | 1.3 | 82% | 0% |
+  | Hard, terminal clade 51+ | 1 | 1.5 | 80% | 2% |
+
+  Terminal-clade size barely moves it — 513 candidates collapse to ~1.5. So **a ceiling on
+  terminal-clade size would fix a problem that doesn't exist**; dropped from the plan.
+
+  Two things this does surface:
+
+  - **The detail layer is load-bearing.** The two lead lines alone (epoch + country) leave
+    median 2 / mean 4.1 and only 36% unique; adding stage, state and formation takes it to 79%.
+    Not an artifact of over-precise dating — dropping the Ma numbers entirely leaves 79%
+    unchanged, it's the stratigraphy doing the work. Coverage in Hard is 99% state, 97%
+    formation. This retro-justifies the Jul-17 near-miss where a stale raw pull wiped location
+    detail: in Hard that regression wouldn't degrade the clue, it would break the endgame.
+  - **What Hard actually taxes is inversion, not deduction.** The clue says "Late Cretaceous
+    (Campanian), Mongolia (Ömnögovi, Djadochta Formation)" and the information to finish is
+    there — but the player must *produce the name* from a 513-member space they can't
+    enumerate. At a 5-member terminal clade you brute-force by guessing; at 513 you can't. So
+    the open Hard question is whether to help the player invert the clue (name the terminal
+    clade and its size at the anchor? let the revealed clue filter autocomplete?) or to decide
+    that unaided recall is exactly what "Mesozoic Mind" means. Design call, flagged not settled.
 - **The isolated-genus cases** (Dilophosaurus, Cryolophosaurus, Agilisaurus, Eoraptor) are
   #13 symptoms; note them there.
 
