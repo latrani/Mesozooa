@@ -24,4 +24,11 @@ export interface GameState {
   hintsUsed: number;
   /** set only when a practice round is started from a seed URL; excluded from stats. */
   seeded?: true;
+  /**
+   * Node ids opened in Explore while this round was in play, deduped, in view order (#72).
+   * Lives on the game (not the explorer store) so it persists with the save and so a new round
+   * starts a fresh count — browsing done BEFORE the round began isn't part of this game's story.
+   * Absent on rounds saved before the field existed.
+   */
+  exploreViews?: string[];
 }

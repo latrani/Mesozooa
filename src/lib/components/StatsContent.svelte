@@ -30,6 +30,7 @@
     <dl class="table">
       <dt>Avg moves (daily)</dt><dd>{avg(source.dailyAvg)}</dd>
       <dt>Avg moves (overall)</dt><dd>{avg(source.overallAvg)}</dd>
+      <dt>Avg explored</dt><dd>{avg(source.exploredAvg)}</dd>
       <div class="sep" role="separator"></div>
       <dt>Last 7 days</dt><dd>{volume(source.week)}</dd>
       <dt>Last 30 days</dt><dd>{volume(source.month)}</dd>

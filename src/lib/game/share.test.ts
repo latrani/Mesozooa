@@ -100,3 +100,27 @@ describe("buildShareText", () => {
     expect([...lines[2]].length).toBe(3); // the single grid row: cold + 💡 + 🎯
   });
 });
+
+describe("buildShareParts explore tally", () => {
+  const base: GameState = {
+    target: "T",
+    guesses: [g(0.1), g(1, "guess", "T")],
+    status: "won",
+    mode: "daily",
+    maxGuesses: 20,
+    hintsUsed: 0,
+  };
+  it("appends 🔍N after the hint tally", () => {
+    const state: GameState = { ...base, guesses: [g(0.1), g(0.5, "branchHint"), g(1, "guess", "T")], hintsUsed: 1, exploreViews: ["a", "b", "c", "d"] };
+    expect(buildShareParts(state, "2026-08-28").score).toBe("3/20 · 🔦1 · 🔍4");
+  });
+  it("stands alone when no hints were used", () => {
+    expect(buildShareParts({ ...base, exploreViews: ["a", "b"] }, "2026-08-28").score).toBe("2/20 · 🔍2");
+  });
+  it("is omitted at zero", () => {
+    expect(buildShareParts({ ...base, exploreViews: [] }, "2026-08-28").score).toBe("2/20");
+  });
+  it("is omitted when the field is absent (legacy save)", () => {
+    expect(buildShareParts(base, "2026-08-28").score).toBe("2/20");
+  });
+});

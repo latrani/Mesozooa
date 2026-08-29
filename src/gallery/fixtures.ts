@@ -125,7 +125,12 @@ export const stateDeep: GameState = (() => {
 })();
 
 // SOLVED (won) — guess the target.
-export const stateSolvedWon: GameState = g(g(daily(), FAR), TARGET);
+// Carries exploreViews (#72) so the harness renders the banner's lookup line and the share
+// card's 🔍 tally; stateSolvedLost below has none, covering the suppressed-at-zero case.
+export const stateSolvedWon: GameState = {
+  ...g(g(daily(), FAR), TARGET),
+  exploreViews: ["ex1", "ex2", "ex3", "ex4"],
+};
 
 // SOLVED (lost) — a daily with maxGuesses exhausted without the target.
 export const stateSolvedLost: GameState = (() => {
@@ -140,7 +145,7 @@ export const stateSolvedLost: GameState = (() => {
 // feeds these so multiple stats states render at once. Windows use a fixed `now` so "last 7/30
 // days" is deterministic (no dependence on the current date).
 import type { Stats } from "../lib/game/stats";
-import { emptyStats, windowStats, avgMoves, currentStreak } from "../lib/game/stats";
+import { emptyStats, windowStats, avgMoves, avgExplored, currentStreak } from "../lib/game/stats";
 import type { StatsView } from "../lib/game/statsStore.svelte";
 
 // A fixed reference "now"/"today" so window math is stable across days. 2026-07-22.
@@ -166,6 +171,9 @@ function statsView(s: Stats): StatsView {
     get overallAvg() {
       return avgMoves(s.overall);
     },
+    get exploredAvg() {
+      return avgExplored(s.overall);
+    },
     get allTime() {
       return { played: o.played, won: o.won, ratio: o.played === 0 ? null : o.won / o.played };
     },
@@ -181,18 +189,18 @@ export const statsActive: StatsView = statsView(
   (() => {
     const s = emptyStats();
     s.streak = { current: 5, best: 12, lastWinDate: STATS_TODAY };
-    s.daily = { played: 40, won: 33, moveSum: 132 }; // avg 4.0 moves/win
-    s.overall = { played: 95, won: 71, moveSum: 355 }; // avg 5.0 moves/win
+    s.daily = { played: 40, won: 33, moveSum: 132, exploredSum: 148 }; // avg 4.0 moves/win, 3.7 explored/game
+    s.overall = { played: 95, won: 71, moveSum: 355, exploredSum: 285 }; // avg 5.0 moves/win, 3.0 explored/game
     // A recent-window spread: 6 plays in the last 7 days (5 won), more across 30.
     s.log = [
-      { t: STATS_NOW - 1 * DAY, mode: "daily", won: true, moves: 3 },
-      { t: STATS_NOW - 2 * DAY, mode: "practice", won: true, moves: 5 },
-      { t: STATS_NOW - 3 * DAY, mode: "daily", won: false, moves: 20 },
-      { t: STATS_NOW - 4 * DAY, mode: "practice", won: true, moves: 4 },
-      { t: STATS_NOW - 5 * DAY, mode: "daily", won: true, moves: 6 },
-      { t: STATS_NOW - 6 * DAY, mode: "daily", won: true, moves: 2 },
-      { t: STATS_NOW - 12 * DAY, mode: "practice", won: true, moves: 7 },
-      { t: STATS_NOW - 20 * DAY, mode: "daily", won: false, moves: 20 },
+      { t: STATS_NOW - 1 * DAY, mode: "daily", won: true, moves: 3, explored: 2 },
+      { t: STATS_NOW - 2 * DAY, mode: "practice", won: true, moves: 5, explored: 5 },
+      { t: STATS_NOW - 3 * DAY, mode: "daily", won: false, moves: 20, explored: 11 },
+      { t: STATS_NOW - 4 * DAY, mode: "practice", won: true, moves: 4, explored: 0 },
+      { t: STATS_NOW - 5 * DAY, mode: "daily", won: true, moves: 6, explored: 4 },
+      { t: STATS_NOW - 6 * DAY, mode: "daily", won: true, moves: 2, explored: 1 },
+      { t: STATS_NOW - 12 * DAY, mode: "practice", won: true, moves: 7, explored: 6 },
+      { t: STATS_NOW - 20 * DAY, mode: "daily", won: false, moves: 20, explored: 9 },
     ];
     return s;
   })(),
@@ -203,9 +211,9 @@ export const statsBrokenStreak: StatsView = statsView(
   (() => {
     const s = emptyStats();
     s.streak = { current: 7, best: 7, lastWinDate: "2026-07-19" }; // 3 days before STATS_TODAY
-    s.daily = { played: 10, won: 8, moveSum: 40 };
-    s.overall = { played: 10, won: 8, moveSum: 40 };
-    s.log = [{ t: STATS_NOW - 3 * DAY, mode: "daily", won: true, moves: 5 }];
+    s.daily = { played: 10, won: 8, moveSum: 40, exploredSum: 21 };
+    s.overall = { played: 10, won: 8, moveSum: 40, exploredSum: 21 };
+    s.log = [{ t: STATS_NOW - 3 * DAY, mode: "daily", won: true, moves: 5, explored: 3 }];
     return s;
   })(),
 );

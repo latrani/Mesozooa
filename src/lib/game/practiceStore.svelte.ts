@@ -5,6 +5,7 @@ import {
   applyGuess,
   applyHint,
   applyForfeit,
+  applyExploreView,
   newRoundState,
   warmestSharedNodeId,
   revealedNodeIds,
@@ -70,7 +71,12 @@ export function createPractice() {
       state = applyGuess(state, id, treeStore, warmth);
       save();
       if (was === "playing" && state.status !== "playing" && !state.seeded) {
-        statsStore.record({ mode: "practice", won: state.status === "won", moves: movesUsed(state) });
+        statsStore.record({
+          mode: "practice",
+          won: state.status === "won",
+          moves: movesUsed(state),
+          explored: state.exploreViews?.length ?? 0,
+        });
       }
     },
     hint() {
@@ -82,8 +88,19 @@ export function createPractice() {
       state = applyForfeit(state);
       save();
       if (was === "playing" && state.status !== "playing" && !state.seeded) {
-        statsStore.record({ mode: "practice", won: false, moves: movesUsed(state) });
+        statsStore.record({
+          mode: "practice",
+          won: false,
+          moves: movesUsed(state),
+          explored: state.exploreViews?.length ?? 0,
+        });
       }
+    },
+    /** An Explore lookup made while this round is live (#72). No-ops once the round is over. */
+    noteExploreView(nodeId: string) {
+      const before = state;
+      state = applyExploreView(state, nodeId);
+      if (state !== before) save();
     },
     newRound() {
       state = newRoundState(treeStore);

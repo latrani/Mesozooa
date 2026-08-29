@@ -75,6 +75,18 @@ export function applyForfeit(state: GameState): GameState {
   return { ...state, status: "lost" };
 }
 
+/**
+ * Record an Explore visit against the live round (#72). Only counts while playing, and only the
+ * first visit to a given node — this is "how far did you wander", not "how many clicks".
+ * Returns the same reference when nothing changes, so reactive readers don't churn.
+ */
+export function applyExploreView(state: GameState, nodeId: string): GameState {
+  if (state.status !== "playing") return state;
+  const seen = state.exploreViews ?? [];
+  if (seen.includes(nodeId)) return state;
+  return { ...state, exploreViews: [...seen, nodeId] };
+}
+
 export function newRoundState(
   store: TreeStore,
   rng: () => number = Math.random,

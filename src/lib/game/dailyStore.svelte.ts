@@ -4,6 +4,7 @@ import { warmthForTarget, type WarmthProvider } from "./warmth";
 import {
   applyGuess,
   applyHint,
+  applyExploreView,
   newDailyState,
   warmestSharedNodeId,
   revealedNodeIds,
@@ -88,12 +89,23 @@ function createDaily() {
       state = applyGuess(state, id, treeStore, warmth);
       save();
       if (was === "playing" && state.status !== "playing") {
-        statsStore.record({ mode: "daily", won: state.status === "won", moves: movesUsed(state) });
+        statsStore.record({
+          mode: "daily",
+          won: state.status === "won",
+          moves: movesUsed(state),
+          explored: state.exploreViews?.length ?? 0,
+        });
       }
     },
     hint() {
       state = applyHint(state, treeStore, warmth);
       save();
+    },
+    /** An Explore lookup made while this round is live (#72). No-ops once the round is over. */
+    noteExploreView(nodeId: string) {
+      const before = state;
+      state = applyExploreView(state, nodeId);
+      if (state !== before) save();
     },
   };
 }

@@ -4,6 +4,7 @@ export interface Acc {
   played: number;
   won: number;
   moveSum: number; // Σ movesUsed over won games; divided by `won` for average moves
+  exploredSum: number; // Σ Explore lookups over ALL played games; divided by `played` (#72)
 }
 
 export interface StreakRec {
@@ -17,6 +18,7 @@ export interface PlayLog {
   mode: GameMode;
   won: boolean;
   moves: number; // movesUsed at completion
+  explored: number; // unique Explore lookups made during the round (#72)
 }
 
 export interface Stats {
@@ -31,8 +33,8 @@ export function emptyStats(): Stats {
   return {
     version: 1,
     streak: { current: 0, best: 0, lastWinDate: null },
-    daily: { played: 0, won: 0, moveSum: 0 },
-    overall: { played: 0, won: 0, moveSum: 0 },
+    daily: { played: 0, won: 0, moveSum: 0, exploredSum: 0 },
+    overall: { played: 0, won: 0, moveSum: 0, exploredSum: 0 },
     log: [],
   };
 }
@@ -41,9 +43,15 @@ export function serializeStats(s: Stats): string {
   return JSON.stringify(s);
 }
 
+// exploredSum/explored are NOT required: records written before #72 are valid, and rejecting
+// them would silently wipe a player's whole history. Missing values are backfilled with 0 below.
 function isAcc(a: unknown): a is Acc {
   const r = a as Record<string, unknown>;
   return !!a && typeof r.played === "number" && typeof r.won === "number" && typeof r.moveSum === "number";
+}
+
+function withExplored(a: Acc): Acc {
+  return { ...a, exploredSum: typeof a.exploredSum === "number" ? a.exploredSum : 0 };
 }
 
 function isPlayLog(p: unknown): p is PlayLog {
@@ -72,7 +80,13 @@ export function deserializeStats(raw: string | null): Stats {
       isAcc(o.overall) &&
       Array.isArray(o.log) && o.log.every(isPlayLog)
     ) {
-      return o as unknown as Stats;
+      const parsed = o as unknown as Stats;
+      return {
+        ...parsed,
+        daily: withExplored(parsed.daily),
+        overall: withExplored(parsed.overall),
+        log: parsed.log.map((p) => ({ ...p, explored: typeof p.explored === "number" ? p.explored : 0 })),
+      };
     }
     return emptyStats();
   } catch {
@@ -118,11 +132,19 @@ export function avgMoves(acc: Acc): number | null {
   return acc.won === 0 ? null : acc.moveSum / acc.won;
 }
 
-function bump(acc: Acc, won: boolean, moves: number): Acc {
+// Denominator is `played`, not `won` (see bump).
+export function avgExplored(acc: Acc): number | null {
+  return acc.played === 0 ? null : acc.exploredSum / acc.played;
+}
+
+// exploredSum accumulates on EVERY play, won or lost — unlike moveSum, which only means
+// something for a win. A round you lost after twelve lookups is exactly what this stat is about.
+function bump(acc: Acc, won: boolean, moves: number, explored: number): Acc {
   return {
     played: acc.played + 1,
     won: acc.won + (won ? 1 : 0),
     moveSum: acc.moveSum + (won ? moves : 0),
+    exploredSum: acc.exploredSum + explored,
   };
 }
 
@@ -131,8 +153,8 @@ function bump(acc: Acc, won: boolean, moves: number): Acc {
 export function recordPlay(stats: Stats, play: PlayLog, today: string): Stats {
   const next: Stats = {
     ...stats,
-    daily: play.mode === "daily" ? bump(stats.daily, play.won, play.moves) : stats.daily,
-    overall: bump(stats.overall, play.won, play.moves),
+    daily: play.mode === "daily" ? bump(stats.daily, play.won, play.moves, play.explored) : stats.daily,
+    overall: bump(stats.overall, play.won, play.moves, play.explored),
     log: [...stats.log, play],
     streak: { ...stats.streak },
   };

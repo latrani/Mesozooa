@@ -1,5 +1,5 @@
 import type { PlayLog, Stats } from "./stats";
-import { emptyStats, deserializeStats, serializeStats, recordPlay, windowStats, avgMoves, currentStreak } from "./stats";
+import { emptyStats, deserializeStats, serializeStats, recordPlay, windowStats, avgMoves, avgExplored, currentStreak } from "./stats";
 import { todayString } from "./daily";
 
 const STATS_KEY = "mesozooa:stats:1";
@@ -12,6 +12,7 @@ export interface StatsView {
   readonly month: { played: number; won: number; ratio: number | null };
   readonly dailyAvg: number | null;
   readonly overallAvg: number | null;
+  readonly exploredAvg: number | null;
   readonly allTime: { played: number; won: number; ratio: number | null };
   reset: () => void;
 }
@@ -47,13 +48,17 @@ function createStatsStore() {
     get overallAvg(): number | null {
       return avgMoves(state.overall);
     },
+    /** Mean Explore lookups per game, over ALL plays (#72) — a loss counts too. */
+    get exploredAvg(): number | null {
+      return avgExplored(state.overall);
+    },
     get allTime(): { played: number; won: number; ratio: number | null } {
       const o = state.overall;
       return { played: o.played, won: o.won, ratio: o.played === 0 ? null : o.won / o.played };
     },
     /** Log one completed, non-seeded game. Caller fires this exactly once per game. */
     record(play: Omit<PlayLog, "t"> & { t?: number }) {
-      const full: PlayLog = { t: play.t ?? Date.now(), mode: play.mode, won: play.won, moves: play.moves };
+      const full: PlayLog = { t: play.t ?? Date.now(), mode: play.mode, won: play.won, moves: play.moves, explored: play.explored };
       state = recordPlay(state, full, todayString());
       save();
     },
