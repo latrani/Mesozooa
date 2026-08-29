@@ -21,6 +21,9 @@
       Inspired by <a href="https://metazooa.com" target="_blank" rel="noopener noreferrer">Metazooa</a>.
     </p>
     <p>
+      <a href="https://github.com/latrani/Mesozooa" target="_blank">Source is on github</a>, issues and PRs welcome!
+    </p>
+    <p>
       Data from <a href="https://www.wikidata.org" target="_blank" rel="noopener noreferrer">Wikidata</a> (CC0),
       the <a href="https://paleobiodb.org" target="_blank" rel="noopener noreferrer">Paleobiology Database</a>,
       and <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer">Wikipedia</a>.
