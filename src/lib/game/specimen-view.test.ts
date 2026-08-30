@@ -95,3 +95,56 @@ describe("specimenView", () => {
     expect(v.title).toBe(store.getNode("TC")!.name);
   });
 });
+
+describe("the anchor note", () => {
+  // FIXTURE: Q430 > T > {TF > {TR, TB}, LO}; Q430 > O > CF > TC. All four genera playable.
+  const anchorTree = assembleTree(pruneSubtree(FIXTURE_RAWS, NEORNITHES), DINOSAURIA, "test");
+  markPlayable(anchorTree);
+  const anchorStore = createTreeStore(anchorTree);
+  const w = warmthForTarget(anchorStore, "TR");
+  const round = (): GameState => ({
+    target: "TR", guesses: [], status: "playing", mode: "practice", maxGuesses: null, hintsUsed: 0,
+  });
+
+  it("is absent before warmth pins at the anchor", () => {
+    // Guessing across the tree leaves the trail broad; the note must not appear yet.
+    const s = applyGuess(round(), "TC", anchorStore, w);
+    const v = specimenView(s, anchorStore);
+    expect(v.anchor).toBeNull();
+  });
+
+  it("names the warmest shared clade and its candidate count once pinned", () => {
+    // Tarbosaurus shares Tyrannosauridae with the target, which is its terminal clade.
+    const s = applyGuess(round(), "TB", anchorStore, w);
+    const v = specimenView(s, anchorStore);
+    expect(v.anchor).not.toBeNull();
+    expect(v.anchor!.cladeId).toBe("TF");
+    expect(v.anchor!.cladeName).toBe("Tyrannosauridae");
+    // TF holds TR + TB; TB is now guessed and eliminated, leaving one candidate.
+    expect(v.anchor!.candidates).toBe(1);
+  });
+
+  it("counts down only the guesses INSIDE the clade", () => {
+    // Triceratops is nowhere near Tyrannosauridae, so it eliminates nothing there.
+    let s = applyGuess(round(), "TB", anchorStore, w);
+    const before = specimenView(s, anchorStore).anchor!.candidates;
+    s = applyGuess(s, "TC", anchorStore, w);
+    expect(specimenView(s, anchorStore).anchor!.candidates).toBe(before);
+  });
+
+  it("is absent once the round is over", () => {
+    const s = applyGuess(round(), "TR", anchorStore, w); // solved
+    expect(specimenView(s, anchorStore).anchor).toBeNull();
+  });
+
+  it("counts the POOL, not the clade — a sparser tier leaves fewer candidates", () => {
+    // Same clade, a pool that excludes Tarbosaurus: the note must speak for the tier in play.
+    const sparse = createTreeStore(anchorTree, ["TR", "TC"]);
+    const sw = warmthForTarget(sparse, "TR");
+    const s = applyGuess(round(), "TC", sparse, sw);
+    const v = specimenView(s, sparse);
+    // With only TR and TC in the pool, TF holds a single pool member, so the terminal clade
+    // climbs to the root — and the count is of pool members, not of genera.
+    expect(v.anchor!.candidates).toBeLessThan(anchorTree.nodes[v.anchor!.cladeId].descendantGenusCount);
+  });
+});

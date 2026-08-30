@@ -190,7 +190,7 @@
   {/snippet}
 
   {#snippet placard(peek: boolean)}
-    <SpecimenPlacard view={specimenView(store.state, store.tree)} {peek} />
+    <SpecimenPlacard view={specimenView(store.state, store.tree)} {peek} onexplore={onexplore} />
   {/snippet}
 
   {#snippet tree(rightInset)}
