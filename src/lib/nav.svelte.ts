@@ -1,8 +1,16 @@
 import { explorer } from "./explorer/explorerStore.svelte";
 import { treeStore } from "./game/treeData";
 import { practice } from "./game/practiceStore.svelte";
+import { daily } from "./game/dailyStore.svelte";
 import { resolveTaxonRef } from "./explorer/explorer-core";
 import { parseHash, type Route, type Tab } from "./route";
+
+// Explore lookups count against whichever round is live (#72). Both stores are pinged and each
+// no-ops unless its own game is in play, so the explorer never has to know which mode you're in.
+explorer.observe((id) => {
+  daily.noteExploreView(id);
+  practice.noteExploreView(id);
+});
 
 function createNav() {
   let tab = $state<Tab>("daily");

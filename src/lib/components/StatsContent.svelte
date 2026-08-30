@@ -54,6 +54,7 @@
     <dl class="table">
       <dt>Avg moves (daily)</dt><dd>{avg(view.dailyAvg)}</dd>
       <dt>Avg moves (overall)</dt><dd>{avg(view.overallAvg)}</dd>
+      <dt>Avg explored</dt><dd>{avg(view.exploredAvg)}</dd>
       <div class="sep" role="separator"></div>
       <dt>Last 7 days</dt><dd>{volume(view.week)}</dd>
       <dt>Last 30 days</dt><dd>{volume(view.month)}</dd>

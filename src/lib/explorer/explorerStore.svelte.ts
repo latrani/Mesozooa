@@ -9,12 +9,21 @@ function createExplorer() {
   // Recently-viewed taxa, most-recent first. Every focused node is recorded;
   // re-viewing an entry moves it back to the front rather than duplicating.
   let history = $state<string[]>([]);
+  // Optional observer of every view (#72). A sink rather than a direct store call so this module
+  // stays ignorant of the game — nav wires it up. History can't serve the same purpose: it is
+  // capped, and it spans the whole session rather than one round.
+  let onView: ((id: string) => void) | null = null;
 
   function record(id: string) {
     history = [id, ...history.filter((h) => h !== id)].slice(0, HISTORY_CAP);
+    onView?.(id);
   }
 
   return {
+    /** Register the view observer (#72). One sink; a second call replaces the first. */
+    observe(sink: (id: string) => void) {
+      onView = sink;
+    },
     get focusId(): string {
       return focusId;
     },

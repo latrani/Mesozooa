@@ -17,7 +17,7 @@ function bucket(fraction: number): string {
 export interface ShareParts {
   /** "Mesozooa 2026-07-12 · Hard" */
   headline: string;
-  /** "3/20 · 🔦1" (or "X/20" on a loss) */
+  /** "3/20 · 🔦1 · 🔍4" (or "X/20" on a loss); the tallies drop out when zero */
   score: string;
   /** emoji grid, 5 per row */
   grid: string[];
@@ -30,6 +30,10 @@ export function buildShareParts(state: GameState, dateStr: string, tier: Tier): 
   const hintPresses = state.guesses.filter((g) => g.kind === "branchHint" || g.kind === "leafHint").length;
   const score = won ? `${moves}/${cap}` : `X/${cap}`;
   const tally = hintPresses > 0 ? ` · 🔦${hintPresses}` : "";
+  // Explore lookups made during the round (#72). Bragging rights, not a cheat flag — omitted at
+  // zero so a no-lookup result stays as clean as it was before the field existed.
+  const explored = state.exploreViews?.length ?? 0;
+  const lookups = explored > 0 ? ` · 🔍${explored}` : "";
 
   // Grid: a hint row expands to cost-many 💡 (visualizes moves spent on help).
   const emojis: string[] = [];
@@ -47,7 +51,7 @@ export function buildShareParts(state: GameState, dateStr: string, tier: Tier): 
 
   // The tier is on EVERY result, Medium included. An unlabelled score would be ambiguous between
   // "Medium" and "posted before tiers existed" — which is the confusion the badge exists to stop.
-  return { headline: `Mesozooa ${dateStr} · ${TIER_LABEL[tier]}`, score: `${score}${tally}`, grid };
+  return { headline: `Mesozooa ${dateStr} · ${TIER_LABEL[tier]}`, score: `${score}${tally}${lookups}`, grid };
 }
 
 // Clipboard form: plain line breaks between every line (no blank-line paragraph spacing — that's

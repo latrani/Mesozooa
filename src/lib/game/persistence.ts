@@ -87,7 +87,14 @@ export function deserializeGame(json: string, expectedMode: GameMode): GameState
           cost: typeof g.cost === "number" ? g.cost : kind === "guess" ? 1 : 2,
         };
       });
-      return { ...(obj as GameState), guesses };
+      // exploreViews (#72) is optional and self-healing: a save from before the field, or one
+      // with a malformed value, loses the count rather than failing the whole restore.
+      const rawViews = (obj as Record<string, unknown>).exploreViews;
+      const exploreViews =
+        Array.isArray(rawViews) && rawViews.every((v) => typeof v === "string")
+          ? (rawViews as string[])
+          : undefined;
+      return { ...(obj as GameState), guesses, ...(exploreViews ? { exploreViews } : { exploreViews: undefined }) };
     }
     return null;
   } catch {

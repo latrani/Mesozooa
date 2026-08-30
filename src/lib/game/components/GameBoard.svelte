@@ -110,6 +110,9 @@
   // beside them as a second unrelated number.
   let moveCount = $derived(budget.used);
   let hintsUsed = $derived(store.state.hintsUsed ?? 0);
+  // Explore lookups made during the round (#72). Its own line under the result sentence rather
+  // than a third clause inside it — the sentence is already carrying moves and hints.
+  let exploredCount = $derived(store.state.exploreViews?.length ?? 0);
 
   // Component ref to the spine tree so trail crumbs can pan it (spec §3B).
   let spine = $state<ReturnType<typeof SpineTree>>();
@@ -147,6 +150,9 @@
       <div class="input-row">
         <div class="result" class:won class:lost={!won} aria-live="polite">
           <span class="result-line">{#if won}Congratulations! {answerName} guessed in {moveCount} {moveCount === 1 ? "move" : "moves"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}!{:else}It was {answerName} — out of guesses after {moveCount} {moveCount === 1 ? "move" : "moves"} with {hintsUsed} {hintsUsed === 1 ? "hint" : "hints"}{/if}</span>
+          {#if exploredCount > 0}
+            <span class="result-explored">🔍 {exploredCount} {exploredCount === 1 ? "taxon" : "taxa"} explored</span>
+          {/if}
         </div>
         {#if onshare}
           <button type="button" class="btn-secondary" bind:this={shareBtn} onclick={() => onshare?.()}>Share</button>
@@ -224,7 +230,10 @@
   /* Result banner — fills the input slot on end state. A bar of high-alpha turquoise glow;
      body-color text, one uniform bold line. Same height footprint as the input row. */
   .result {
-    display: flex; align-items: center;
+    /* column so the explore tally (#72) sits under the result sentence rather than extending it.
+       justify-content centers the stack in the banner, keeping the one-line case where it was. */
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+    gap: var(--space-1);
     /* takes the search field's place in the row, so it flexes and the end actions trail it */
     flex: 1 1 auto; min-width: 0;
     /* padding + transparent 2px border == the SearchBox input's box, so this banner is exactly
@@ -234,6 +243,9 @@
     box-shadow: var(--gem-glow);
   }
   .result-line { font-size: var(--type-body); font-weight: var(--fw-bold); color: var(--ink); }
+  /* Secondary by size, not by color: the banner's turquoise ground isn't the surface --ink-soft
+     was contrast-checked against, so this stays full --ink and steps down in scale/weight. */
+  .result-explored { font-size: var(--type-meta); font-weight: var(--fw-semibold); color: var(--ink); }
 
   /* Phone: the search field takes its own full-width line and the controls wrap beneath it.
      Without this the row's incompressible content overflows a 390px cluster and, since the shell

@@ -1,5 +1,5 @@
 import type { PlayLog, Stats } from "./stats";
-import { emptyStats, deserializeStats, serializeStats, recordPlay, windowStats, avgMoves, currentStreak } from "./stats";
+import { emptyStats, deserializeStats, serializeStats, recordPlay, windowStats, avgMoves, avgExplored, currentStreak } from "./stats";
 import { todayString } from "./daily";
 import type { Tier } from "../tree/tiers";
 import { tierSetting } from "./tierStore.svelte";
@@ -14,6 +14,8 @@ export interface StatsView {
   readonly month: { played: number; won: number; ratio: number | null };
   readonly dailyAvg: number | null;
   readonly overallAvg: number | null;
+  /** Mean Explore lookups per game, over ALL plays (#72) — a loss counts too. */
+  readonly exploredAvg: number | null;
   readonly allTime: { played: number; won: number; ratio: number | null };
   reset: () => void;
 }
@@ -49,6 +51,9 @@ function createStatsStore() {
       get overallAvg(): number | null {
         return avgMoves(state.byTier[tier].overall);
       },
+      get exploredAvg(): number | null {
+        return avgExplored(state.byTier[tier].overall);
+      },
       get allTime(): { played: number; won: number; ratio: number | null } {
         const o = state.byTier[tier].overall;
         return { played: o.played, won: o.won, ratio: o.played === 0 ? null : o.won / o.played };
@@ -75,10 +80,11 @@ function createStatsStore() {
     get month() { return viewFor(tierSetting.tier).month; },
     get dailyAvg(): number | null { return viewFor(tierSetting.tier).dailyAvg; },
     get overallAvg(): number | null { return viewFor(tierSetting.tier).overallAvg; },
+    get exploredAvg(): number | null { return viewFor(tierSetting.tier).exploredAvg; },
     get allTime() { return viewFor(tierSetting.tier).allTime; },
     /** Log one completed, non-seeded game. Caller fires this exactly once per game. */
     record(play: Omit<PlayLog, "t"> & { t?: number }) {
-      const full: PlayLog = { t: play.t ?? Date.now(), mode: play.mode, won: play.won, moves: play.moves, tier: play.tier };
+      const full: PlayLog = { t: play.t ?? Date.now(), mode: play.mode, won: play.won, moves: play.moves, explored: play.explored, tier: play.tier };
       state = recordPlay(state, full, todayString());
       save();
     },

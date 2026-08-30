@@ -97,3 +97,20 @@ describe("dailyKey / practiceKey / staleDailyKeys", () => {
     expect(staleDailyKeys(keys, "2026-07-12").sort()).toEqual(keys.sort());
   });
 });
+
+describe("exploreViews round-trip", () => {
+  it("survives serialize/deserialize", () => {
+    const withViews = { ...sample, exploreViews: ["Q1", "Q2"] };
+    expect(deserializeGame(serializeGame(withViews), "daily")?.exploreViews).toEqual(["Q1", "Q2"]);
+  });
+  it("is absent (not invalid) on a save written before the field existed", () => {
+    const state = deserializeGame(serializeGame(sample), "daily");
+    expect(state).not.toBeNull();
+    expect(state!.exploreViews).toBeUndefined();
+  });
+  it("drops a malformed value rather than rejecting the whole save", () => {
+    const state = deserializeGame(JSON.stringify({ ...sample, exploreViews: "nope" }), "daily");
+    expect(state).not.toBeNull();
+    expect(state!.exploreViews).toBeUndefined();
+  });
+});

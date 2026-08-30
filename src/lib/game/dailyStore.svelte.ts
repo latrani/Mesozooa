@@ -3,6 +3,7 @@ import { treeStore } from "./treeData";
 import { warmthForTarget, type WarmthProvider } from "./warmth";
 import {
   applyGuess,
+  applyExploreView,
   applyHint,
   newDailyState,
   warmestSharedNodeId,
@@ -122,12 +123,26 @@ function createDaily() {
       games[tier] = applyGuess(state, id, treeStore, warmth);
       save();
       if (was === "playing" && games[tier].status !== "playing") {
-        statsStore.record({ mode: "daily", tier, won: games[tier].status === "won", moves: movesUsed(games[tier]) });
+        statsStore.record({
+          mode: "daily",
+          tier,
+          won: games[tier].status === "won",
+          moves: movesUsed(games[tier]),
+          explored: games[tier].exploreViews?.length ?? 0,
+        });
       }
     },
     hint() {
       games[tier] = applyHint(state, treeStore, warmth);
       save();
+    },
+    /** An Explore lookup made while this round is live (#72). No-ops once the round is over.
+        Writes into the ACTIVE tier's slot, so a lookup counts toward the round you are playing
+        and not the ones parked in the other tiers. */
+    noteExploreView(nodeId: string) {
+      const before = games[tier];
+      games[tier] = applyExploreView(before, nodeId);
+      if (games[tier] !== before) save();
     },
   };
 }

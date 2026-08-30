@@ -3,6 +3,7 @@ import {
   applyGuess,
   applyHint,
   applyForfeit,
+  applyExploreView,
   hintCost,
   movesUsed,
   newRoundState,
@@ -449,5 +450,32 @@ describe("newRoundState seeded flag", () => {
   });
   it("leaves seeded undefined for a normal random round", () => {
     expect(newRoundState(store).seeded).toBeUndefined();
+  });
+});
+
+describe("applyExploreView", () => {
+  it("records a viewed node id while the game is in play", () => {
+    const s = applyExploreView(practice("TC"), "N1");
+    expect(s.exploreViews).toEqual(["N1"]);
+  });
+  it("dedupes a re-view of the same node", () => {
+    const s = applyExploreView(applyExploreView(practice("TC"), "N1"), "N1");
+    expect(s.exploreViews).toEqual(["N1"]);
+  });
+  it("keeps distinct nodes in view order", () => {
+    const s = applyExploreView(applyExploreView(practice("TC"), "N1"), "N2");
+    expect(s.exploreViews).toEqual(["N1", "N2"]);
+  });
+  it("returns the same reference on a repeat (no needless invalidation)", () => {
+    const once = applyExploreView(practice("TC"), "N1");
+    expect(applyExploreView(once, "N1")).toBe(once);
+  });
+  it("is a no-op once the round is over", () => {
+    const won = applyGuess(practice("TC"), "TC", store, warmthTC);
+    expect(won.status).toBe("won");
+    expect(applyExploreView(won, "N1")).toBe(won);
+  });
+  it("leaves a fresh round with no views", () => {
+    expect(practice("TC").exploreViews).toBeUndefined();
   });
 });
