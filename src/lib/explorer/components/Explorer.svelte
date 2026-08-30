@@ -1,5 +1,6 @@
 <script lang="ts">
   import { treeStore } from "../../game/treeData";
+  import { tierSetting } from "../../game/tierStore.svelte";
   import { explorer } from "../explorerStore.svelte";
   import { searchSource, pathPositions, resolveSearchPick } from "../explorer-core";
   import SpineTree from "../../game/components/SpineTree.svelte";
@@ -121,6 +122,7 @@
         {onnodeselect}
         {rightInset}
         gradeByPlayable
+        isPlayable={(id) => tierSetting.store.isPlayable(id)}
         emptyLabel="Search for a taxon to explore the tree."
       />
     {/snippet}

@@ -58,6 +58,7 @@
     showCounts = true,
     speakShared = false,
     gradeByPlayable = false,
+    isPlayable,
     linkLabels = false,
     focusOnClick = true,
     warmthProvider,
@@ -85,6 +86,10 @@
     /** grade genus labels by playability. On in Explore, so a name scanned here is worth
         carrying to the guess box; off in the game, whose pool is playable-only anyway. */
     gradeByPlayable?: boolean;
+    /** which genera the guess box currently accepts. MUST be supplied with gradeByPlayable under
+        difficulty tiers: the baked `playable` flag means Medium, so grading by it would tell an
+        Easy player that 734 names are guessable when 100 are. */
+    isPlayable?: (id: string) => boolean;
     /** underline labels to advertise them as links. On for the game's end state, where node
         clicks become portals into Explore — a new affordance appearing mid-session, so it has
         to announce itself. Off in Explore, where clicking the tree IS the mode. */
@@ -954,8 +959,8 @@
           class:spine={n?.onSpine}
           class:highlight={isHi}
           class:genus={node?.isGenus}
-          class:playable={gradeByPlayable && node?.isGenus && node.playable}
-          class:nonplayable={gradeByPlayable && node?.isGenus && !node.playable}
+          class:playable={gradeByPlayable && node?.isGenus && !!node && (isPlayable?.(node.id) ?? node.playable)}
+          class:nonplayable={gradeByPlayable && node?.isGenus && !!node && !(isPlayable?.(node.id) ?? node.playable)}
           class:clickable={!!onnodeselect}
           class:link={linkLabels && !!onnodeselect}
           transform={`translate(${d.x} ${d.y})`}

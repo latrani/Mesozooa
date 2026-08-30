@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick, untrack } from "svelte";
-  import { treeStore } from "../treeData";
+  import type { TreeStore } from "../treeStore";
   import type { GameState } from "../types";
   import SearchBox from "./SearchBox.svelte";
   import GuessList from "./GuessList.svelte";
@@ -8,6 +8,7 @@
   import SpecimenPlacard from "./SpecimenPlacard.svelte";
   import BoardLayout from "./BoardLayout.svelte";
   import { statsModal } from "../../components/statsModal.svelte";
+  import TierControl from "../../components/TierControl.svelte";
   import { specimenView, nodeView } from "../specimen-view";
   import type { WarmthProvider } from "../warmth";
   import { viewport } from "../../viewport.svelte";
@@ -21,6 +22,9 @@
   }: {
     store: {
       state: GameState;
+      /** The tier lens this game is played against. Comes from the game store rather than a
+          module import, so the board always renders against the tier its OWN game is in. */
+      tree: TreeStore;
       warmestId: string | null;
       revealed: Set<string>;
       warmthProvider: WarmthProvider;
@@ -40,7 +44,9 @@
     onshare?: () => void;
   } = $props();
 
-  const playableEntries = treeStore.playableGenera().map((n) => ({ id: n.id, name: n.name }));
+  // Autocomplete offers exactly the active tier's pool — the guess box and the answer pool are
+  // one and the same set (design spec § Tier definitions).
+  let playableEntries = $derived(store.tree.playableGenera().map((n) => ({ id: n.id, name: n.name })));
   // Autocomplete hides genera already guessed this round — no point re-guessing them.
   let guessedIds = $derived(
     new Set(store.state.guesses.filter((g) => g.kind === "guess").map((g) => g.guessId)),
@@ -81,10 +87,10 @@
   let treeTipId = $derived(
     store.state.status === "lost"
       ? store.state.target
-      : (store.warmestId ?? treeStore.data.rootId),
+      : (store.warmestId ?? store.tree.data.rootId),
   );
   let treeRevealed = $derived(
-    store.warmestId ? store.revealed : new Set([treeStore.data.rootId]),
+    store.warmestId ? store.revealed : new Set([store.tree.data.rootId]),
   );
 
   // Always show a move counter; max is null in Practice (unbounded) -> rendered as a bare count.
@@ -97,7 +103,7 @@
   // End state: the correct guess leaves the record and becomes the result banner.
   let ended = $derived(store.state.status !== "playing");
   let won = $derived(store.state.status === "won");
-  let answerName = $derived(treeStore.getNode(store.state.target)?.name ?? store.state.target);
+  let answerName = $derived(store.tree.getNode(store.state.target)?.name ?? store.state.target);
   // Real guesses only — gates the Forfeit button (nothing to forfeit before the first guess).
   let turnCount = $derived(store.state.guesses.filter((g) => g.kind === "guess").length);
   // The result banner counts MOVES, the same currency the budget spends: guesses plus what each
@@ -132,8 +138,8 @@
 
 <BoardLayout
   bind:sheetExpanded
-  hasExtraPanel={selectedId != null && treeStore.getNode(selectedId) != null}
-  extraPanelKey={selectedId != null && treeStore.getNode(selectedId) != null ? selectedId : null}
+  hasExtraPanel={selectedId != null && store.tree.getNode(selectedId) != null}
+  extraPanelKey={selectedId != null && store.tree.getNode(selectedId) != null ? selectedId : null}
 >
   {#snippet cluster()}
     {#if ended}
@@ -169,6 +175,9 @@
         {:else}
           <span class="budget">Moves remaining: {budget.max - budget.used}</span>
         {/if}
+        <!-- Phone only: the header has no room for a fourth control, and the tier has to stay
+             readable while playing — this is the line already read between guesses. -->
+        <span class="tier-inline"><TierControl compact /></span>
       </div>
     {/if}
     <GuessList
@@ -181,7 +190,7 @@
   {/snippet}
 
   {#snippet placard(peek: boolean)}
-    <SpecimenPlacard view={specimenView(store.state, treeStore)} {peek} />
+    <SpecimenPlacard view={specimenView(store.state, store.tree)} {peek} />
   {/snippet}
 
   {#snippet tree(rightInset)}
@@ -202,8 +211,8 @@
   {/snippet}
 
   {#snippet extraPanel(peek: boolean)}
-    {#if selectedId && treeStore.getNode(selectedId)}
-      <SpecimenPlacard view={nodeView(treeStore.getNode(selectedId)!)} {peek} />
+    {#if selectedId && store.tree.getNode(selectedId)}
+      <SpecimenPlacard view={nodeView(store.tree.getNode(selectedId)!)} {peek} />
     {/if}
   {/snippet}
 </BoardLayout>
@@ -211,6 +220,8 @@
 <style>
   /* Region skeleton is owned by BoardLayout; these rules back the snippet CONTENT only. */
   .input-row { display: flex; gap: var(--space-3); align-items: center; }
+  .tier-inline { display: none; }
+  @media (max-width: 640px) { .tier-inline { display: inline-flex; } }
   .budget {
     font-size: var(--type-body); font-weight: var(--fw-black);
     color: var(--btn-secondary-ink); 

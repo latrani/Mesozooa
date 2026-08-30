@@ -13,6 +13,7 @@
   import Explorer from "./lib/explorer/components/Explorer.svelte";
   import HowToPlay from "./lib/components/HowToPlay.svelte";
   import StatsPanel from "./lib/components/StatsPanel.svelte";
+  import TierControl from "./lib/components/TierControl.svelte";
   // Claw mark for the header, inlined so it inherits the header's cream color. ?raw gives the
   // file text; strip the wrapper to the drawing so a CSS `fill` reaches its (fill-less) path.
   import clawSvg from "./assets/claw.svg?raw";
@@ -134,6 +135,9 @@
   </span>
   <HowToPlay />
   <StatsPanel />
+  <!-- Desktop only: at phone width the header already carries three nav tabs plus two icon
+       buttons, so the tier moves into the board status row instead (design spec § IA). -->
+  <span class="tier-slot"><TierControl /></span>
   <nav
     class="modes"
     class:ready
@@ -171,6 +175,9 @@
 </footer>
 
 <style>
+  .tier-slot { align-self: center; }
+  @media (max-width: 640px) { .tier-slot { display: none; } }
+
   .app-header {
     display: flex;
     /* baseline so the wordmark and tagline sit on one line; the claw and nav opt back out to
@@ -180,8 +187,10 @@
     /* vertical padding halved from the side padding */
     padding: var(--space-2) var(--space-5);
     /* edge-to-edge terracotta placard casting a soft shadow DOWN onto the tree below, so the
-       tree canvas reads as inset. z-index keeps the shadow above the canvas. */
-    position: relative; z-index: 4;
+       tree canvas reads as inset. z-index keeps the shadow above the canvas — and above the
+       board's own cluster band (also 4, and later in the DOM), so the header's tier popover
+       overlays the board instead of being swallowed by it. Still below the sheet/placard at 8. */
+    position: relative; z-index: 6;
     background: linear-gradient(var(--placard), var(--placard-dp));
     border-bottom: 1px solid var(--placard-edge);
     box-shadow: 0 6px 16px -8px rgba(51, 38, 26, 0.35);

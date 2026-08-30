@@ -1,18 +1,36 @@
 import type { GameState, GameMode, GuessResult, GuessKind } from "./types";
+import type { Tier } from "../tree/tiers";
 
-const DAILY_PREFIX = "mesozooa:daily:1:";
+// v2 namespaces the tier: each tier holds its own game in each lane, so switching difficulty
+// mid-round never destroys the round you left.
+const DAILY_PREFIX = "mesozooa:daily:2:";
+const PRACTICE_PREFIX = "mesozooa:practice:2:";
 
-// Practice is a single slot (no date to namespace by) — the current round, whatever its status.
-export const PRACTICE_KEY = "mesozooa:practice:1";
+// v1, pre-tiers. Read once so an in-progress game survives the upgrade, then pruned. Both belong
+// to what is now Medium — that was the only pool.
+export const LEGACY_DAILY_PREFIX = "mesozooa:daily:1:";
+export const LEGACY_PRACTICE_KEY = "mesozooa:practice:1";
 
-export function dailyKey(date: string): string {
-  return DAILY_PREFIX + date;
+export function dailyKey(tier: Tier, date: string): string {
+  return `${DAILY_PREFIX}${tier}:${date}`;
 }
 
-// Daily-namespaced keys that aren't today's — safe to prune on load.
+export function practiceKey(tier: Tier): string {
+  return PRACTICE_PREFIX + tier;
+}
+
+export function legacyDailyKey(date: string): string {
+  return LEGACY_DAILY_PREFIX + date;
+}
+
+// Daily keys worth dropping on load: any tier's key for a past date, plus every v1 daily key
+// (superseded once the migration below has had its one chance to read them).
 export function staleDailyKeys(allKeys: string[], today: string): string[] {
-  const keep = dailyKey(today);
-  return allKeys.filter((k) => k.startsWith(DAILY_PREFIX) && k !== keep);
+  return allKeys.filter((k) => {
+    if (k.startsWith(LEGACY_DAILY_PREFIX)) return true;
+    if (!k.startsWith(DAILY_PREFIX)) return false;
+    return !k.endsWith(`:${today}`);
+  });
 }
 
 export function serializeGame(state: GameState): string {

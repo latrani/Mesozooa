@@ -13,33 +13,49 @@ import {
   movesUsed,
   leafHintActive,
 } from "./engine-core";
-import { serializeGame, deserializeGame, PRACTICE_KEY } from "./persistence";
+import { serializeGame, deserializeGame, practiceKey, LEGACY_PRACTICE_KEY } from "./persistence";
 import { statsStore } from "./statsStore.svelte";
+import { tierSetting } from "./tierStore.svelte";
+import { TIERS, type Tier } from "../tree/tiers";
+import { tierStores } from "./treeData";
 
 // Practice is a single slot: the current round survives reloads (and silent post-deploy
 // reloads) exactly like Daily. Solved/forfeited end-state persists; newRound overwrites it.
-function loadOrCreate(): GameState {
+function loadOrCreate(tier: Tier): GameState {
   if (typeof localStorage !== "undefined") {
-    const raw = localStorage.getItem(PRACTICE_KEY);
+    // Medium falls back to the pre-tier key so an in-progress round survives the upgrade.
+    const raw =
+      localStorage.getItem(practiceKey(tier)) ??
+      (tier === "medium" ? localStorage.getItem(LEGACY_PRACTICE_KEY) : null);
     const restored = raw ? deserializeGame(raw, "practice") : null;
     if (restored) return restored;
   }
-  return newRoundState(treeStore);
+  return newRoundState(tierStores[tier]);
 }
 
 export function createPractice() {
-  let state = $state<GameState>(loadOrCreate());
+  // One round per tier — switching difficulty parks the round you were on rather than ending it.
+  const games = $state<Record<Tier, GameState>>(
+    Object.fromEntries(TIERS.map((t) => [t, loadOrCreate(t)])) as Record<Tier, GameState>,
+  );
+  const tier = $derived(tierSetting.tier);
+  const treeStore = $derived(tierSetting.store);
+  const state = $derived(games[tier]);
   const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore, state.target));
 
   function save() {
     if (typeof localStorage !== "undefined") {
-      localStorage.setItem(PRACTICE_KEY, serializeGame(state));
+      localStorage.setItem(practiceKey(tier), serializeGame(games[tier]));
     }
   }
 
   return {
     get state(): GameState {
       return state;
+    },
+    /** The lens this round is played against — GameBoard renders from it. */
+    get tree() {
+      return treeStore;
     },
     get warmthProvider(): WarmthProvider {
       return warmth;
@@ -67,30 +83,31 @@ export function createPractice() {
     },
     guess(id: string) {
       const was = state.status;
-      state = applyGuess(state, id, treeStore, warmth);
+      games[tier] = applyGuess(state, id, treeStore, warmth);
       save();
-      if (was === "playing" && state.status !== "playing" && !state.seeded) {
-        statsStore.record({ mode: "practice", won: state.status === "won", moves: movesUsed(state) });
+      if (was === "playing" && games[tier].status !== "playing" && !games[tier].seeded) {
+        // Stats are still global across tiers; per-tier streaks are slice 4.
+        statsStore.record({ mode: "practice", won: games[tier].status === "won", moves: movesUsed(games[tier]) });
       }
     },
     hint() {
-      state = applyHint(state, treeStore, warmth);
+      games[tier] = applyHint(state, treeStore, warmth);
       save();
     },
     forfeit() {
       const was = state.status;
-      state = applyForfeit(state);
+      games[tier] = applyForfeit(state);
       save();
-      if (was === "playing" && state.status !== "playing" && !state.seeded) {
-        statsStore.record({ mode: "practice", won: false, moves: movesUsed(state) });
+      if (was === "playing" && games[tier].status !== "playing" && !games[tier].seeded) {
+        statsStore.record({ mode: "practice", won: false, moves: movesUsed(games[tier]) });
       }
     },
     newRound() {
-      state = newRoundState(treeStore);
+      games[tier] = newRoundState(treeStore);
       save();
     },
     startWith(targetId: string) {
-      state = newRoundState(treeStore, Math.random, targetId);
+      games[tier] = newRoundState(treeStore, Math.random, targetId);
       save();
     },
   };

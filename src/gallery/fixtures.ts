@@ -1,9 +1,10 @@
 // Gallery fixtures — real GameStates built by running the REAL engine, so every
 // gallery panel shows exactly what the game would produce (not hand-faked state).
 // Dev-only (imported by the gallery entry, never by the app).
+import type { TreeStore } from "../lib/game/treeStore";
 import type { GameState } from "../lib/game/types";
 import type { GenusAttribute } from "../lib/attributes";
-import { treeStore } from "../lib/game/treeData";
+import { treeStore, tierStores } from "../lib/game/treeData";
 import { warmthForTarget, type WarmthProvider } from "../lib/game/warmth";
 import {
   newDailyState,
@@ -31,11 +32,14 @@ export interface FixtureStore {
   movesRemaining?: number;
   guessesUsed?: number;
   readonly warmthProvider: WarmthProvider;
+  readonly tree: TreeStore;
 }
 
 export function fixtureStore(state: GameState, opts: { daily?: boolean } = {}): FixtureStore {
   const base: FixtureStore = {
     state,
+    // Pinned to Medium on purpose: a visual harness must not shift under the player's setting.
+    tree: tierStores.medium,
     warmestId: warmestSharedNodeId(state, treeStore),
     revealed: revealedNodeIds(state, treeStore),
     clue: state.guesses.some((g) => g.kind === "leafHint") ? clueFor(state.target) : null,
