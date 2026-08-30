@@ -8,7 +8,6 @@
   import SpecimenPlacard from "./SpecimenPlacard.svelte";
   import BoardLayout from "./BoardLayout.svelte";
   import { statsModal } from "../../components/statsModal.svelte";
-  import TierControl from "../../components/TierControl.svelte";
   import { specimenView, nodeView } from "../specimen-view";
   import type { WarmthProvider } from "../warmth";
   import { viewport } from "../../viewport.svelte";
@@ -175,9 +174,6 @@
         {:else}
           <span class="budget">Moves remaining: {budget.max - budget.used}</span>
         {/if}
-        <!-- Phone only: the header has no room for a fourth control, and the tier has to stay
-             readable while playing — this is the line already read between guesses. -->
-        <span class="tier-inline"><TierControl compact /></span>
       </div>
     {/if}
     <GuessList
@@ -220,8 +216,6 @@
 <style>
   /* Region skeleton is owned by BoardLayout; these rules back the snippet CONTENT only. */
   .input-row { display: flex; gap: var(--space-3); align-items: center; }
-  .tier-inline { display: none; }
-  @media (max-width: 640px) { .tier-inline { display: inline-flex; } }
   .budget {
     font-size: var(--type-body); font-weight: var(--fw-black);
     color: var(--btn-secondary-ink); 

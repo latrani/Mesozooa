@@ -168,13 +168,16 @@ Difficulty is a **player setting**, not a lane — it applies to Daily and Pract
 persists across sessions. But it changes what your score means, so it has to stay legible
 while playing, not hide in a modal.
 
-Proposal: a tier control in the header beside How-to-play and Stats, opening a small popover;
-the active tier is echoed in the board's status row so it's in frame during play.
+The control rides **beside the active mode tab**, and only there — Daily and Practice each carry
+it while selected; Explore never does, because Explore has no difficulty of its own. Attaching it
+to the lane rather than parking it in the header says what it governs without a word of copy, and
+it keeps the setting in the one row a player already reads to know where they are.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 🐾 Mesozooa  Find today's dinosaur!   [?] [◫] [Medium ▾]             │
-│                                        Daily • Practice • Explore     │
+│ 🐾 Mesozooa  Find today's dinosaur!   [?] [◫]                        │
+│                          Daily (Medium ▾) · Practice · Explore       │
+│                          ‾‾‾‾‾                                        │
 └──────────────────────────────────────────────────────────────────────┘
 
         ┌ Difficulty ──────────────────────────────┐
@@ -182,41 +185,22 @@ the active tier is echoed in the board's status row so it's in frame during play
         │  ○ Medium   734 · the standard set        │
         │  ○ Hard   1,170 · Mesozoic Mind           │
         │                                            │
-        │  Each tier has its own daily puzzle and    │
-        │  streak. Switching keeps both games.       │
+        │  Each difficulty keeps its own daily       │
+        │  puzzle and round — switching loses none.  │
         └────────────────────────────────────────────┘
 ```
 
-Board status row, both lanes:
+Switching lanes moves the chip with it. The tab bar's sliding indicator still measures the
+button, so it underlines the mode name alone and the chip reads as a qualifier on it rather than
+a fourth tab.
 
-```
-┌ board ───────────────────────────────────────────────────────────────┐
-│ ┌ placard ──────┐  ┌ tree ──────────────────────────────────────┐   │
-│ │   specimen    │  │                                             │   │
-│ └───────────────┘  └─────────────────────────────────────────────┘   │
-│ ┌──────────────────────────────────────────────────────────────────┐ │
-│ │ [search…]          Medium · 12 of 20 moves left        [💡 2]    │ │
-│ └──────────────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-Stats, tier-tabbed, defaulting to the active tier:
-
-```
-┌ Stats ────────────────────────────────┐
-│  [ Easy ][ Medium ][ Hard ]           │
-│  Streak      4        Best     11     │
-│  This week   5/6      Month  18/22    │
-│  Avg moves   7.2                      │
-└───────────────────────────────────────┘
-```
-
-**Phone: the tier control lives in the board status row, not the header.** The header already
-carries three nav tabs plus two icon buttons, and the tier name is the widest of the three
-controls; it does not earn header space at that width. In the status row it sits beside the
-move counter — the one line already read between guesses — and stays in frame during play,
-which is the requirement. Explore has no status row, so on phone the control simply isn't
-present there; the tier persists and applies as soon as you return to a game lane.
+**Phone** takes the same arrangement rather than a separate one. An earlier draft put the control
+in the board's status row on the grounds that the header could not carry a fourth control — but
+tying it to the active tab means there is no fourth control to place, only a chip beside one of
+three. That leaves the status row to the move counter alone, which is tidier than what the
+header-plus-status-row split produced. The one phone-specific rule is the menu: it drops the full
+width of the tab bar instead of anchoring to the chip, which would hang off the left edge when
+Daily is active and off the right when Practice is.
 
 Explore is untouched — whole reference pool, true counts — except `gradeByPlayable`, which
 grades genus labels by *whether the guess box accepts them*. That must follow the active tier,

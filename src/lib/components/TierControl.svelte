@@ -3,9 +3,6 @@
   import { tierStores } from "../game/treeData";
   import { TIERS, type Tier } from "../tree/tiers";
 
-  // `compact` is the phone placement (the board status row); the default is the header button.
-  let { compact = false }: { compact?: boolean } = $props();
-
   let open = $state(false);
   let rootEl = $state<HTMLElement>();
 
@@ -41,13 +38,10 @@
   });
 </script>
 
-<span class="tier-control" class:compact bind:this={rootEl}>
+<span class="tier-control" bind:this={rootEl}>
   <button
     type="button"
-    class="tier-button"
-    class:btn-secondary={!compact}
-    class:btn-secondary-inverse={!compact}
-    class:btn-small={!compact}
+    class="tier-button btn-secondary btn-secondary-inverse btn-small"
     aria-haspopup="true"
     aria-expanded={open}
     aria-label="Difficulty: {LABEL[tierSetting.tier]}"
@@ -55,7 +49,7 @@
   >
 
   {#if open}
-    <div class="menu" role="menu" aria-label="Difficulty">
+    <div class="menu tier-menu" role="menu" aria-label="Difficulty">
       <p class="menu-head">Difficulty</p>
       {#each TIERS as t (t)}
         <button
@@ -77,16 +71,10 @@
 
 <style>
   .tier-control { position: relative; display: inline-flex; align-items: center; }
+  /* Smaller than the mode labels it sits beside: the lane is the heading, the difficulty is a
+     qualifier on it, and the tab bar's indicator should stay the loudest thing in the row. */
+  .tier-button { font-size: var(--type-label); }
   .caret { margin-left: 0.35em; font-size: 0.8em; opacity: 0.75; }
-
-  /* Compact (phone status row): reads as a quiet inline control beside the move counter rather
-     than a second button competing with Hint. */
-  .compact .tier-button {
-    background: none; border: none; padding: 0;
-    font-family: inherit; font-size: var(--type-body); font-weight: var(--fw-black);
-    color: var(--btn-secondary-ink); white-space: nowrap; cursor: pointer;
-  }
-  .compact .tier-button:hover { text-decoration: underline; }
 
   .menu {
     position: absolute; top: calc(100% + var(--space-2)); right: 0; z-index: 20;
@@ -99,9 +87,6 @@
     border: 1px solid var(--placard-edge); border-radius: var(--radius-card);
     box-shadow: var(--shadow-placard);
   }
-  /* No compact override: on phone the status row sits near the TOP of the board (y~164 of 844),
-     so the default downward, right-anchored menu is the one that stays on screen. Opening it
-     upward put it at y=-160. */
 
   .menu-head {
     margin: 0 0 var(--space-2); font-size: var(--type-label); font-weight: var(--fw-bold);

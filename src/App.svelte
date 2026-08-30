@@ -53,9 +53,10 @@
   // transition durations, so the leading edge sprints ahead, the trailing edge dawdles, and
   // the bar is momentarily longer than either label before snapping to its new width.
   const modes = $derived([
-    { tab: "daily" as const, label: "Daily", progress: hasProgress(daily.state) },
-    { tab: "practice" as const, label: "Practice", progress: hasProgress(practice.state) },
-    { tab: "explore" as const, label: "Explore", progress: false },
+    { tab: "daily" as const, label: "Daily", progress: hasProgress(daily.state), tiered: true },
+    { tab: "practice" as const, label: "Practice", progress: hasProgress(practice.state), tiered: true },
+    // Explore has no difficulty of its own — it is the whole reference pool, always.
+    { tab: "explore" as const, label: "Explore", progress: false, tiered: false },
   ]);
 
   let navEl = $state<HTMLElement>();
@@ -135,9 +136,6 @@
   </span>
   <HowToPlay />
   <StatsPanel />
-  <!-- Desktop only: at phone width the header already carries three nav tabs plus two icon
-       buttons, so the tier moves into the board status row instead (design spec § IA). -->
-  <span class="tier-slot"><TierControl /></span>
   <nav
     class="modes"
     class:ready
@@ -153,6 +151,11 @@
         aria-current={nav.tab === m.tab ? "page" : undefined}
         onclick={() => nav.set(m.tab)}>{m.label}{#if m.progress}<span class="progress-dot" aria-hidden="true"></span><span class="sr-only"> in progress</span>{/if}</button
       >
+      <!-- Difficulty belongs to the lane you are in, so it rides beside the ACTIVE game tab and
+           is absent everywhere else. That is also what frees the board's status row on phone. -->
+      {#if m.tiered && nav.tab === m.tab}
+        <TierControl />
+      {/if}
     {/each}
     <!-- decorative: aria-current on the buttons already carries "which mode am I in" -->
     <span class="indicator" aria-hidden="true"></span>
@@ -175,9 +178,6 @@
 </footer>
 
 <style>
-  .tier-slot { align-self: center; }
-  @media (max-width: 640px) { .tier-slot { display: none; } }
-
   .app-header {
     display: flex;
     /* baseline so the wordmark and tagline sit on one line; the claw and nav opt back out to
@@ -227,6 +227,7 @@
      width and the ~40px a second row would cost is 8% of the tree's height budget. */
   .modes {
     display: flex;
+    align-items: center;
     gap: var(--space-5);
     margin-left: auto;
     align-self: center;   /* keep the nav vertically centered, out of the baseline row */
@@ -328,6 +329,12 @@
        breathing room instead of hugging the screen edges. The indicator measures offsetLeft and
        offsetWidth, so it follows the third rather than the text - which reads as a proper tab bar. */
     .modes button { flex: 1 1 0; text-align: center; }
+    /* The chip sizes to its content; only the three tabs share the row equally. */
+    .modes :global(.tier-control) { flex: 0 0 auto; }
+    /* Drop the menu the full width of the tab bar rather than anchoring it to the chip, which
+       would hang off the left edge when Daily is active and off the right when Practice is. */
+    .modes :global(.tier-control) { position: static; }
+    .modes :global(.tier-menu) { left: 0; right: 0; min-width: 0; }
     .app-footer { display: none; }
   }
 </style>
