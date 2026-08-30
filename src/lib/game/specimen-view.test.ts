@@ -78,9 +78,11 @@ const practice = (target: string): GameState => ({
 });
 
 describe("specimenView", () => {
-  it("empty -> unidentified placeholder", () => {
+  it("empty -> unidentified placeholder, titled by what is still in the running", () => {
     const v = specimenView(practice("TC"), store);
-    expect(v.title).toBeNull();
+    // The specimen is still anonymous — the title now says how much ground is left rather than
+    // "? ? ?", which said nothing.
+    expect(v.title).toBe("4 candidate specimens");
     expect(v.mount).toEqual({ kind: "slip", text: "New exhibit coming soon!", tilt: -4 });
     expect(v.fields).toEqual([
       { label: "Lived", value: null },
@@ -96,55 +98,63 @@ describe("specimenView", () => {
   });
 });
 
-describe("the anchor note", () => {
+describe("the candidate count title", () => {
   // FIXTURE: Q430 > T > {TF > {TR, TB}, LO}; Q430 > O > CF > TC. All four genera playable.
-  const anchorTree = assembleTree(pruneSubtree(FIXTURE_RAWS, NEORNITHES), DINOSAURIA, "test");
-  markPlayable(anchorTree);
-  const anchorStore = createTreeStore(anchorTree);
-  const w = warmthForTarget(anchorStore, "TR");
+  const scopeTree = assembleTree(pruneSubtree(FIXTURE_RAWS, NEORNITHES), DINOSAURIA, "test");
+  markPlayable(scopeTree);
+  const scopeStore = createTreeStore(scopeTree);
+  const w = warmthForTarget(scopeStore, "TR");
   const round = (): GameState => ({
     target: "TR", guesses: [], status: "playing", mode: "practice", maxGuesses: null, hintsUsed: 0,
   });
 
-  it("is absent before warmth pins at the anchor", () => {
-    // Guessing across the tree leaves the trail broad; the note must not appear yet.
-    const s = applyGuess(round(), "TC", anchorStore, w);
-    const v = specimenView(s, anchorStore);
-    expect(v.anchor).toBeNull();
+  it("opens at the whole tier before a single guess", () => {
+    // The card is a progress readout from the first render, not a late-game reveal.
+    const v = specimenView(round(), scopeStore);
+    expect(v.title).toBe("4 candidate specimens");
+    expect(v.explore!.nodeId).toBe("Q430");
   });
 
-  it("names the warmest shared clade and its candidate count once pinned", () => {
-    // Tarbosaurus shares Tyrannosauridae with the target, which is its terminal clade.
-    const s = applyGuess(round(), "TB", anchorStore, w);
-    const v = specimenView(s, anchorStore);
-    expect(v.anchor).not.toBeNull();
-    expect(v.anchor!.cladeId).toBe("TF");
-    expect(v.anchor!.cladeName).toBe("Tyrannosauridae");
-    // TF holds TR + TB; TB is now guessed and eliminated, leaving one candidate.
-    expect(v.anchor!.candidates).toBe(1);
+  it("narrows as the trail narrows", () => {
+    // Guessing Triceratops shares only Dinosauria, so the scope stays the root — minus the
+    // genus just spent.
+    let s = applyGuess(round(), "TC", scopeStore, w);
+    expect(specimenView(s, scopeStore).title).toBe("3 candidate specimens");
+    // Tarbosaurus shares Tyrannosauridae: the scope collapses to that clade, TB now eliminated.
+    s = applyGuess(s, "TB", scopeStore, w);
+    const v = specimenView(s, scopeStore);
+    expect(v.title).toBe("1 candidate specimen"); // singular
+    expect(v.explore!.nodeId).toBe("TF");
+    expect(v.explore!.destination).toBe("Tyrannosauridae");
   });
 
-  it("counts down only the guesses INSIDE the clade", () => {
-    // Triceratops is nowhere near Tyrannosauridae, so it eliminates nothing there.
-    let s = applyGuess(round(), "TB", anchorStore, w);
-    const before = specimenView(s, anchorStore).anchor!.candidates;
-    s = applyGuess(s, "TC", anchorStore, w);
-    expect(specimenView(s, anchorStore).anchor!.candidates).toBe(before);
+  it("counts down only the guesses INSIDE the current scope", () => {
+    // Once scoped to Tyrannosauridae, a Triceratops guess eliminates nothing there.
+    let s = applyGuess(round(), "TB", scopeStore, w);
+    const before = specimenView(s, scopeStore).title;
+    s = applyGuess(s, "TC", scopeStore, w);
+    expect(specimenView(s, scopeStore).title).toBe(before);
   });
 
-  it("is absent once the round is over", () => {
-    const s = applyGuess(round(), "TR", anchorStore, w); // solved
-    expect(specimenView(s, anchorStore).anchor).toBeNull();
+  it("always offers the explore jump while in play", () => {
+    const fresh = specimenView(round(), scopeStore);
+    const played = specimenView(applyGuess(round(), "TC", scopeStore, w), scopeStore);
+    expect(fresh.explore!.label).toBe("Explore from here");
+    expect(played.explore!.label).toBe("Explore from here");
+  });
+
+  it("drops both once the round is over — the card becomes the real specimen", () => {
+    const v = specimenView(applyGuess(round(), "TR", scopeStore, w), scopeStore);
+    expect(v.title).toBe("Tyrannosaurus");
+    expect(v.explore).toBeNull();
   });
 
   it("counts the POOL, not the clade — a sparser tier leaves fewer candidates", () => {
-    // Same clade, a pool that excludes Tarbosaurus: the note must speak for the tier in play.
-    const sparse = createTreeStore(anchorTree, ["TR", "TC"]);
-    const sw = warmthForTarget(sparse, "TR");
-    const s = applyGuess(round(), "TC", sparse, sw);
-    const v = specimenView(s, sparse);
-    // With only TR and TC in the pool, TF holds a single pool member, so the terminal clade
-    // climbs to the root — and the count is of pool members, not of genera.
-    expect(v.anchor!.candidates).toBeLessThan(anchorTree.nodes[v.anchor!.cladeId].descendantGenusCount);
+    const sparse = createTreeStore(scopeTree, ["TR", "TC"]);
+    expect(specimenView(round(), sparse).title).toBe("2 candidate specimens");
+  });
+
+  it("never carries an explore jump on a reference card", () => {
+    expect(nodeView(scopeTree.nodes["TF"]).explore).toBeNull();
   });
 });

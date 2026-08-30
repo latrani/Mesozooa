@@ -24,7 +24,6 @@
   <span class="peek-row">
     <span class="peek-title">{view.title ?? "? ? ?"}</span>
     {#if view.note}<span class="peek-note">{view.note}</span>{/if}
-    {#if view.anchor}<span class="peek-note">{view.anchor.candidates} left</span>{/if}
   </span>
 {:else}
   <aside class="specimen-placard" aria-label="Specimen">
@@ -59,24 +58,18 @@
 
     {#if view.note}<p class="note">{view.note}</p>{/if}
 
-    {#if view.anchor}
-      {@const a = view.anchor}
-      <p class="anchor">
-        {#if onexplore}
-          <button
-            type="button"
-            class="anchor-link"
-            title="See {a.cladeName} in Explore"
-            onclick={() => onexplore?.(a.cladeId)}
-          >{a.cladeName} · {a.candidates} candidate specimen{a.candidates === 1 ? "" : "s"}</button>
-        {:else}
-          {a.cladeName} · {a.candidates} candidate specimen{a.candidates === 1 ? "" : "s"}
-        {/if}
-      </p>
-    {/if}
-
     {#if view.link}
       <a class="wiki" href={view.link.href} target="_blank" rel="noopener noreferrer">{view.link.label}</a>
+    {/if}
+
+    {#if view.explore && onexplore}
+      {@const e = view.explore}
+      <button
+        type="button"
+        class="explore-link"
+        title="Open {e.destination} in Explore"
+        onclick={() => onexplore?.(e.nodeId)}>{e.label} <span aria-hidden="true">→</span></button
+      >
     {/if}
   </aside>
 {/if}
@@ -112,15 +105,14 @@
   /* De-emphasized: honest reference context (genera count), not a primary signal — smaller so it
      reads as minor caption beneath the title. See two-phase warmth work / #41. */
   .note { color: var(--specimen-text-dim); font-size: var(--type-label); }
-  /* The anchor note. Arrives only when the warm trail has bottomed out, so it reads a step
-     louder than .note — it is the live state of the hunt, not background reference. */
-  .anchor { margin: 0; font-size: var(--type-label); color: var(--specimen-text); }
-  .anchor-link {
-    padding: 0; border: none; background: none; cursor: pointer;
-    font: inherit; color: inherit; text-align: left;
-    text-decoration: underline; text-underline-offset: 2px;
+  /* Always present while a round is in play, so it reads as a standing affordance rather than
+     something that appeared mid-game. Matches .wiki's weight and placement. */
+  .explore-link {
+    align-self: flex-start; padding: 0; border: none; background: none; cursor: pointer;
+    font-family: inherit; font-weight: var(--fw-semibold); font-size: var(--type-label);
+    color: var(--sand-200); text-align: left;
   }
-  .anchor-link:hover { color: var(--sand-200); }
+  .explore-link:hover { text-decoration: underline; text-underline-offset: 2px; }
   .wiki { font-weight: var(--fw-semibold); font-size: var(--type-label); align-self: flex-start; color: var(--sand-200); }
   /* image credit — small, understated provenance; hugs the photo via the figure's 2px gap. */
   .credit { margin: 0; font-size: var(--type-meta); opacity: .55; display: flex; max-width: 100%; }

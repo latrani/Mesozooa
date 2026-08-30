@@ -220,63 +220,63 @@ present there; the tier persists and applies as soon as you return to a game lan
 
 Explore is untouched — whole reference pool, true counts — except `gradeByPlayable`, which
 grades genus labels by *whether the guess box accepts them*. That must follow the active tier,
-or the grading lies to an Easy player. See **The anchor note** for the exact rule.
+or the grading lies to an Easy player. See **The candidate count** for the exact rule.
 
-## The anchor note
+## The candidate count — the answer card's title
 
-The fix for the flat endgame described under *Deferred / noted*. One line, appearing at one
-moment.
+The fix for the flat endgame described under *Deferred / noted*, revised after playtest. It was
+first specified as a single line appearing only at the anchor; that put it out of sight for most
+of a round and made it read as a late-game surprise. It is now the card's **title**, live from
+the first render.
 
-**When.** Only once warmth pins at the anchor (`leafHintActive`). Before that, play stays
-countless — #41's call to keep `showCounts={false}` during play stands. This is not a general
-un-hiding of counts; it is a single line that arrives exactly when the warm trail stops being
-informative and the clue takes over.
-
-**What.** The specimen placard's `note` — `null` throughout play today — renders the warmest
-shared clade and its size in the active tier:
+**What.** The in-play answer card is titled by how many pool members of the narrowest clade you
+have established are still in the running — the whole tier before your first guess, counting down
+as the trail narrows:
 
 ```
 ┌ placard ───────────────────┐
-│ ? ? ?                      │
+│ 2 candidate specimens      │  ← the title. was "? ? ?"
 │ ┌────────────────────────┐ │
 │ │  New exhibit           │ │
 │ │  coming soon!          │ │
 │ └────────────────────────┘ │
-│ Lived:    Middle Jurassic  │
-│           (Bajocian, …)    │
-│ Found in: China            │
-│           (Sichuan, …)     │
-│                            │
-│ Theropoda ·                │
-│ 513 candidate specimens    │  ← new. the count is the affordance
+│ Lived:    ? ? ?            │
+│ Found in: ? ? ?            │
+│ Explore from here →        │  ← always present while in play
 └────────────────────────────┘
 ```
 
-**Copy.** "**513 candidate specimens**" — deliberately not "genera" and not "dinosaurs". The
-card is describing the state of your hunt, so it counts candidates; a taxonomic word here would
-read as a claim about Theropoda's size and collide with the reference cards that legitimately
-say "751 genera in this clade". See **Counts: two surfaces, two questions**. "Specimen" is
-already this card's vocabulary ("Specimen missing", `specimenState`).
+A real round reads 734 → 733 → 279 → 2. The number *is* the progress readout, which is what the
+card previously had nothing of: "? ? ?" said only that the specimen was unidentified, which the
+photo slip already said.
 
-**The affordance.** The count is a button. Clicking it hands off to Explore focused on that
-clade — the existing `nav.exploreAround(id)` path already used at end state. No new Explore
-functionality: no filtering, no scoping, Explore remains the full reference explorer. Hover
-title and accessible name say where it goes: *"See Theropoda in Explore."*
+**Copy.** "**candidate specimens**" — deliberately not "genera" and not "dinosaurs". The card
+describes the state of your hunt, so it counts candidates; a taxonomic word here would read as a
+claim about the clade's size and collide with the reference cards, which legitimately say "751
+genera in this clade". See **Counts: two surfaces, two questions**. "Specimen" is already this
+card's vocabulary ("Specimen missing", `specimenState`).
 
-**The one requirement it puts on Explore.** `gradeByPlayable` reads the global `node.playable`
-today. Under tiers it must read the pool of **the current game's tier**, or a player arriving
-from an Easy game sees Medium's guessable set graded as accepted — the grading would lie at
-precisely the moment it's being relied on. Since choosing a tier is what makes that tier's game
-current, active tier and most-recently-touched game coincide; if the two lanes are ever allowed
-to sit at different tiers independently, this needs an explicit last-touched pointer rather
-than reading the setting.
+**The affordance.** "Explore from here →" sits at the bottom of the card for the whole round,
+jumping to the clade the count is scoped to via the existing `nav.exploreAround` path. No new
+Explore functionality. Because the label is generic, the destination is named in the button's
+`title` and accessible name: *"Open Tyrannosaurini in Explore."* Being always present, it reads
+as a standing affordance rather than something that appears mid-game and has to explain itself.
 
-**Consequence worth knowing.** At the anchor, one click now shows the neighbourhood you're
-stuck in, with guessable genera graded. In Hard that's a 513-member clade — orientation, not an
-answer. In Easy and Medium the terminal clade is 3–5, so the same click lands close to a
-candidate list. It adds no capability (Explore is already a tab away and already grades by
-playability) — it removes friction, which is the point, but the friction was doing some work.
-Reads as an escape hatch rather than a cheat. If it ever needs pricing, the share line has the
+**The count** subtracts only pool members you have actually guessed inside the current scope.
+That understates progress — a guess inside a sub-branch eliminates the whole branch, not just the
+one genus — but a number claiming less narrowing than really happened is the safe direction, and
+computing true elimination would mean running a deduction engine over the guess history.
+
+**The one requirement it puts on Explore.** `gradeByPlayable` read the global `node.playable`
+flag, which means Medium. It now reads the pool of **the current game's tier**, or a player
+arriving from an Easy game would see Medium's guessable set graded as accepted — the grading would
+lie at precisely the moment it is being relied on.
+
+**Consequence worth knowing.** The jump shows the neighbourhood you are stuck in with guessable
+genera graded. In Hard that is orientation across a large clade; in Easy and Medium the scope
+narrows to 3–5 late on, so the same click lands close to a candidate list. It adds no capability
+(Explore is already a tab away and already grades by playability) — it removes friction, which is
+the point, but the friction was doing some work. If it ever needs pricing, the share line has the
 precedent in its 🔦 hint tally.
 
 ## Counts: two surfaces, two questions
@@ -350,7 +350,7 @@ player's guess history.
     (Campanian), Mongolia (Ömnögovi, Djadochta Formation)" and the information to finish is
     there — but the player must *produce the name* from a 513-member space they can't
     enumerate. At a 5-member terminal clade you brute-force by guessing; at 513 you can't.
-    Addressed by **The anchor note** below.
+    Addressed by **The candidate count** below.
 - **The isolated-genus cases** (Dilophosaurus, Cryolophosaurus, Agilisaurus, Eoraptor) are
   #13 symptoms; note them there.
 
