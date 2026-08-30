@@ -13,13 +13,27 @@ import {
   movesUsed,
   leafHintActive,
 } from "./engine-core";
-import { dailyAnswer, todayString } from "./daily";
+import { dailyAnswersByTier, todayString } from "./daily";
 import dailyCalendar from "../../data/daily-calendar.json";
 import { serializeGame, deserializeGame, dailyKey, legacyDailyKey, staleDailyKeys } from "./persistence";
 import { statsStore } from "./statsStore.svelte";
 import { tierSetting } from "./tierStore.svelte";
 import { TIERS, type Tier } from "../tree/tiers";
 import { tierStores } from "./treeData";
+
+// All three answers for a date, computed once per date and reused by each tier's loader.
+const answerCache = new Map<string, Record<Tier, string>>();
+function answersFor(date: string): Record<Tier, string> {
+  let a = answerCache.get(date);
+  if (!a) {
+    const pools = Object.fromEntries(
+      TIERS.map((t) => [t, tierStores[t].playableGenera().map((n) => ({ id: n.id }))]),
+    ) as Record<Tier, { id: string }[]>;
+    a = dailyAnswersByTier(date, pools, dailyCalendar as Record<string, string>);
+    answerCache.set(date, a);
+  }
+  return a;
+}
 
 // Drop persisted state from earlier days so keys don't accumulate.
 function pruneStale(today: string): void {
@@ -41,9 +55,9 @@ function loadOrCreate(date: string, tier: Tier): GameState {
     // tier's lens.
     if (restored) return refreshWarmth(restored, store, warmthForTarget(store, restored.target));
   }
-  // Each tier draws from its own pool, so each already gets its own answer of the day.
-  const pool = store.playableGenera().map((n) => ({ id: n.id }));
-  return newDailyState(dailyAnswer(date, pool, dailyCalendar as Record<string, string>));
+  // Drawn jointly across the tiers so no genus is the answer twice on one date — solving one
+  // tier must never hand you another.
+  return newDailyState(answersFor(date)[tier]);
 }
 
 function createDaily() {
@@ -108,8 +122,7 @@ function createDaily() {
       games[tier] = applyGuess(state, id, treeStore, warmth);
       save();
       if (was === "playing" && games[tier].status !== "playing") {
-        // Stats are still global across tiers; per-tier streaks are slice 4.
-        statsStore.record({ mode: "daily", won: games[tier].status === "won", moves: movesUsed(games[tier]) });
+        statsStore.record({ mode: "daily", tier, won: games[tier].status === "won", moves: movesUsed(games[tier]) });
       }
     },
     hint() {

@@ -86,8 +86,7 @@ export function createPractice() {
       games[tier] = applyGuess(state, id, treeStore, warmth);
       save();
       if (was === "playing" && games[tier].status !== "playing" && !games[tier].seeded) {
-        // Stats are still global across tiers; per-tier streaks are slice 4.
-        statsStore.record({ mode: "practice", won: games[tier].status === "won", moves: movesUsed(games[tier]) });
+        statsStore.record({ mode: "practice", tier, won: games[tier].status === "won", moves: movesUsed(games[tier]) });
       }
     },
     hint() {
@@ -99,7 +98,7 @@ export function createPractice() {
       games[tier] = applyForfeit(state);
       save();
       if (was === "playing" && games[tier].status !== "playing" && !games[tier].seeded) {
-        statsStore.record({ mode: "practice", won: false, moves: movesUsed(games[tier]) });
+        statsStore.record({ mode: "practice", tier, won: false, moves: movesUsed(games[tier]) });
       }
     },
     newRound() {

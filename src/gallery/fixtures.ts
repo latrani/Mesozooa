@@ -152,23 +152,26 @@ const STATS_NOW = Date.parse("2026-07-22T12:00:00Z");
 const STATS_TODAY = "2026-07-22";
 const DAY = 86_400_000;
 
+// Gallery stats states are single-tier snapshots, written into Medium's slot. The panel's tier
+// tabs only render for the LIVE store, so each fixture shows exactly one state.
 function statsView(s: Stats): StatsView {
-  const o = s.overall;
+  const o = s.byTier.medium.overall;
   return {
     get streak() {
-      return { ...s.streak, current: currentStreak(s.streak, STATS_TODAY) };
+      const st = s.byTier.medium.streak;
+      return { ...st, current: currentStreak(st, STATS_TODAY) };
     },
     get week() {
-      return windowStats(s, STATS_NOW, 7);
+      return windowStats(s, STATS_NOW, 7, "medium");
     },
     get month() {
-      return windowStats(s, STATS_NOW, 30);
+      return windowStats(s, STATS_NOW, 30, "medium");
     },
     get dailyAvg() {
-      return avgMoves(s.daily);
+      return avgMoves(s.byTier.medium.daily);
     },
     get overallAvg() {
-      return avgMoves(s.overall);
+      return avgMoves(s.byTier.medium.overall);
     },
     get allTime() {
       return { played: o.played, won: o.won, ratio: o.played === 0 ? null : o.won / o.played };
@@ -184,19 +187,19 @@ export const statsEmpty: StatsView = statsView(emptyStats());
 export const statsActive: StatsView = statsView(
   (() => {
     const s = emptyStats();
-    s.streak = { current: 5, best: 12, lastWinDate: STATS_TODAY };
-    s.daily = { played: 40, won: 33, moveSum: 132 }; // avg 4.0 moves/win
-    s.overall = { played: 95, won: 71, moveSum: 355 }; // avg 5.0 moves/win
+    s.byTier.medium.streak = { current: 5, best: 12, lastWinDate: STATS_TODAY };
+    s.byTier.medium.daily = { played: 40, won: 33, moveSum: 132 }; // avg 4.0 moves/win
+    s.byTier.medium.overall = { played: 95, won: 71, moveSum: 355 }; // avg 5.0 moves/win
     // A recent-window spread: 6 plays in the last 7 days (5 won), more across 30.
     s.log = [
-      { t: STATS_NOW - 1 * DAY, mode: "daily", won: true, moves: 3 },
-      { t: STATS_NOW - 2 * DAY, mode: "practice", won: true, moves: 5 },
-      { t: STATS_NOW - 3 * DAY, mode: "daily", won: false, moves: 20 },
-      { t: STATS_NOW - 4 * DAY, mode: "practice", won: true, moves: 4 },
-      { t: STATS_NOW - 5 * DAY, mode: "daily", won: true, moves: 6 },
-      { t: STATS_NOW - 6 * DAY, mode: "daily", won: true, moves: 2 },
-      { t: STATS_NOW - 12 * DAY, mode: "practice", won: true, moves: 7 },
-      { t: STATS_NOW - 20 * DAY, mode: "daily", won: false, moves: 20 },
+      { t: STATS_NOW - 1 * DAY, mode: "daily", won: true, moves: 3, tier: "medium" as const },
+      { t: STATS_NOW - 2 * DAY, mode: "practice", won: true, moves: 5, tier: "medium" as const },
+      { t: STATS_NOW - 3 * DAY, mode: "daily", won: false, moves: 20, tier: "medium" as const },
+      { t: STATS_NOW - 4 * DAY, mode: "practice", won: true, moves: 4, tier: "medium" as const },
+      { t: STATS_NOW - 5 * DAY, mode: "daily", won: true, moves: 6, tier: "medium" as const },
+      { t: STATS_NOW - 6 * DAY, mode: "daily", won: true, moves: 2, tier: "medium" as const },
+      { t: STATS_NOW - 12 * DAY, mode: "practice", won: true, moves: 7, tier: "medium" as const },
+      { t: STATS_NOW - 20 * DAY, mode: "daily", won: false, moves: 20, tier: "medium" as const },
     ];
     return s;
   })(),
@@ -206,10 +209,10 @@ export const statsActive: StatsView = statsView(
 export const statsBrokenStreak: StatsView = statsView(
   (() => {
     const s = emptyStats();
-    s.streak = { current: 7, best: 7, lastWinDate: "2026-07-19" }; // 3 days before STATS_TODAY
-    s.daily = { played: 10, won: 8, moveSum: 40 };
-    s.overall = { played: 10, won: 8, moveSum: 40 };
-    s.log = [{ t: STATS_NOW - 3 * DAY, mode: "daily", won: true, moves: 5 }];
+    s.byTier.medium.streak = { current: 7, best: 7, lastWinDate: "2026-07-19" }; // 3 days before STATS_TODAY
+    s.byTier.medium.daily = { played: 10, won: 8, moveSum: 40 };
+    s.byTier.medium.overall = { played: 10, won: 8, moveSum: 40 };
+    s.log = [{ t: STATS_NOW - 3 * DAY, mode: "daily", won: true, moves: 5, tier: "medium" as const }];
     return s;
   })(),
 );

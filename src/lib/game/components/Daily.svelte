@@ -4,10 +4,11 @@
   import GameBoard from "./GameBoard.svelte";
   import Modal from "../../components/Modal.svelte";
   import { buildShareText, buildShareParts } from "../share";
+  import { tierSetting } from "../tierStore.svelte";
 
   let shareOpen = $state(false);
-  let shareText = $derived(buildShareText(daily.state, daily.date));
-  let shareParts = $derived(buildShareParts(daily.state, daily.date));
+  let shareText = $derived(buildShareText(daily.state, daily.date, tierSetting.tier));
+  let shareParts = $derived(buildShareParts(daily.state, daily.date, tierSetting.tier));
 
   async function copyAndClose() {
     try {
