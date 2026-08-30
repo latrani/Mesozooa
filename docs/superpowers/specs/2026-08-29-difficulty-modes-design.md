@@ -39,13 +39,19 @@ one tree**, not a parallel structure.
 
 **Becomes a function of the active pool** (three derived quantities, recomputed per tier):
 
-- `descendantGenusCount` → count of *pool members* below a node.
+- pool count → count of *pool members* below a node.
 - `branchDepth` → increments only where the **pool** count narrows.
 - `terminalClade` → lowest ancestor holding ≥2 pool members.
 
-Everything downstream then works unchanged, because all of it reads those three: the warmth
-ramp and its denominator, `warmestSharedNodeId`, `leafHintActive`, `nextHintRun`, `hintCost`,
-the degenerate-target gate.
+The whole engine then works unchanged, because all of it reads those three: the warmth ramp and
+its denominator, `warmestSharedNodeId`, `leafHintActive`, `nextHintRun`, `hintCost`, the
+degenerate-target gate.
+
+**Beside, never on top.** The lens publishes its values *alongside* the node's own —
+`node.descendantGenusCount` keeps meaning the true clade size, and pool counts arrive through a
+separate store accessor. Overwriting the field would quietly convert every reference surface
+(`nodeView`, and through it the #69 panel and Explore, plus `a11y-tree`) to tier-relative
+counts by accident. See **Counts: two surfaces, two questions**.
 
 **Stays global:** node identity, names, parentage, `mrca()`, images, clues, and Explore (the
 reference explorer keeps the whole 1,813-genus pool and true counts).
@@ -222,15 +228,16 @@ shared clade and its size in the active tier:
 │ Found in: China            │
 │           (Sichuan, …)     │
 │                            │
-│ Theropoda · 513 dinosaurs  │  ← new. the count is the affordance
-│ at this tier               │
+│ Theropoda ·                │
+│ 513 candidate specimens    │  ← new. the count is the affordance
 └────────────────────────────┘
 ```
 
-**Copy.** In game the number is tier-relative, per the lens: "Theropoda · 513 dinosaurs at this
-tier". In Explore the same node keeps its reference note — "N genera in this clade" — because
-that lane is the whole reference pool. Same helper, different lane, deliberately different
-number; the wording is what keeps it honest rather than contradictory.
+**Copy.** "**513 candidate specimens**" — deliberately not "genera" and not "dinosaurs". The
+card is describing the state of your hunt, so it counts candidates; a taxonomic word here would
+read as a claim about Theropoda's size and collide with the reference cards that legitimately
+say "751 genera in this clade". See **Counts: two surfaces, two questions**. "Specimen" is
+already this card's vocabulary ("Specimen missing", `specimenState`).
 
 **The affordance.** The count is a button. Clicking it hands off to Explore focused on that
 clade — the existing `nav.exploreAround(id)` path already used at end state. No new Explore
@@ -253,20 +260,47 @@ playability) — it removes friction, which is the point, but the friction was d
 Reads as an escape hatch rather than a cheat. If it ever needs pricing, the share line has the
 precedent in its 🔦 hint tally.
 
-## Assumption I'm carrying, and its one consequence
+## Counts: two surfaces, two questions
 
-You called the counts question moot given a single pool per tier, which I read as: the pool is
-the game's universe, so a clade reports its **pool count**. Adopting that.
+There is no conflict to resolve here, and treating it as one was an error. The game screen
+carries two count-bearing cards and they are **different objects asking different questions**:
 
-It has one visible consequence beyond Easy: Medium's counts change today's behavior.
-Tyrannosauridae currently reads "13 genera" (all of Wikidata's) and would read "9" (the ones
-you can actually guess). I think that's right — it makes every number on screen predict your
-odds, and it's what keeps "warmest" meaning the same thing the player sees. But it is a change
-to the shipping game, so: say if you'd rather Medium's display stayed at true counts.
+- **The selected-node panel** (#69) is a *reference* card. Its own spec fixes it as "Explore's
+  `nodeView()` unchanged — no game-specific gating", and that holds under tiers: it always
+  reports the true clade size, "751 genera in this clade", identical to what Explore shows for
+  the same node. Nothing about difficulty touches it.
+- **The answer card** — the specimen placard you are playing against — is a *game* card. It
+  describes your search, not a taxon, so it speaks in candidates: **"513 candidate specimens"**.
 
-The one place the two disagree is the end-state Explore link: the same node reads "9 genera"
-in the game and "13 genera" in Explore. Cheapest honest fix is "9 of 13" in-game. Deferring
-that to the visual/IA pass.
+The wording is what keeps them from reading as a discrepancy. "Candidate specimens" is a claim
+about the state of your hunt; "genera in this clade" is a claim about the clade. Both true, both
+on screen, neither contradicting the other. And "specimen" is already the vocabulary the card
+speaks.
+
+So Medium's displayed counts do **not** change: reference surfaces keep true counts in every
+tier, and no existing number moves.
+
+### What this forces on the lens
+
+The lens must not overwrite `descendantGenusCount` on the node objects. If it did, every
+reference surface reading that field — `nodeView`, and through it both the #69 panel and
+Explore, plus `a11y-tree` — would silently become tier-relative, breaking the "same as Explore"
+rule by accident rather than by decision.
+
+So the rule is: **pool counts are engine-facing; the node's own count stays reference-facing.**
+The lens exposes its values beside the true ones (a `poolCount(id)` accessor on the store, not
+a mutated field). Engine reads — `warmestSharedNodeId`, `leafHintActive`, `nextHintRun`,
+`hintCost`, the warmth denominator, the degenerate gate — take the pool count. Display reads
+that describe a taxon take `node.descendantGenusCount`, untouched.
+
+### One sub-decision
+
+Does "513 candidate specimens" tick down as you guess? Recommend yes, subtracting only pool
+members you have already guessed. It is monotone, obviously correct, and never overstates your
+progress. It *understates* it — a guess inside a sub-branch eliminates that whole branch, not
+just the one genus — but a number that claims less narrowing than really happened is the safe
+direction, and computing true elimination would mean running a deduction engine against the
+player's guess history.
 
 ## Deferred / noted
 
