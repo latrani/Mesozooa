@@ -108,25 +108,41 @@ A marooned member is a target you can only find by brute force — the warm trai
 it is **pick famous dinosaurs in company**. Adding a relative fixes the neighbour too, so the
 list wants to be assembled in pairs and triples.
 
-Two shapes of fix, and the distinction is diagnostic:
+Searched across every genus that could legally join Easy (article + clue + image +
+non-degenerate — 1,170 of them, not just Medium's pool), only **two of the six can be fixed at
+all**:
 
-- **Has a close companion** — add it. Coelophysis → Procompsognathus or Segisaurus
-  (Coelophysidae); Mononykus → Shuvuuia (Mononykini); Massospondylus → Lufengosaurus;
-  Mamenchisaurus → Omeisaurus; Therizinosaurus → Nothronychus; Heterodontosaurus →
-  Abrictosaurus; Hypsilophodon → Thescelosaurus; Troodon → Stenonychosaurus; Archaeopteryx →
-  Protarchaeopteryx.
-- **Has no close companion at any notability** — Dilophosaurus, Cryolophosaurus, Agilisaurus
-  and Eoraptor hang directly off huge clades in Wikidata, so nothing shrinks their terminal
-  clade. Either drop them from Easy or accept a brute-force target. This isolation is a
-  *resolution gap in the source topology*, i.e. epic #13 surfacing again — worth noting there,
-  not worth fixing here.
+| marooned | nearest real family | eligible relatives | verdict |
+|---|---|---|---|
+| Coelophysis | Coelophysidae | 6 — Procompsognathus (24), Segisaurus (23), Camposaurus (15) | **fixable** |
+| Mononykus | Mononykini | 3 — Shuvuuia (27), Albertonykus (20), Linhenykus (18) | **fixable** |
+| Dilophosaurus | *parent is Neotheropoda* | 486, all equidistant | unfixable |
+| Cryolophosaurus | *parent is Tetanurae* | 431, all equidistant | unfixable |
+| Eoraptor | *parent is Sauropodomorpha* | 279, all equidistant | unfixable |
+| Agilisaurus | *parent is Neornithischia* | 288, all equidistant | unfixable |
 
-**Build-time gate.** Warn (don't fail) when an Easy member's induced terminal clade exceeds a
-threshold — 10 is the natural line given the histogram. Fail-closed name resolution as
-`ALWAYS_PLAYABLE` already does: a name that doesn't resolve to a pool-eligible genus is warned
-and skipped, never forced.
+The four unfixable ones hang **directly off a giant clade** — there is no intermediate family in
+the tree, so no addition can shrink their terminal clade. That is a resolution gap in the source
+topology (epic #13 again), not a curation mistake. Eoraptor is the clearest case: its position
+is genuinely contested in the literature, so Wikidata leaves it parked at the base.
 
-The drafted 100 is in the appendix, for editing.
+**The mitigating fact:** marooned hurts far less in Easy than in Hard, because the clue
+partitions 100 famous names rather than 513 obscure ones. In the set below, Dilophosaurus keeps
+a 48-member terminal clade but its clue — Early Jurassic, United States (Arizona, Kayenta) —
+leaves exactly **one** candidate. Marooned in Easy means the warm trail stalls and the clue
+becomes decisive, not that the target is unfindable.
+
+**The applied edit** (budget-neutral at 100): cut **Agilisaurus** and **Cryolophosaurus**, the
+two least-known unfixables; add **Procompsognathus** (fixes Coelophysis, 49 → 2) and **Shuvuuia**
+(fixes Mononykus, 30 → 2). Dilophosaurus and Eoraptor stay — both are too famous to cut, and
+both are clue-unique. Resulting set: 65 of 100 in a terminal clade of 2–3, **95 of 100 uniquely
+identified by their clue** within their terminal clade, one outlier (Dilophosaurus at 48).
+
+**Build-time gate.** Warn (don't fail) when an Easy member's induced terminal clade exceeds 10
+*and* its clue does not uniquely identify it within that clade — the pair is the real test, since
+Dilophosaurus fails the first alone and is fine. Fail-closed name resolution as `ALWAYS_PLAYABLE`
+already does: a name that doesn't resolve to a pool-eligible genus is warned and skipped, never
+forced.
 
 ## Daily, stats and sharing
 
@@ -195,9 +211,12 @@ Stats, tier-tabbed, defaulting to the active tier:
 └───────────────────────────────────────┘
 ```
 
-Phone: the header is already tight with three nav tabs plus two icon buttons, so the tier
-control likely collapses to the board status row there rather than earning header space. That
-is a layout call for the build, flagged not settled.
+**Phone: the tier control lives in the board status row, not the header.** The header already
+carries three nav tabs plus two icon buttons, and the tier name is the widest of the three
+controls; it does not earn header space at that width. In the status row it sits beside the
+move counter — the one line already read between guesses — and stays in frame during play,
+which is the requirement. Explore has no status row, so on phone the control simply isn't
+present there; the tier persists and applies as soon as you return to a game lane.
 
 Explore is untouched — whole reference pool, true counts — except `gradeByPlayable`, which
 grades genus labels by *whether the guess box accepts them*. That must follow the active tier,
@@ -335,31 +354,34 @@ player's guess history.
 - **The isolated-genus cases** (Dilophosaurus, Cryolophosaurus, Agilisaurus, Eoraptor) are
   #13 symptoms; note them there.
 
-## Appendix — drafted Easy 100
+## Appendix — the Easy 100
 
-Ranked by Wikipedia sitelinks among the current playable pool. Spread: 49 Theropoda,
-30 Ornithischia, 19 Sauropodomorpha (Archaeopteryx, Hesperornis and Confuciusornis sit in
-Avialae, outside crown Aves). Marooned members marked ⚠ — add a companion or cut.
+Ranked by Wikipedia sitelinks among the current playable pool, with the curation edit applied:
+**Agilisaurus** and **Cryolophosaurus** cut, **Procompsognathus** and **Shuvuuia** added (`+`).
+Spread: 49 Theropoda, 29 Ornithischia, 19 Sauropodomorpha (Archaeopteryx, Hesperornis and
+Confuciusornis sit in Avialae, outside crown Aves). `⚠` marks the two accepted marooned
+members — kept because both are too famous to cut and both are uniquely identified by their
+clue.
 
 ```
-Tyrannosaurus     Archaeopteryx     Triceratops       Spinosaurus       Stegosaurus
-Velociraptor      Diplodocus        Brachiosaurus     Apatosaurus       Allosaurus
-Iguanodon         Ankylosaurus      Ceratosaurus      Parasaurolophus   Carnotaurus
-Argentinosaurus   Compsognathus     Albertosaurus     Edmontosaurus     Eoraptor ⚠
-Dilophosaurus ⚠   Deinonychus       Giganotosaurus    Pachycephalosaurus Carcharodontosaurus
-Baryonyx          Acrocanthosaurus  Massospondylus    Coelophysis ⚠     Plateosaurus
-Oviraptor         Tarbosaurus       Abelisaurus       Styracosaurus     Megalosaurus
-Microraptor       Troodon           Gallimimus        Herrerasaurus     Corythosaurus
-Protoceratops     Euoplocephalus    Kentrosaurus      Psittacosaurus    Mamenchisaurus
-Barosaurus        Ornithomimus      Brontosaurus      Gorgosaurus       Lambeosaurus
-Maiasaura         Camptosaurus      Camarasaurus      Supersaurus       Torosaurus
-Avimimus          Daspletosaurus    Amphicoelias      Torvosaurus       Alamosaurus
-Therizinosaurus   Pachyrhinosaurus  Sauroposeidon     Amargasaurus      Struthiomimus
-Hesperornis       Saurolophus       Hypsilophodon     Ouranosaurus      Deinocheirus
-Cryolophosaurus ⚠ Edmontonia        Dromaeosaurus     Tuojiangosaurus   Heterodontosaurus
-Suchomimus        Achillobator      Staurikosaurus    Shantungosaurus   Centrosaurus
-Utahraptor        Irritator         Gigantoraptor     Giraffatitan      Scelidosaurus
-Dilong            Sinornithosaurus  Sinosauropteryx   Barapasaurus      Huayangosaurus
-Afrovenator       Confuciusornis    Majungasaurus     Chasmosaurus      Saltasaurus
-Alioramus         Mapusaurus        Agilisaurus ⚠     Mononykus ⚠       Yutyrannus
+Tyrannosaurus      Archaeopteryx      Triceratops        Spinosaurus        Stegosaurus
+Velociraptor       Diplodocus         Brachiosaurus      Apatosaurus        Allosaurus
+Iguanodon          Ankylosaurus       Ceratosaurus       Parasaurolophus    Carnotaurus
+Argentinosaurus    Compsognathus      Albertosaurus      Edmontosaurus      Eoraptor ⚠
+Dilophosaurus ⚠    Deinonychus        Giganotosaurus     Pachycephalosaurus Carcharodontosaurus
+Baryonyx           Acrocanthosaurus   Massospondylus     Coelophysis        Plateosaurus
+Oviraptor          Tarbosaurus        Abelisaurus        Styracosaurus      Megalosaurus
+Microraptor        Troodon            Gallimimus         Herrerasaurus      Corythosaurus
+Protoceratops      Euoplocephalus     Kentrosaurus       Psittacosaurus     Mamenchisaurus
+Barosaurus         Ornithomimus       Brontosaurus       Gorgosaurus        Lambeosaurus
+Maiasaura          Camptosaurus       Camarasaurus       Supersaurus        Torosaurus
+Avimimus           Daspletosaurus     Amphicoelias       Torvosaurus        Alamosaurus
+Therizinosaurus    Pachyrhinosaurus   Sauroposeidon      Amargasaurus       Struthiomimus
+Hesperornis        Saurolophus        Hypsilophodon      Ouranosaurus       Deinocheirus
+Edmontonia         Dromaeosaurus      Tuojiangosaurus    Heterodontosaurus  Suchomimus
+Achillobator       Staurikosaurus     Shantungosaurus    Centrosaurus       Utahraptor
+Irritator          Gigantoraptor      Giraffatitan       Scelidosaurus      Dilong
+Sinornithosaurus   Sinosauropteryx    Barapasaurus       Huayangosaurus     Afrovenator
+Confuciusornis     Majungasaurus      Chasmosaurus       Saltasaurus        Alioramus
+Mapusaurus         Mononykus          Yutyrannus         Procompsognathus + Shuvuuia +
 ```
