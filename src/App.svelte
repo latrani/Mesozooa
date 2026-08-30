@@ -60,6 +60,9 @@
   ]);
 
   let navEl = $state<HTMLElement>();
+  // The difficulty chip, when the active lane has one. The indicator spans the tab AND the chip,
+  // so the underline reads as "this lane, at this difficulty" — one selection, not two controls.
+  let chipEl = $state<HTMLElement>();
   const btns: (HTMLButtonElement | undefined)[] = [];
   let indL = $state(0);
   let indR = $state(0);
@@ -72,20 +75,23 @@
   function measure() {
     const el = btns[modes.findIndex((m) => m.tab === nav.tab)];
     if (!el || !navEl) return;
-    const mid = el.offsetLeft + el.offsetWidth / 2;
+    // The chip trails the active tab, so the span's right edge is its right edge when present.
+    const spanL = el.offsetLeft;
+    const spanR = chipEl ? chipEl.offsetLeft + chipEl.offsetWidth : el.offsetLeft + el.offsetWidth;
+    const mid = (spanL + spanR) / 2;
     // Direction comes from the bar's own midpoint travel, NOT from the tab index. That way one
     // rule covers both cases: a tab click, and a re-layout that shoves the active button
     // sideways without anyone clicking (see the ResizeObserver below). Equal midpoints (a pure
     // re-measure) leave the previous direction alone.
     if (ready && mid !== lastMid) dir = mid > lastMid ? "right" : "left";
     lastMid = mid;
-    indL = el.offsetLeft;
-    indR = navEl.clientWidth - (el.offsetLeft + el.offsetWidth);
+    indL = spanL;
+    indR = navEl.clientWidth - spanR;
   }
 
   // Re-measure on tab change and on either label gaining/losing its "in progress" suffix.
   $effect(() => {
-    void [nav.tab, modes];
+    void [nav.tab, modes, chipEl];
     measure();
   });
 
@@ -100,6 +106,9 @@
     const ro = new ResizeObserver(() => measure());
     ro.observe(navEl);
     for (const b of btns) if (b) ro.observe(b);
+    // The chip too: its label width changes with the tier ("Easy" -> "Medium"), and on phone the
+    // nav is a fixed 100% so that resize never reaches navEl.
+    if (chipEl) ro.observe(chipEl);
     const raf = requestAnimationFrame(() => (ready = true));
     return () => {
       ro.disconnect();
@@ -154,7 +163,7 @@
       <!-- Difficulty belongs to the lane you are in, so it rides beside the ACTIVE game tab and
            is absent everywhere else. That is also what frees the board's status row on phone. -->
       {#if m.tiered && nav.tab === m.tab}
-        <TierControl />
+        <span class="tier-slot" bind:this={chipEl}><TierControl /></span>
       {/if}
     {/each}
     <!-- decorative: aria-current on the buttons already carries "which mode am I in" -->
@@ -255,6 +264,10 @@
   }
   .modes button:hover { color: var(--cream); }
   .modes button.active { color: var(--cream); }
+  /* Sits inside the underlined span, so it takes the ACTIVE tab's colour — it is part of the
+     selection, not a neighbour of it. A hair dimmer keeps the lane name dominant. */
+  .tier-slot { display: inline-flex; align-items: center; margin-left: var(--space-2); color: var(--cream); }
+  .tier-slot :global(.tier-button):hover { text-decoration: underline; text-underline-offset: 3px; }
   .progress-dot {
     display: inline-block; width: .4em; height: .4em; margin-left: .35em;
     border-radius: 50%; background: var(--accent); vertical-align: middle;
@@ -330,7 +343,7 @@
        offsetWidth, so it follows the third rather than the text - which reads as a proper tab bar. */
     .modes button { flex: 1 1 0; text-align: center; }
     /* The chip sizes to its content; only the three tabs share the row equally. */
-    .modes :global(.tier-control) { flex: 0 0 auto; }
+    .tier-slot { flex: 0 0 auto; }
     /* Drop the menu the full width of the tab bar rather than anchoring it to the chip, which
        would hang off the left edge when Daily is active and off the right when Practice is. */
     .modes :global(.tier-control) { position: static; }

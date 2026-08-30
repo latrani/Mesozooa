@@ -41,7 +41,7 @@
 <span class="tier-control" bind:this={rootEl}>
   <button
     type="button"
-    class="tier-button btn-secondary btn-secondary-inverse btn-small"
+    class="tier-button"
     aria-haspopup="true"
     aria-expanded={open}
     aria-label="Difficulty: {LABEL[tierSetting.tier]}"
@@ -71,10 +71,15 @@
 
 <style>
   .tier-control { position: relative; display: inline-flex; align-items: center; }
-  /* Smaller than the mode labels it sits beside: the lane is the heading, the difficulty is a
-     qualifier on it, and the tab bar's indicator should stay the loudest thing in the row. */
-  .tier-button { font-size: var(--type-label); }
-  .caret { margin-left: 0.35em; font-size: 0.8em; opacity: 0.75; }
+  /* No button chrome. It sits INSIDE the tab bar and shares the active tab's underline, so a
+     pill would read as a separate control sitting on top of one. Inherits the nav's colour and
+     weight; smaller, because the lane is the heading and the difficulty qualifies it. */
+  .tier-button {
+    background: none; border: none; padding: .15rem 0; cursor: pointer;
+    font-family: inherit; font-size: var(--type-label); font-weight: var(--fw-semibold);
+    color: inherit; white-space: nowrap;
+  }
+  .caret { margin-left: 0.3em; font-size: 0.8em; opacity: 0.75; }
 
   .menu {
     position: absolute; top: calc(100% + var(--space-2)); right: 0; z-index: 20;

@@ -190,9 +190,12 @@ it keeps the setting in the one row a player already reads to know where they ar
         └────────────────────────────────────────────┘
 ```
 
-Switching lanes moves the chip with it. The tab bar's sliding indicator still measures the
-button, so it underlines the mode name alone and the chip reads as a qualifier on it rather than
-a fourth tab.
+Switching lanes moves the chip with it, and the sliding indicator **spans the tab and the chip
+together** — one underline reading "this lane, at this difficulty", rather than a selected tab
+sitting next to an unselected-looking control. The chip carries no button chrome for the same
+reason: inside the underlined span, a pill would read as a separate control resting on top of the
+selection instead of part of it. It inherits the active tab's colour at a smaller size, so the
+lane name stays dominant.
 
 **Phone** takes the same arrangement rather than a separate one. An earlier draft put the control
 in the board's status row on the grounds that the header could not carry a fourth control — but
