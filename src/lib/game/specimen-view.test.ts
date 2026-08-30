@@ -72,7 +72,7 @@ const tree = assembleTree(pruneSubtree(FIXTURE_RAWS, NEORNITHES), DINOSAURIA, "t
 markPlayable(tree);
 const store = createTreeStore(tree);
 // Only "TC" is guessed against warmth in this file; scope the provider to that target.
-const warmth = warmthForTarget(tree, "TC");
+const warmth = warmthForTarget(store, "TC");
 const practice = (target: string): GameState => ({
   target, guesses: [], status: "playing", mode: "practice", maxGuesses: null, hintsUsed: 0,
 });

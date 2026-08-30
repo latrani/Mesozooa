@@ -1,7 +1,6 @@
 import type { GameState, GameStatus, GuessResult } from "./types";
 import type { TreeStore } from "./treeStore";
 import type { WarmthProvider } from "./warmth";
-import { terminalClade } from "../tree/terminal";
 
 export const DAILY_MAX_GUESSES = 20;
 
@@ -102,9 +101,9 @@ export function warmestSharedNodeId(state: GameState, store: TreeStore): string 
   const rows = state.guesses.filter((g) => g.kind !== "leafHint");
   if (rows.length === 0) return null;
   let bestId = rows[0].sharedNodeId;
-  let bestCount = store.getNode(bestId)!.descendantGenusCount;
+  let bestCount = store.poolCount(bestId);
   for (const g of rows) {
-    const count = store.getNode(g.sharedNodeId)!.descendantGenusCount;
+    const count = store.poolCount(g.sharedNodeId);
     if (count < bestCount) {
       bestCount = count;
       bestId = g.sharedNodeId;
@@ -120,9 +119,9 @@ export function leafHintActive(state: GameState, store: TreeStore): boolean {
   if (state.status !== "playing") return false;
   const warmestId = warmestSharedNodeId(state, store);
   if (warmestId === null) return false;
-  const terminalId = terminalClade(store.data, state.target);
-  const warmestCount = store.getNode(warmestId)!.descendantGenusCount;
-  const terminalCount = store.getNode(terminalId)!.descendantGenusCount;
+  const terminalId = store.terminalClade(state.target);
+  const warmestCount = store.poolCount(warmestId);
+  const terminalCount = store.poolCount(terminalId);
   return warmestCount <= terminalCount;
 }
 
@@ -167,7 +166,7 @@ export function revealedNodeIds(state: GameState, store: TreeStore): Set<string>
 }
 
 // The run of lineage nodes from just below the deepest revealed node down to (and INCLUDING)
-// the next node whose descendantGenusCount is strictly less than the deepest revealed node's —
+// the next node whose POOL count is strictly less than the deepest revealed node's —
 // the next genuine narrowing. Usually one node; through a monotypic run it's [..intermediates,
 // branchPoint]. Empty when nothing narrows below the deepest revealed node. When the caller has
 // verified !leafHintActive, the final node is always a clade (the terminal clade or above),
@@ -180,12 +179,12 @@ export function nextHintRun(state: GameState, store: TreeStore): string[] {
     if (revealed.has(rootToTarget[i])) deepest = i;
   }
   if (deepest === -1 || deepest + 1 >= rootToTarget.length) return [];
-  const deepestCount = store.getNode(rootToTarget[deepest])!.descendantGenusCount;
+  const deepestCount = store.poolCount(rootToTarget[deepest]);
   const run: string[] = [];
   for (let i = deepest + 1; i < rootToTarget.length; i++) {
     const id = rootToTarget[i];
     run.push(id);
-    if (store.getNode(id)!.descendantGenusCount < deepestCount) break; // strict narrowing → done
+    if (store.poolCount(id) < deepestCount) break; // strict narrowing → done
   }
   return run;
 }

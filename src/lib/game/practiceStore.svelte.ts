@@ -29,7 +29,7 @@ function loadOrCreate(): GameState {
 
 export function createPractice() {
   let state = $state<GameState>(loadOrCreate());
-  const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore.data, state.target));
+  const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore, state.target));
 
   function save() {
     if (typeof localStorage !== "undefined") {

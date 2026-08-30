@@ -41,7 +41,7 @@ export function fixtureStore(state: GameState, opts: { daily?: boolean } = {}): 
     clue: state.guesses.some((g) => g.kind === "leafHint") ? clueFor(state.target) : null,
     guess: () => {}, // no-op: gallery states are frozen
     get warmthProvider() {
-      return warmthForTarget(treeStore.data, state.target);
+      return warmthForTarget(treeStore, state.target);
     },
   };
   if (opts.daily) {
@@ -65,7 +65,7 @@ export function warmthFractionOf(state: GameState): number {
 const TARGET = "Q100196"; // Archaeopteryx
 
 // Every state in this file plays toward the same target, so one provider suffices.
-const warmth = warmthForTarget(treeStore.data, TARGET);
+const warmth = warmthForTarget(treeStore, TARGET);
 
 function daily(target = TARGET): GameState {
   return newDailyState(target);

@@ -66,7 +66,7 @@ The pure core. Two passes over ~2,200 nodes plus an upward walk; sub-millisecond
   ```
 - Consumed by: Task 2 (`TreeStore`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/lib/tree/lens.test.ts`. Use the existing fixtures — `FIXTURE_RAWS` (Dinosauria/Theropoda/Tyrannosauridae with TR, TB, LO, TC) and `MONO_FIXTURE_RAWS` (the monotypic run above a non-root terminal clade), both from `src/lib/tree/fixture.ts`, assembled exactly as `terminal.test.ts` does:
 
@@ -93,7 +93,7 @@ Cover, at minimum:
 
 Run `npx vitest run src/lib/tree/lens.test.ts` and confirm every test fails for the right reason (module not found).
 
-- [ ] **Step 2: Implement `createLens`**
+- [x] **Step 2: Implement `createLens`**
 
 Create `src/lib/tree/lens.ts`. Mirror the two passes in `assembleTree` (`src/lib/tree/assemble.ts:80-99`) so the shapes stay recognisable — post-order by descending `depth` for counts, BFS from the root for branch depth — but write into local `Map`s, never into the nodes:
 
@@ -160,7 +160,7 @@ Run the tests; all green.
 - Produces: `TreeStore` gains `poolCount(id)`, `poolBranchDepth(id)`, `terminalClade(id)`, and `createTreeStore(data, pool?)` where `pool` defaults to the genera flagged `playable`. Existing members are unchanged.
 - Consumed by: Tasks 3 and 4.
 
-- [ ] **Step 1: Extend the interface**
+- [x] **Step 1: Extend the interface**
 
 In `src/lib/game/treeStore.ts`, add to `TreeStore`:
 
@@ -174,7 +174,7 @@ In `src/lib/game/treeStore.ts`, add to `TreeStore`:
   terminalClade(id: string): string;
 ```
 
-- [ ] **Step 2: Build the lens in `createTreeStore`**
+- [x] **Step 2: Build the lens in `createTreeStore`**
 
 Add the optional pool parameter, defaulting to today's behavior so every existing call site keeps working:
 
@@ -192,7 +192,7 @@ Then delegate the three new members to `lens`, and re-point the two existing poo
 
 Keep `rootCount` reading `data.nodes[data.rootId].descendantGenusCount` — it is reference context, not an engine ruler.
 
-- [ ] **Step 3: Test it**
+- [x] **Step 3: Test it**
 
 Extend `src/lib/game/treeStore.test.ts`: a store built with an explicit two-genus pool reports `isPlayable` and `playableGenera` from that pool, not from the `playable` flag; a store built with no pool reproduces today's playable set exactly.
 
@@ -209,7 +209,7 @@ Four reads of `descendantGenusCount` and one `terminalClade` import.
 **Interfaces:**
 - Produces: no signature changes — every touched function already takes `store`.
 
-- [ ] **Step 1: Swap the reads**
+- [x] **Step 1: Swap the reads**
 
 In `src/lib/game/engine-core.ts`:
 
@@ -220,7 +220,7 @@ In `src/lib/game/engine-core.ts`:
 
 Leave `terminal.ts` in place and exported — Explore and the build still use the true-tree version.
 
-- [ ] **Step 2: Update the tests**
+- [x] **Step 2: Update the tests**
 
 `engine-core.test.ts` builds stores from the fixtures. Where a test's expectation depended on non-pool genera being counted (`LO` in `FIXTURE_RAWS` is a genus but not playable), the pool-relative answer differs — update the expectation and add a comment saying which ruler it is asserting. Add one test that pins the new semantics directly: with a pool excluding a sibling genus, `leafHintActive` becomes true one guess *earlier* than it would under the true-tree count.
 
@@ -240,7 +240,7 @@ Leave `terminal.ts` in place and exported — Explore and the build still use th
 - Produces: `warmthForTarget(store: TreeStore, targetId: string, anchor?: number)` — takes the store rather than `TreeData`, because it now needs the lens. `createTwoPhaseWarmth` keeps taking plain numbers plus a `branchDepthOf` lookup (Step 1).
 - Breaking: **all 7 call sites** pass `treeStore.data` or a raw tree today and must pass a store. The two view tests (`specimen-view.test.ts:75`, `chip-view.test.ts:12`) pass a bare assembled tree, so they need a `createTreeStore(tree)` wrapper — easy to miss, and `tsc` is what catches it.
 
-- [ ] **Step 1: Re-point `warmthForTarget`**
+- [x] **Step 1: Re-point `warmthForTarget`**
 
 ```ts
 export function warmthForTarget(store: TreeStore, targetId: string, anchor?: number): WarmthProvider {
@@ -266,11 +266,11 @@ export function warmthForTarget(store: TreeStore, targetId: string, anchor?: num
 
 with `branchDepthOf` supplied by `warmthForTarget` as `store.poolBranchDepth`. Keep the `Math.max(1, …)` denominator guard — one Medium target has a degenerate lens terminal clade and relies on it.
 
-- [ ] **Step 2: Update both stores**
+- [x] **Step 2: Update both stores**
 
 `dailyStore.svelte.ts` (two call sites: `loadOrCreate`'s `refreshWarmth` and the `$derived` provider) and `practiceStore.svelte.ts` — pass `treeStore`, not `treeStore.data`.
 
-- [ ] **Step 3: Update `warmth.test.ts`**
+- [x] **Step 3: Update `warmth.test.ts`**
 
 Tests construct providers directly with a `terminalBranchDepth`; those stay. Add a test that `warmthForTarget` over a pool that excludes intermediate genera yields a *shorter* runway than the same target over the full pool — the 40% effect, asserted once.
 
@@ -283,11 +283,11 @@ Cheap, and it is the constraint most likely to be violated silently by a later c
 **Files:**
 - Create: `src/lib/game/reference-counts.test.ts`
 
-- [ ] **Step 1: Pin `nodeView` to true counts**
+- [x] **Step 1: Pin `nodeView` to true counts**
 
 Assert that `nodeView(node).note` for a clade reports `node.descendantGenusCount` — the true clade size — even when the store's pool excludes most of that clade's genera. This is the executable form of *beside, never on top*: if someone later makes the lens write through to the node, this test fails.
 
-- [ ] **Step 2: Grep-check the invariant**
+- [x] **Step 2: Grep-check the invariant**
 
 Confirm no assignment to either field outside `assemble.ts`:
 
@@ -306,11 +306,11 @@ The 40% denominator shift is intended, but it should be a recorded number rather
 **Files:**
 - Create: `scripts/lens-impact.ts` (a reporting script, not a build step)
 
-- [ ] **Step 1: Write the report**
+- [x] **Step 1: Write the report**
 
 Over the committed `tree.json` and the current playable pool, print: how many targets change terminal clade, how many change warmth denominator and by how much, and how many have a degenerate lens terminal clade. Expected on today's data: **18**, **297** (all −1 to −3), and **1**.
 
-- [ ] **Step 2: Eyeball it in the app**
+- [x] **Step 2: Eyeball it in the app**
 
 `npm run dev`, play a Practice round, confirm the warm trail still climbs monotonically and the clue still unlocks at the anchor. Then open `/gallery.html` and check the warmth states render unchanged — the ramp's *shape* is the same, only its length moved.
 
@@ -318,12 +318,12 @@ Over the committed `tree.json` and the current playable pool, print: how many ta
 
 ## Verification
 
-- [ ] `npx vitest run` — all green
-- [ ] `npx tsc --noEmit` — clean (watch for `import type` on `TreeStore`/`TreeLens`)
-- [ ] `npx svelte-check` — clean
-- [ ] `npm run build` — succeeds
-- [ ] `scripts/lens-impact.ts` prints 18 / 297 / 1
-- [ ] Practice round played end-to-end: warmth climbs, clue unlocks, win state reached
+- [x] `npx vitest run` — all green
+- [x] `npx tsc --noEmit` — clean (watch for `import type` on `TreeStore`/`TreeLens`)
+- [x] `npx svelte-check` — clean
+- [x] `npm run build` — succeeds
+- [x] `scripts/lens-impact.ts` prints 18 / 297 / 1
+- [x] Practice round played end-to-end: warmth climbs, clue unlocks, win state reached
 
 ## What this slice deliberately does NOT do
 

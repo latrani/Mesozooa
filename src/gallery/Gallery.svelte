@@ -75,7 +75,7 @@
 
   // Per-fixture-state provider for the standalone SpineTree panels below (GameBoard reads its
   // own store.warmthProvider; these panels drive SpineTree directly with a raw revealed/tipId).
-  const galleryWarmth = (state: GameState) => warmthForTarget(treeStore.data, state.target);
+  const galleryWarmth = (state: GameState) => warmthForTarget(treeStore, state.target);
 
 </script>
 

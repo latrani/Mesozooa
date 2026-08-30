@@ -31,7 +31,7 @@ function loadOrCreate(date: string): GameState {
     const raw = localStorage.getItem(dailyKey(date));
     const restored = raw ? deserializeGame(raw, "daily") : null;
     // Recompute stored warmth so restored games reflect the current warmth model.
-    if (restored) return refreshWarmth(restored, treeStore, warmthForTarget(treeStore.data, restored.target));
+    if (restored) return refreshWarmth(restored, treeStore, warmthForTarget(treeStore, restored.target));
   }
   const pool = treeStore.playableGenera().map((n) => ({ id: n.id }));
   return newDailyState(dailyAnswer(date, pool, dailyCalendar as Record<string, string>));
@@ -41,7 +41,7 @@ function createDaily() {
   const date = todayString();
   pruneStale(date);
   let state = $state<GameState>(loadOrCreate(date));
-  const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore.data, state.target));
+  const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore, state.target));
 
   function save() {
     if (typeof localStorage !== "undefined") {

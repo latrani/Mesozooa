@@ -34,3 +34,27 @@ describe("createTreeStore", () => {
     expect(store.rootCount).toBe(4);
   });
 });
+
+describe("createTreeStore — explicit pool", () => {
+  const twoGenera = createTreeStore(tree, ["TR", "TC"]);
+
+  it("reports playability from the pool, not the playable flag", () => {
+    expect(twoGenera.isPlayable("TR")).toBe(true);
+    expect(twoGenera.isPlayable("TB")).toBe(false); // flagged playable, but outside this pool
+    expect(twoGenera.playableGenera().map((n) => n.id).sort()).toEqual(["TC", "TR"]);
+  });
+
+  it("counts the pool while leaving the node's true count alone", () => {
+    expect(twoGenera.poolCount("TF")).toBe(1);
+    expect(twoGenera.getNode("TF")!.descendantGenusCount).toBe(2);
+  });
+
+  it("walks terminalClade past a clade holding only one pool member", () => {
+    expect(twoGenera.terminalClade("TR")).toBe("Q430");
+    expect(store.terminalClade("TR")).toBe("TF"); // default pool has TR + TB under TF
+  });
+
+  it("defaults to the playable flag when no pool is given", () => {
+    expect(store.playableGenera().map((n) => n.id).sort()).toEqual(["LO", "TB", "TC", "TR"]);
+  });
+});
