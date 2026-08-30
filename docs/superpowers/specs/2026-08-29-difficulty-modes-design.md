@@ -195,7 +195,63 @@ is a layout call for the build, flagged not settled.
 
 Explore is untouched — whole reference pool, true counts — except `gradeByPlayable`, which
 grades genus labels by *whether the guess box accepts them*. That must follow the active tier,
-or the grading lies to an Easy player.
+or the grading lies to an Easy player. See **The anchor note** for the exact rule.
+
+## The anchor note
+
+The fix for the flat endgame described under *Deferred / noted*. One line, appearing at one
+moment.
+
+**When.** Only once warmth pins at the anchor (`leafHintActive`). Before that, play stays
+countless — #41's call to keep `showCounts={false}` during play stands. This is not a general
+un-hiding of counts; it is a single line that arrives exactly when the warm trail stops being
+informative and the clue takes over.
+
+**What.** The specimen placard's `note` — `null` throughout play today — renders the warmest
+shared clade and its size in the active tier:
+
+```
+┌ placard ───────────────────┐
+│ ? ? ?                      │
+│ ┌────────────────────────┐ │
+│ │  New exhibit           │ │
+│ │  coming soon!          │ │
+│ └────────────────────────┘ │
+│ Lived:    Middle Jurassic  │
+│           (Bajocian, …)    │
+│ Found in: China            │
+│           (Sichuan, …)     │
+│                            │
+│ Theropoda · 513 dinosaurs  │  ← new. the count is the affordance
+│ at this tier               │
+└────────────────────────────┘
+```
+
+**Copy.** In game the number is tier-relative, per the lens: "Theropoda · 513 dinosaurs at this
+tier". In Explore the same node keeps its reference note — "N genera in this clade" — because
+that lane is the whole reference pool. Same helper, different lane, deliberately different
+number; the wording is what keeps it honest rather than contradictory.
+
+**The affordance.** The count is a button. Clicking it hands off to Explore focused on that
+clade — the existing `nav.exploreAround(id)` path already used at end state. No new Explore
+functionality: no filtering, no scoping, Explore remains the full reference explorer. Hover
+title and accessible name say where it goes: *"See Theropoda in Explore."*
+
+**The one requirement it puts on Explore.** `gradeByPlayable` reads the global `node.playable`
+today. Under tiers it must read the pool of **the current game's tier**, or a player arriving
+from an Easy game sees Medium's guessable set graded as accepted — the grading would lie at
+precisely the moment it's being relied on. Since choosing a tier is what makes that tier's game
+current, active tier and most-recently-touched game coincide; if the two lanes are ever allowed
+to sit at different tiers independently, this needs an explicit last-touched pointer rather
+than reading the setting.
+
+**Consequence worth knowing.** At the anchor, one click now shows the neighbourhood you're
+stuck in, with guessable genera graded. In Hard that's a 513-member clade — orientation, not an
+answer. In Easy and Medium the terminal clade is 3–5, so the same click lands close to a
+candidate list. It adds no capability (Explore is already a tab away and already grades by
+playability) — it removes friction, which is the point, but the friction was doing some work.
+Reads as an escape hatch rather than a cheat. If it ever needs pricing, the share line has the
+precedent in its 🔦 hint tally.
 
 ## Assumption I'm carrying, and its one consequence
 
@@ -240,10 +296,8 @@ that to the visual/IA pass.
   - **What Hard actually taxes is inversion, not deduction.** The clue says "Late Cretaceous
     (Campanian), Mongolia (Ömnögovi, Djadochta Formation)" and the information to finish is
     there — but the player must *produce the name* from a 513-member space they can't
-    enumerate. At a 5-member terminal clade you brute-force by guessing; at 513 you can't. So
-    the open Hard question is whether to help the player invert the clue (name the terminal
-    clade and its size at the anchor? let the revealed clue filter autocomplete?) or to decide
-    that unaided recall is exactly what "Mesozoic Mind" means. Design call, flagged not settled.
+    enumerate. At a 5-member terminal clade you brute-force by guessing; at 513 you can't.
+    Addressed by **The anchor note** below.
 - **The isolated-genus cases** (Dilophosaurus, Cryolophosaurus, Agilisaurus, Eoraptor) are
   #13 symptoms; note them there.
 
