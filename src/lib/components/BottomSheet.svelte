@@ -289,7 +289,7 @@
 <style>
   /* Fixed, not absolute: the drawer must be able to travel ABOVE the app header, both so a long
      pull is not clipped at the board's top edge and so a header stays grabbable no matter how
-     far up it has been pulled. z-index clears the header's 4. */
+     far up it has been pulled. z-index clears the header's 6. */
   .drawer-layer {
     position: fixed; inset: 0; z-index: 8;
     pointer-events: none; overflow: hidden;

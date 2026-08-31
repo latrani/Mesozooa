@@ -72,15 +72,17 @@ const tree = assembleTree(pruneSubtree(FIXTURE_RAWS, NEORNITHES), DINOSAURIA, "t
 markPlayable(tree);
 const store = createTreeStore(tree);
 // Only "TC" is guessed against warmth in this file; scope the provider to that target.
-const warmth = warmthForTarget(tree, "TC");
+const warmth = warmthForTarget(store, "TC");
 const practice = (target: string): GameState => ({
   target, guesses: [], status: "playing", mode: "practice", maxGuesses: null, hintsUsed: 0,
 });
 
 describe("specimenView", () => {
-  it("empty -> unidentified placeholder", () => {
+  it("empty -> unidentified placeholder, titled by what is still in the running", () => {
     const v = specimenView(practice("TC"), store);
-    expect(v.title).toBeNull();
+    // The specimen is still anonymous — the title now says how much ground is left rather than
+    // "? ? ?", which said nothing.
+    expect(v.title).toBe("4 candidate specimens");
     expect(v.mount).toEqual({ kind: "slip", text: "New exhibit coming soon!", tilt: -4 });
     expect(v.fields).toEqual([
       { label: "Lived", value: null },
@@ -93,5 +95,66 @@ describe("specimenView", () => {
     expect(won.status).toBe("won");
     const v = specimenView(won, store);
     expect(v.title).toBe(store.getNode("TC")!.name);
+  });
+});
+
+describe("the candidate count title", () => {
+  // FIXTURE: Q430 > T > {TF > {TR, TB}, LO}; Q430 > O > CF > TC. All four genera playable.
+  const scopeTree = assembleTree(pruneSubtree(FIXTURE_RAWS, NEORNITHES), DINOSAURIA, "test");
+  markPlayable(scopeTree);
+  const scopeStore = createTreeStore(scopeTree);
+  const w = warmthForTarget(scopeStore, "TR");
+  const round = (): GameState => ({
+    target: "TR", guesses: [], status: "playing", mode: "practice", maxGuesses: null, hintsUsed: 0,
+  });
+
+  it("opens at the whole tier before a single guess", () => {
+    // The card is a progress readout from the first render, not a late-game reveal.
+    const v = specimenView(round(), scopeStore);
+    expect(v.title).toBe("4 candidate specimens");
+    expect(v.explore!.nodeId).toBe("Q430");
+  });
+
+  it("narrows as the trail narrows", () => {
+    // Guessing Triceratops shares only Dinosauria, so the scope stays the root — minus the
+    // genus just spent.
+    let s = applyGuess(round(), "TC", scopeStore, w);
+    expect(specimenView(s, scopeStore).title).toBe("3 candidate specimens");
+    // Tarbosaurus shares Tyrannosauridae: the scope collapses to that clade, TB now eliminated.
+    s = applyGuess(s, "TB", scopeStore, w);
+    const v = specimenView(s, scopeStore);
+    expect(v.title).toBe("1 candidate specimen"); // singular
+    expect(v.explore!.nodeId).toBe("TF");
+    expect(v.explore!.destination).toBe("Tyrannosauridae");
+  });
+
+  it("counts down only the guesses INSIDE the current scope", () => {
+    // Once scoped to Tyrannosauridae, a Triceratops guess eliminates nothing there.
+    let s = applyGuess(round(), "TB", scopeStore, w);
+    const before = specimenView(s, scopeStore).title;
+    s = applyGuess(s, "TC", scopeStore, w);
+    expect(specimenView(s, scopeStore).title).toBe(before);
+  });
+
+  it("always offers the explore jump while in play", () => {
+    const fresh = specimenView(round(), scopeStore);
+    const played = specimenView(applyGuess(round(), "TC", scopeStore, w), scopeStore);
+    expect(fresh.explore!.label).toBe("Explore from here");
+    expect(played.explore!.label).toBe("Explore from here");
+  });
+
+  it("drops both once the round is over — the card becomes the real specimen", () => {
+    const v = specimenView(applyGuess(round(), "TR", scopeStore, w), scopeStore);
+    expect(v.title).toBe("Tyrannosaurus");
+    expect(v.explore).toBeNull();
+  });
+
+  it("counts the POOL, not the clade — a sparser tier leaves fewer candidates", () => {
+    const sparse = createTreeStore(scopeTree, ["TR", "TC"]);
+    expect(specimenView(round(), sparse).title).toBe("2 candidate specimens");
+  });
+
+  it("never carries an explore jump on a reference card", () => {
+    expect(nodeView(scopeTree.nodes["TF"]).explore).toBeNull();
   });
 });

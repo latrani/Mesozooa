@@ -1,9 +1,19 @@
 <script lang="ts">
   import { statsStore, type StatsView } from "../game/statsStore.svelte";
+  import { tierSetting } from "../game/tierStore.svelte";
+  import { TIERS, type Tier } from "../tree/tiers";
 
   // Defaults to the live singleton (the app never passes a source). The gallery passes a frozen
   // fixture view so multiple stats states render side by side on one page.
-  let { source = statsStore }: { source?: StatsView } = $props();
+  let { source }: { source?: StatsView } = $props();
+
+  // Tabs open on the tier you are playing. A fixture `source` pins the panel to that one view
+  // (the gallery renders a specific state), so the tabs only appear for the live store.
+  let shown = $state<Tier>(tierSetting.tier);
+  let live = $derived(source === undefined);
+  let view = $derived<StatsView>(source ?? statsStore.viewFor(shown));
+
+  const LABEL: Record<Tier, string> = { easy: "Easy", medium: "Medium", hard: "Hard" };
 
   let confirming = $state(false);
 
@@ -13,35 +23,49 @@
   const volume = (w: { played: number; ratio: number | null }) =>
     `${w.played} ${w.played === 1 ? "play" : "plays"} · ${pct(w.ratio)} won`;
 
-  // Empty state: nothing ever recorded.
-  let empty = $derived(source.allTime.played === 0);
+  // Empty state, now PER TIER: an untouched Hard is no evidence about Easy.
+  let empty = $derived(view.allTime.played === 0);
 </script>
 
 <div class="stats">
+  {#if live}
+    <div class="tier-tabs" role="tablist" aria-label="Difficulty">
+      {#each TIERS as t (t)}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={shown === t}
+          class="tier-tab"
+          class:active={shown === t}
+          onclick={() => (shown = t)}>{LABEL[t]}</button
+        >
+      {/each}
+    </div>
+  {/if}
   {#if empty}
-    <p class="stats-empty">Play the daily to start a streak.</p>
+    <p class="stats-empty">Play the {live ? LABEL[shown] : ""} daily to start a streak.</p>
   {:else}
     <div class="streak">
-      <span class="big">{source.streak.current}</span>
+      <span class="big">{view.streak.current}</span>
       <span class="streak-label">day streak</span>
-      <span class="streak-best">Best: {source.streak.best}</span>
+      <span class="streak-best">Best: {view.streak.best}</span>
     </div>
 
     <dl class="table">
-      <dt>Avg moves (daily)</dt><dd>{avg(source.dailyAvg)}</dd>
-      <dt>Avg moves (overall)</dt><dd>{avg(source.overallAvg)}</dd>
-      <dt>Avg explored</dt><dd>{avg(source.exploredAvg)}</dd>
+      <dt>Avg moves (daily)</dt><dd>{avg(view.dailyAvg)}</dd>
+      <dt>Avg moves (overall)</dt><dd>{avg(view.overallAvg)}</dd>
+      <dt>Avg explored</dt><dd>{avg(view.exploredAvg)}</dd>
       <div class="sep" role="separator"></div>
-      <dt>Last 7 days</dt><dd>{volume(source.week)}</dd>
-      <dt>Last 30 days</dt><dd>{volume(source.month)}</dd>
-      <dt>All-time</dt><dd>{volume(source.allTime)}</dd>
+      <dt>Last 7 days</dt><dd>{volume(view.week)}</dd>
+      <dt>Last 30 days</dt><dd>{volume(view.month)}</dd>
+      <dt>All-time</dt><dd>{volume(view.allTime)}</dd>
     </dl>
 
     <div class="reset">
       {#if confirming}
-        <span class="reset-warn">Erase all stats? This can't be undone.</span>
+        <span class="reset-warn">Erase stats for every difficulty? This can't be undone.</span>
         <button type="button" class="btn-secondary btn-small" onclick={() => (confirming = false)}>Cancel</button>
-        <button type="button" class="btn-secondary btn-small" onclick={() => { source.reset(); confirming = false; }}>Erase</button>
+        <button type="button" class="btn-secondary btn-small" onclick={() => { view.reset(); confirming = false; }}>Erase</button>
       {:else}
         <button type="button" class="btn-secondary btn-small" onclick={() => (confirming = true)}>Reset stats</button>
       {/if}
@@ -51,6 +75,15 @@
 
 <style>
   .stats { display: flex; flex-direction: column; gap: var(--space-4); }
+  .tier-tabs { display: flex; gap: var(--space-1); }
+  .tier-tab {
+    flex: 1 1 0; cursor: pointer;
+    padding: var(--space-2) var(--space-3);
+    font-family: inherit; font-size: var(--type-label); font-weight: var(--fw-bold);
+    color: var(--ink-soft); background: none;
+    border: none; border-bottom: 2px solid var(--placard-edge);
+  }
+  .tier-tab.active { color: var(--ink); border-bottom-color: var(--accent); }
   .streak { display: flex; align-items: baseline; gap: var(--space-2); }
   .streak .big { font-size: 2.5rem; font-weight: var(--fw-black); color: var(--ink); }
   .streak-label { font-size: var(--type-body); color: var(--ink); }

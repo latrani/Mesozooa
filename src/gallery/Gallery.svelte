@@ -70,12 +70,12 @@
     ["--type-meta", "Meta 0.8rem / 12.8px"],
   ];
 
-  const sampleShareText = buildShareText(stateSolvedWon, "2026-07-18");
-  const sampleShareParts = buildShareParts(stateSolvedWon, "2026-07-18");
+  const sampleShareText = buildShareText(stateSolvedWon, "2026-07-18", "medium");
+  const sampleShareParts = buildShareParts(stateSolvedWon, "2026-07-18", "medium");
 
   // Per-fixture-state provider for the standalone SpineTree panels below (GameBoard reads its
   // own store.warmthProvider; these panels drive SpineTree directly with a raw revealed/tipId).
-  const galleryWarmth = (state: GameState) => warmthForTarget(treeStore.data, state.target);
+  const galleryWarmth = (state: GameState) => warmthForTarget(treeStore, state.target);
 
 </script>
 

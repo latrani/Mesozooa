@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { serializeGame, deserializeGame, dailyKey, staleDailyKeys } from "./persistence";
+import { serializeGame, deserializeGame, dailyKey, practiceKey, staleDailyKeys } from "./persistence";
 import type { GameState } from "./types";
 
 const sample: GameState = {
@@ -61,17 +61,40 @@ describe("serializeGame / deserializeGame", () => {
   });
 });
 
-describe("dailyKey / staleDailyKeys", () => {
-  it("namespaces the key by date", () => {
-    expect(dailyKey("2026-07-12")).toBe("mesozooa:daily:1:2026-07-12");
+describe("dailyKey / practiceKey / staleDailyKeys", () => {
+  it("namespaces the daily key by tier AND date", () => {
+    expect(dailyKey("medium", "2026-07-12")).toBe("mesozooa:daily:2:medium:2026-07-12");
+    expect(dailyKey("easy", "2026-07-12")).toBe("mesozooa:daily:2:easy:2026-07-12");
   });
-  it("returns daily keys that aren't today's, ignoring other keys", () => {
+  it("namespaces the practice key by tier", () => {
+    expect(practiceKey("hard")).toBe("mesozooa:practice:2:hard");
+  });
+  it("keeps today's key for EVERY tier", () => {
+    // The bug this guards: pruning by a single expected key would wipe the two tiers you are not
+    // currently playing, silently ending games the player never finished.
     const keys = [
-      "mesozooa:daily:1:2026-07-10",
-      "mesozooa:daily:1:2026-07-12",
+      "mesozooa:daily:2:easy:2026-07-12",
+      "mesozooa:daily:2:medium:2026-07-12",
+      "mesozooa:daily:2:hard:2026-07-12",
+    ];
+    expect(staleDailyKeys(keys, "2026-07-12")).toEqual([]);
+  });
+  it("drops past dates across all tiers, and ignores unrelated keys", () => {
+    const keys = [
+      "mesozooa:daily:2:easy:2026-07-10",
+      "mesozooa:daily:2:medium:2026-07-12",
+      "mesozooa:daily:2:hard:2026-07-11",
+      "mesozooa:practice:2:easy",
       "some:other:key",
     ];
-    expect(staleDailyKeys(keys, "2026-07-12")).toEqual(["mesozooa:daily:1:2026-07-10"]);
+    expect(staleDailyKeys(keys, "2026-07-12").sort()).toEqual([
+      "mesozooa:daily:2:easy:2026-07-10",
+      "mesozooa:daily:2:hard:2026-07-11",
+    ]);
+  });
+  it("drops every v1 daily key, today's included — the migration has already read it", () => {
+    const keys = ["mesozooa:daily:1:2026-07-12", "mesozooa:daily:1:2026-07-10"];
+    expect(staleDailyKeys(keys, "2026-07-12").sort()).toEqual(keys.sort());
   });
 });
 

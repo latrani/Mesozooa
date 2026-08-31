@@ -9,7 +9,7 @@ import type { GuessResult } from "./types";
 const tree = assembleTree(FIXTURE_RAWS, "Q430", "test");
 const store = createTreeStore(tree);
 // These tests only need a valid provider (colors, not fraction values); any playable target works.
-const warmth = warmthForTarget(tree, "TR");
+const warmth = warmthForTarget(store, "TR");
 
 // helper to build a GuessResult row
 function row(kind: GuessResult["kind"], guessId: string, sharedNodeId: string): GuessResult {

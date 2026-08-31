@@ -4,7 +4,16 @@
 
   // Pure display of a SpecimenView — identical in Daily, Practice and Explore. End-state actions
   // (Share/Stats/New round) live beside the result banner instead (#63).
-  let { view, peek = false }: { view: SpecimenView; peek?: boolean } = $props();
+  let {
+    view,
+    peek = false,
+    onexplore,
+  }: {
+    view: SpecimenView;
+    peek?: boolean;
+    /** click-through for the anchor note's count. Absent => the count renders as plain text. */
+    onexplore?: (id: string) => void;
+  } = $props();
 </script>
 
 {#if peek}
@@ -52,6 +61,16 @@
     {#if view.link}
       <a class="wiki" href={view.link.href} target="_blank" rel="noopener noreferrer">{view.link.label}</a>
     {/if}
+
+    {#if view.explore && onexplore}
+      {@const e = view.explore}
+      <button
+        type="button"
+        class="explore-link"
+        title="Open {e.destination} in Explore"
+        onclick={() => onexplore?.(e.nodeId)}>{e.label} <span aria-hidden="true">→</span></button
+      >
+    {/if}
   </aside>
 {/if}
 
@@ -86,6 +105,14 @@
   /* De-emphasized: honest reference context (genera count), not a primary signal — smaller so it
      reads as minor caption beneath the title. See two-phase warmth work / #41. */
   .note { color: var(--specimen-text-dim); font-size: var(--type-label); }
+  /* Always present while a round is in play, so it reads as a standing affordance rather than
+     something that appeared mid-game. Matches .wiki's weight and placement. */
+  .explore-link {
+    align-self: flex-start; padding: 0; border: none; background: none; cursor: pointer;
+    font-family: inherit; font-weight: var(--fw-semibold); font-size: var(--type-label);
+    color: var(--sand-200); text-align: left;
+  }
+  .explore-link:hover { text-decoration: underline; text-underline-offset: 2px; }
   .wiki { font-weight: var(--fw-semibold); font-size: var(--type-label); align-self: flex-start; color: var(--sand-200); }
   /* image credit — small, understated provenance; hugs the photo via the figure's 2px gap. */
   .credit { margin: 0; font-size: var(--type-meta); opacity: .55; display: flex; max-width: 100%; }

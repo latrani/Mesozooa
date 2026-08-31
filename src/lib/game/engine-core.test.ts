@@ -32,13 +32,13 @@ const tree = assembleTree(pruneSubtree(FIXTURE_RAWS, NEORNITHES), DINOSAURIA, "t
 markPlayable(tree);
 const store = createTreeStore(tree);
 // Providers scoped per target used across this file's states (TC and TR).
-const warmthTC = warmthForTarget(store.data, "TC");
-const warmthTR = warmthForTarget(store.data, "TR");
+const warmthTC = warmthForTarget(store, "TC");
+const warmthTR = warmthForTarget(store, "TR");
 
 const monoTree = assembleTree(MONO_FIXTURE_RAWS, "MR", "test");
 markPlayable(monoTree);
 const monoStore = createTreeStore(monoTree);
-const monoWarmth = warmthForTarget(monoStore.data, "GA1");
+const monoWarmth = warmthForTarget(monoStore, "GA1");
 
 const practice = (target: string): GameState => ({
   target,

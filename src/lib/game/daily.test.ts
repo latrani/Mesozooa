@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hashDate, dailyAnswer, todayString } from "./daily";
+import { hashDate, dailyAnswer, dailyAnswersByTier, todayString } from "./daily";
 
 describe("hashDate", () => {
   it("is deterministic", () => {
@@ -48,5 +48,57 @@ describe("todayString", () => {
   it("formats local date components zero-padded", () => {
     // Local Jan 5 2026 -> "2026-01-05" (month is 0-indexed in Date)
     expect(todayString(new Date(2026, 0, 5))).toBe("2026-01-05");
+  });
+});
+
+describe("dailyAnswersByTier", () => {
+  // Nested pools, as the tiers really are: easy ⊆ medium ⊆ hard.
+  const easy = [{ id: "Q1" }, { id: "Q2" }, { id: "Q3" }];
+  const medium = [...easy, { id: "Q4" }, { id: "Q5" }, { id: "Q6" }];
+  const hard = [...medium, { id: "Q7" }, { id: "Q8" }, { id: "Q9" }];
+  const pools = { easy, medium, hard };
+
+  it("gives the three tiers three DIFFERENT answers", () => {
+    // Without exclusion the nested pools would routinely collide, and solving one tier would
+    // hand you another for free.
+    for (const date of ["2026-07-12", "2026-08-30", "2026-12-25", "2027-01-01"]) {
+      const a = dailyAnswersByTier(date, pools, {});
+      expect(new Set([a.easy, a.medium, a.hard]).size).toBe(3);
+    }
+  });
+
+  it("draws every answer from its own tier's pool", () => {
+    const a = dailyAnswersByTier("2026-08-30", pools, {});
+    expect(easy.some((p) => p.id === a.easy)).toBe(true);
+    expect(medium.some((p) => p.id === a.medium)).toBe(true);
+    expect(hard.some((p) => p.id === a.hard)).toBe(true);
+  });
+
+  it("honours a calendar entry on Medium and moves the others out of its way", () => {
+    const a = dailyAnswersByTier("2026-08-30", pools, { "2026-08-30": "Q2" });
+    expect(a.medium).toBe("Q2");
+    expect(a.easy).not.toBe("Q2");
+    expect(a.hard).not.toBe("Q2");
+  });
+
+  it("falls back when the calendar names something outside Medium's pool", () => {
+    const a = dailyAnswersByTier("2026-08-30", pools, { "2026-08-30": "Q999" });
+    expect(medium.some((p) => p.id === a.medium)).toBe(true);
+  });
+
+  it("is stable for a given date", () => {
+    expect(dailyAnswersByTier("2026-08-30", pools, {})).toEqual(
+      dailyAnswersByTier("2026-08-30", pools, {}),
+    );
+  });
+
+  it("still answers when exclusion would empty a tier's pool", () => {
+    // A degenerate one-genus pool shared by every tier: distinctness is impossible, and the
+    // answer must still be a real genus rather than undefined.
+    const one = [{ id: "Q1" }];
+    const a = dailyAnswersByTier("2026-08-30", { easy: one, medium: one, hard: one }, {});
+    expect(a.easy).toBe("Q1");
+    expect(a.medium).toBe("Q1");
+    expect(a.hard).toBe("Q1");
   });
 });

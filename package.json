@@ -21,7 +21,8 @@
     "fetch:pbdb": "tsx scripts/fetch-pbdb.ts",
     "fetch:images": "tsx scripts/fetch-images.ts",
     "process:images": "tsx scripts/process-images.ts",
-    "build:data": "tsx scripts/build-tree.ts"
+    "build:data": "tsx scripts/build-tree.ts",
+    "report:lens": "tsx scripts/lens-impact.ts"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.2.4",

@@ -3,9 +3,9 @@ import { treeStore } from "./treeData";
 import { warmthForTarget, type WarmthProvider } from "./warmth";
 import {
   applyGuess,
+  applyExploreView,
   applyHint,
   applyForfeit,
-  applyExploreView,
   newRoundState,
   warmestSharedNodeId,
   revealedNodeIds,
@@ -14,33 +14,49 @@ import {
   movesUsed,
   leafHintActive,
 } from "./engine-core";
-import { serializeGame, deserializeGame, PRACTICE_KEY } from "./persistence";
+import { serializeGame, deserializeGame, practiceKey, LEGACY_PRACTICE_KEY } from "./persistence";
 import { statsStore } from "./statsStore.svelte";
+import { tierSetting } from "./tierStore.svelte";
+import { TIERS, type Tier } from "../tree/tiers";
+import { tierStores } from "./treeData";
 
 // Practice is a single slot: the current round survives reloads (and silent post-deploy
 // reloads) exactly like Daily. Solved/forfeited end-state persists; newRound overwrites it.
-function loadOrCreate(): GameState {
+function loadOrCreate(tier: Tier): GameState {
   if (typeof localStorage !== "undefined") {
-    const raw = localStorage.getItem(PRACTICE_KEY);
+    // Medium falls back to the pre-tier key so an in-progress round survives the upgrade.
+    const raw =
+      localStorage.getItem(practiceKey(tier)) ??
+      (tier === "medium" ? localStorage.getItem(LEGACY_PRACTICE_KEY) : null);
     const restored = raw ? deserializeGame(raw, "practice") : null;
     if (restored) return restored;
   }
-  return newRoundState(treeStore);
+  return newRoundState(tierStores[tier]);
 }
 
 export function createPractice() {
-  let state = $state<GameState>(loadOrCreate());
-  const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore.data, state.target));
+  // One round per tier — switching difficulty parks the round you were on rather than ending it.
+  const games = $state<Record<Tier, GameState>>(
+    Object.fromEntries(TIERS.map((t) => [t, loadOrCreate(t)])) as Record<Tier, GameState>,
+  );
+  const tier = $derived(tierSetting.tier);
+  const treeStore = $derived(tierSetting.store);
+  const state = $derived(games[tier]);
+  const warmth = $derived<WarmthProvider>(warmthForTarget(treeStore, state.target));
 
   function save() {
     if (typeof localStorage !== "undefined") {
-      localStorage.setItem(PRACTICE_KEY, serializeGame(state));
+      localStorage.setItem(practiceKey(tier), serializeGame(games[tier]));
     }
   }
 
   return {
     get state(): GameState {
       return state;
+    },
+    /** The lens this round is played against — GameBoard renders from it. */
+    get tree() {
+      return treeStore;
     },
     get warmthProvider(): WarmthProvider {
       return warmth;
@@ -68,46 +84,50 @@ export function createPractice() {
     },
     guess(id: string) {
       const was = state.status;
-      state = applyGuess(state, id, treeStore, warmth);
+      games[tier] = applyGuess(state, id, treeStore, warmth);
       save();
-      if (was === "playing" && state.status !== "playing" && !state.seeded) {
+      if (was === "playing" && games[tier].status !== "playing" && !games[tier].seeded) {
         statsStore.record({
           mode: "practice",
-          won: state.status === "won",
-          moves: movesUsed(state),
-          explored: state.exploreViews?.length ?? 0,
+          tier,
+          won: games[tier].status === "won",
+          moves: movesUsed(games[tier]),
+          explored: games[tier].exploreViews?.length ?? 0,
         });
       }
     },
     hint() {
-      state = applyHint(state, treeStore, warmth);
+      games[tier] = applyHint(state, treeStore, warmth);
       save();
+    },
+    /** An Explore lookup made while this round is live (#72). No-ops once the round is over.
+        Writes into the ACTIVE tier's slot, so a lookup counts toward the round you are playing
+        and not the ones parked in the other tiers. */
+    noteExploreView(nodeId: string) {
+      const before = games[tier];
+      games[tier] = applyExploreView(before, nodeId);
+      if (games[tier] !== before) save();
     },
     forfeit() {
       const was = state.status;
-      state = applyForfeit(state);
+      games[tier] = applyForfeit(state);
       save();
-      if (was === "playing" && state.status !== "playing" && !state.seeded) {
+      if (was === "playing" && games[tier].status !== "playing" && !games[tier].seeded) {
         statsStore.record({
           mode: "practice",
+          tier,
           won: false,
-          moves: movesUsed(state),
-          explored: state.exploreViews?.length ?? 0,
+          moves: movesUsed(games[tier]),
+          explored: games[tier].exploreViews?.length ?? 0,
         });
       }
     },
-    /** An Explore lookup made while this round is live (#72). No-ops once the round is over. */
-    noteExploreView(nodeId: string) {
-      const before = state;
-      state = applyExploreView(state, nodeId);
-      if (state !== before) save();
-    },
     newRound() {
-      state = newRoundState(treeStore);
+      games[tier] = newRoundState(treeStore);
       save();
     },
     startWith(targetId: string) {
-      state = newRoundState(treeStore, Math.random, targetId);
+      games[tier] = newRoundState(treeStore, Math.random, targetId);
       save();
     },
   };
