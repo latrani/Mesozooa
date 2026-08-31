@@ -9,11 +9,11 @@
   let open = $state(false);
   let rootEl = $state<HTMLElement>();
 
-  const LABEL: Record<Tier, string> = { easy: "Easy", medium: "Medium", hard: "Hard" };
+  const LABEL: Record<Tier, string> = { easy: "Cenozoic Cub", medium: "Default", hard: "Mesozoic Mind" };
   const BLURB: Record<Tier, string> = {
-    easy: "the famous ones",
-    medium: "the standard set",
-    hard: "Mesozoic Mind",
+    easy: "A set of big-name curated dinos",
+    medium: "Pruned to be tough but fair",
+    hard: "Everything with good data. Beware the wastebasket taxa!",
   };
   const size = (t: Tier) => tierStores[t].playableGenera().length;
   // The dot means the same thing here as in the tab bar: a game of THIS lane is mid-play at that
@@ -75,7 +75,6 @@
           <span class="option-meta">{size(t)} · {BLURB[t]}</span>
         </button>
       {/each}
-      <p class="menu-foot">Each difficulty keeps its own daily puzzle and its own round — switching never loses one.</p>
     </div>
   {/if}
 </span>
@@ -114,6 +113,7 @@
     padding: var(--space-2) var(--space-3);
     background: none; border: none; border-radius: var(--radius-pill);
     font-family: inherit; color: var(--ink);
+    border-radius: 0px;
   }
   .option:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .option.active { background: color-mix(in srgb, var(--accent) 22%, transparent); }
