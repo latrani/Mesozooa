@@ -52,6 +52,10 @@
   // left + width. That's what buys the squash-and-stretch: the two edges get different
   // transition durations, so the leading edge sprints ahead, the trailing edge dawdles, and
   // the bar is momentarily longer than either label before snapping to its new width.
+  // With a difficulty chip on the active lane, the in-progress dot belongs AFTER it (the game is
+  // this lane at this tier); everywhere else it stays on the label.
+  const dotRidesChip = (m: { tiered: boolean; tab: string }) => m.tiered && nav.tab === m.tab;
+
   const modes = $derived([
     { tab: "daily" as const, label: "Daily", progress: hasProgress(daily.state), tiered: true },
     { tab: "practice" as const, label: "Practice", progress: hasProgress(practice.state), tiered: true },
@@ -158,12 +162,19 @@
         bind:this={btns[i]}
         class:active={nav.tab === m.tab}
         aria-current={nav.tab === m.tab ? "page" : undefined}
-        onclick={() => nav.set(m.tab)}>{m.label}{#if m.progress}<span class="progress-dot" aria-hidden="true"></span><span class="sr-only"> in progress</span>{/if}</button
+        onclick={() => nav.set(m.tab)}>{m.label}{#if m.progress}{#if !dotRidesChip(m)}<span
+            class="progress-dot"
+            aria-hidden="true"
+          ></span>{/if}<span class="sr-only"> in progress</span>{/if}</button
       >
       <!-- Difficulty belongs to the lane you are in, so it rides beside the ACTIVE game tab and
            is absent everywhere else. That is also what frees the board's status row on phone. -->
       {#if m.tiered && nav.tab === m.tab}
-        <span class="tier-slot" bind:this={chipEl}><TierControl /></span>
+        <!-- The dot marks the game you'd return to, and with a difficulty showing that game is
+             "this lane AT this tier" — so the dot trails the chip, not the lane name. -->
+        <span class="tier-slot" bind:this={chipEl}
+          ><TierControl />{#if m.progress}<span class="progress-dot" aria-hidden="true"></span>{/if}</span
+        >
       {/if}
     {/each}
     <!-- decorative: aria-current on the buttons already carries "which mode am I in" -->
