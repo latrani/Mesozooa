@@ -128,9 +128,4 @@
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
   .option-meta { font-size: var(--type-label); color: var(--ink-mute); }
-  .menu-foot {
-    margin: var(--space-2) 0 0; padding-top: var(--space-2);
-    border-top: 1px solid var(--placard-edge);
-    font-size: var(--type-label); color: var(--ink-mute); line-height: 1.35;
-  }
 </style>
