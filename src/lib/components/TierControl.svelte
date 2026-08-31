@@ -4,17 +4,11 @@
   import { daily } from "../game/dailyStore.svelte";
   import { practice } from "../game/practiceStore.svelte";
   import { tierStores } from "../game/treeData";
-  import { TIERS, type Tier } from "../tree/tiers";
+  import { TIERS, TIER_LABEL, TIER_BLURB, type Tier } from "../tree/tiers";
 
   let open = $state(false);
   let rootEl = $state<HTMLElement>();
 
-  const LABEL: Record<Tier, string> = { easy: "Cenozoic Cub", medium: "Default", hard: "Mesozoic Mind" };
-  const BLURB: Record<Tier, string> = {
-    easy: "A set of big-name curated dinos",
-    medium: "Pruned to be tough but fair",
-    hard: "Everything with good data. Beware the wastebasket taxa!",
-  };
   const size = (t: Tier) => tierStores[t].playableGenera().length;
   // The dot means the same thing here as in the tab bar: a game of THIS lane is mid-play at that
   // difficulty. Reading the lane off nav keeps one control serving both (Explore has no chip).
@@ -52,8 +46,8 @@
     class="tier-button"
     aria-haspopup="true"
     aria-expanded={open}
-    aria-label="Difficulty: {LABEL[tierSetting.tier]}"
-    onclick={() => (open = !open)}>{LABEL[tierSetting.tier]}<span class="caret" aria-hidden="true">▾</span></button
+    aria-label="Difficulty: {TIER_LABEL[tierSetting.tier]}"
+    onclick={() => (open = !open)}>{TIER_LABEL[tierSetting.tier]}<span class="caret" aria-hidden="true">▾</span></button
   >
 
   {#if open}
@@ -69,10 +63,10 @@
           onclick={() => pick(t)}
         >
           <span class="option-name"
-            >{LABEL[t]}{#if progress?.[t]}<span class="progress-dot" aria-hidden="true"></span
+            >{TIER_LABEL[t]}{#if progress?.[t]}<span class="progress-dot" aria-hidden="true"></span
               ><span class="sr-only"> (in progress)</span>{/if}</span
           >
-          <span class="option-meta">{size(t)} · {BLURB[t]}</span>
+          <span class="option-meta">{size(t)} · {TIER_BLURB[t]}</span>
         </button>
       {/each}
     </div>

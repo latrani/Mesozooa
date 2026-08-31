@@ -11,6 +11,21 @@ export const TIERS = ["easy", "medium", "hard"] as const;
 export type Tier = (typeof TIERS)[number];
 
 /**
+ * The player-facing name of each tier, and its one-line pitch. ONE copy: the chip, the stats
+ * tabs and the share headline all read these, so renaming a tier is a single edit here.
+ */
+export const TIER_LABEL: Record<Tier, string> = {
+  easy: "Cenozoic Cub",
+  medium: "Default",
+  hard: "Mesozoic Mind",
+};
+export const TIER_BLURB: Record<Tier, string> = {
+  easy: "A set of big-name curated dinos",
+  medium: "Pruned to be tough but fair",
+  hard: "Everything with good data. Beware the wastebasket taxa!",
+};
+
+/**
  * A genus's rank is the LOWEST tier that admits it, so pool membership is a comparison:
  * a genus is in tier T iff rank <= index(T). That is what makes Easy ⊆ Medium ⊆ Hard hold by
  * construction rather than by a check someone can forget to run.

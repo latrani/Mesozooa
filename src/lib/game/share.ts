@@ -1,8 +1,6 @@
 import type { GameState } from "./types";
 import { DAILY_MAX_GUESSES } from "./engine-core";
-import type { Tier } from "../tree/tiers";
-
-const TIER_LABEL: Record<Tier, string> = { easy: "Easy", medium: "Medium", hard: "Hard" };
+import { TIER_LABEL, type Tier } from "../tree/tiers";
 
 function bucket(fraction: number): string {
   if (fraction >= 0.8) return "🌋";
@@ -15,7 +13,7 @@ function bucket(fraction: number): string {
 // The three "thoughts" of a share result, each its own block. The preview renders these with
 // paragraph spacing between blocks; the clipboard text joins them with plain line breaks.
 export interface ShareParts {
-  /** "Mesozooa 2026-07-12 · Hard" */
+  /** "Mesozooa 2026-07-12 · Mesozoic Mind" */
   headline: string;
   /** "3/20 · 🔦1 · 🔍4" (or "X/20" on a loss); the tallies drop out when zero */
   score: string;

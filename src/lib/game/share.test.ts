@@ -17,7 +17,7 @@ describe("buildShareParts", () => {
       hintsUsed: 1,
     };
     const parts = buildShareParts(state, "2026-07-12", "medium");
-    expect(parts.headline).toBe("Mesozooa 2026-07-12 · Medium");
+    expect(parts.headline).toBe("Mesozooa 2026-07-12 · Default");
     expect(parts.score).toBe("3/20 · 🔦1");
     expect(parts.grid.join("")).toContain("🧊"); // cold guess
     expect(parts.grid.join("")).toContain("💡"); // hint
@@ -94,7 +94,7 @@ describe("buildShareText", () => {
       hintsUsed: 1,
     };
     const lines = buildShareText(state, "2026-07-12", "medium").split("\n");
-    expect(lines[0]).toBe("Mesozooa 2026-07-12 · Medium");
+    expect(lines[0]).toBe("Mesozooa 2026-07-12 · Default");
     expect(lines[1]).toBe("3/20 · 🔦1");
     expect(lines.every((l) => l !== "")).toBe(true); // no blank paragraph lines in the copy
     expect([...lines[2]].length).toBe(3); // the single grid row: cold + 💡 + 🎯
@@ -102,14 +102,14 @@ describe("buildShareText", () => {
 });
 
 describe("share carries the tier", () => {
-  it("names the tier on every result, Medium included", () => {
+  it("names the tier on every result, the default included", () => {
     const won: GameState = {
       target: "TR", status: "won", mode: "daily", maxGuesses: 20, hintsUsed: 0,
       guesses: [{ guessId: "TR", sharedNodeId: "TR", warmth: { fraction: 1 }, kind: "guess", cost: 1 }],
     };
-    expect(buildShareParts(won, "2026-08-30", "easy").headline).toBe("Mesozooa 2026-08-30 · Easy");
-    expect(buildShareParts(won, "2026-08-30", "medium").headline).toBe("Mesozooa 2026-08-30 · Medium");
-    expect(buildShareParts(won, "2026-08-30", "hard").headline).toBe("Mesozooa 2026-08-30 · Hard");
+    expect(buildShareParts(won, "2026-08-30", "easy").headline).toBe("Mesozooa 2026-08-30 · Cenozoic Cub");
+    expect(buildShareParts(won, "2026-08-30", "medium").headline).toBe("Mesozooa 2026-08-30 · Default");
+    expect(buildShareParts(won, "2026-08-30", "hard").headline).toBe("Mesozooa 2026-08-30 · Mesozoic Mind");
   });
 
   it("leaves the score and grid untouched by the tier", () => {

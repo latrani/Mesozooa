@@ -1,7 +1,7 @@
 <script lang="ts">
   import { statsStore, type StatsView } from "../game/statsStore.svelte";
   import { tierSetting } from "../game/tierStore.svelte";
-  import { TIERS, type Tier } from "../tree/tiers";
+  import { TIERS, TIER_LABEL, type Tier } from "../tree/tiers";
 
   // Defaults to the live singleton (the app never passes a source). The gallery passes a frozen
   // fixture view so multiple stats states render side by side on one page.
@@ -12,8 +12,6 @@
   let shown = $state<Tier>(tierSetting.tier);
   let live = $derived(source === undefined);
   let view = $derived<StatsView>(source ?? statsStore.viewFor(shown));
-
-  const LABEL: Record<Tier, string> = { easy: "Easy", medium: "Medium", hard: "Hard" };
 
   let confirming = $state(false);
 
@@ -37,13 +35,13 @@
           aria-selected={shown === t}
           class="tier-tab"
           class:active={shown === t}
-          onclick={() => (shown = t)}>{LABEL[t]}</button
+          onclick={() => (shown = t)}>{TIER_LABEL[t]}</button
         >
       {/each}
     </div>
   {/if}
   {#if empty}
-    <p class="stats-empty">Play the {live ? LABEL[shown] : ""} daily to start a streak.</p>
+    <p class="stats-empty">Play the {live ? TIER_LABEL[shown] : ""} daily to start a streak.</p>
   {:else}
     <div class="streak">
       <span class="big">{view.streak.current}</span>
@@ -76,8 +74,11 @@
 <style>
   .stats { display: flex; flex-direction: column; gap: var(--space-4); }
   .tier-tabs { display: flex; gap: var(--space-1); }
+  /* nowrap: the tier names are two words ("Cenozoic Cub"), and a wrapped tab reads as two tabs.
+     The dialog shrink-to-fits its content, so this is what widens the panel — up to Modal's own
+     cap, which is where the phone (90vw) stops it. */
   .tier-tab {
-    flex: 1 1 0; cursor: pointer;
+    flex: 1 1 auto; white-space: nowrap; cursor: pointer;
     padding: var(--space-2) var(--space-3);
     font-family: inherit; font-size: var(--type-label); font-weight: var(--fw-bold);
     color: var(--ink-soft); background: none;
