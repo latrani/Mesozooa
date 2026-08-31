@@ -13,6 +13,7 @@ import {
   hintCost,
   movesUsed,
   leafHintActive,
+  hasProgress,
 } from "./engine-core";
 import { dailyAnswersByTier, todayString } from "./daily";
 import dailyCalendar from "../../data/daily-calendar.json";
@@ -84,6 +85,11 @@ function createDaily() {
     date,
     get state(): GameState {
       return state;
+    },
+    /** Which tiers hold a puzzle mid-play — the difficulty menu marks them, so you can see what
+        you'd be parking before you switch. */
+    get progressByTier(): Record<Tier, boolean> {
+      return Object.fromEntries(TIERS.map((t) => [t, hasProgress(games[t])])) as Record<Tier, boolean>;
     },
     /** The lens this game is played against — GameBoard renders from it. */
     get tree() {

@@ -13,6 +13,7 @@ import {
   hintCost,
   movesUsed,
   leafHintActive,
+  hasProgress,
 } from "./engine-core";
 import { serializeGame, deserializeGame, practiceKey, LEGACY_PRACTICE_KEY } from "./persistence";
 import { statsStore } from "./statsStore.svelte";
@@ -53,6 +54,11 @@ export function createPractice() {
   return {
     get state(): GameState {
       return state;
+    },
+    /** Which tiers hold a round mid-play — the difficulty menu marks them, so you can see what
+        you'd be parking before you switch. */
+    get progressByTier(): Record<Tier, boolean> {
+      return Object.fromEntries(TIERS.map((t) => [t, hasProgress(games[t])])) as Record<Tier, boolean>;
     },
     /** The lens this round is played against — GameBoard renders from it. */
     get tree() {

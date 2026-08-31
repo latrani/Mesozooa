@@ -1,5 +1,8 @@
 <script lang="ts">
   import { tierSetting } from "../game/tierStore.svelte";
+  import { nav } from "../nav.svelte";
+  import { daily } from "../game/dailyStore.svelte";
+  import { practice } from "../game/practiceStore.svelte";
   import { tierStores } from "../game/treeData";
   import { TIERS, type Tier } from "../tree/tiers";
 
@@ -13,6 +16,11 @@
     hard: "Mesozoic Mind",
   };
   const size = (t: Tier) => tierStores[t].playableGenera().length;
+  // The dot means the same thing here as in the tab bar: a game of THIS lane is mid-play at that
+  // difficulty. Reading the lane off nav keeps one control serving both (Explore has no chip).
+  const progress = $derived(
+    nav.tab === "daily" ? daily.progressByTier : nav.tab === "practice" ? practice.progressByTier : null,
+  );
 
   function pick(t: Tier) {
     tierSetting.set(t);
@@ -60,7 +68,10 @@
           class:active={tierSetting.tier === t}
           onclick={() => pick(t)}
         >
-          <span class="option-name">{LABEL[t]}</span>
+          <span class="option-name"
+            >{LABEL[t]}{#if progress?.[t]}<span class="progress-dot" aria-hidden="true"></span
+              ><span class="sr-only"> (in progress)</span>{/if}</span
+          >
           <span class="option-meta">{size(t)} · {BLURB[t]}</span>
         </button>
       {/each}
@@ -106,7 +117,16 @@
   }
   .option:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .option.active { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-  .option-name { font-size: var(--type-body); font-weight: var(--fw-bold); }
+  .option-name { font-size: var(--type-body); font-weight: var(--fw-bold); white-space: nowrap; }
+  /* Same marker as the tab bar's, on the menu's own ground rather than the header's. */
+  .progress-dot {
+    display: inline-block; width: .4em; height: .4em; margin-left: .4em;
+    border-radius: 50%; background: var(--accent); vertical-align: middle;
+  }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
   .option-meta { font-size: var(--type-label); color: var(--ink-mute); }
   .menu-foot {
     margin: var(--space-2) 0 0; padding-top: var(--space-2);
